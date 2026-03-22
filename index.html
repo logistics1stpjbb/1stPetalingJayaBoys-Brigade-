@@ -1182,8 +1182,11 @@ async function renderAdminList() {
       (m.name||'').toLowerCase().includes(search) || (m.ic||'').includes(search)
     );
     if (!filtered.length) { list.innerHTML = '<div style="color:#666;text-align:center;padding:20px;">No members found.</div>'; return; }
+    // Store in window map for safe access
+    window._adminMembers = {};
+    filtered.forEach(m => { window._adminMembers[m.ic] = m; });
     list.innerHTML = filtered.map(m => `
-      <div class="admin-row" style="cursor:pointer;" onclick="openEditMember(${JSON.stringify(JSON.stringify(m))})">
+      <div class="admin-row" style="cursor:pointer;" onclick="openEditMember('${m.ic.replace(/'/g,"\\'")}')">
         <div style="flex:1;">
           <div class="admin-name">${m.name}</div>
           <div class="admin-sub">IC: ${m.ic} · ${m.rank||'No rank'} · ${m.squad ? m.squad+' Squad' : 'No squad'}</div>
@@ -1208,8 +1211,8 @@ function openAddMember() {
   document.getElementById('edit-member-modal').style.display = 'block';
 }
 
-function openEditMember(mJson) {
-  const m = JSON.parse(mJson);
+function openEditMember(ic) {
+  const m = (window._adminMembers && window._adminMembers[ic]) || { ic };
   document.getElementById('em-modal-title').textContent = '✏️ Edit Member';
   document.getElementById('em-name').value  = m.name  || '';
   document.getElementById('em-ic').value    = m.ic    || '';
@@ -1416,7 +1419,7 @@ function renderAdminAnnList() {
   const container = document.getElementById('admin-ann-list');
   if (!container) return;
   if (!announcements.length) { container.innerHTML = '<div style="color:#556;font-size:12px;text-align:center;padding:10px;">No announcements yet.</div>'; return; }
-  container.innerHTML = '<div style="font-family:'Oswald',sans-serif;font-size:13px;font-weight:600;color:#8898bb;margin-bottom:8px;letter-spacing:1px;">EXISTING ANNOUNCEMENTS</div>'
+  container.innerHTML = `<div style="font-family:'Oswald',sans-serif;font-size:13px;font-weight:600;color:#8898bb;margin-bottom:8px;letter-spacing:1px;">EXISTING ANNOUNCEMENTS</div>`
     + announcements.slice().reverse().map((a, ri) => {
       const i = announcements.length - 1 - ri;
       return `<div style="background:#122040;border-radius:10px;padding:12px;margin-bottom:8px;border-left:3px solid var(--accent);display:flex;justify-content:space-between;align-items:flex-start;gap:10px;">
