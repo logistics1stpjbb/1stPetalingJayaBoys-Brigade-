@@ -226,7 +226,7 @@
     <button class="tab-btn active" id="tab-home" onclick="switchTab('home',this)">🏠 Home</button>
     <button class="tab-btn" id="tab-order" onclick="switchTab('order',this)">👔 Order</button>
     <button class="tab-btn" id="tab-member" onclick="switchTab('member',this)">🪪 Member</button>
-    <button class="tab-btn" id="tab-tasks" onclick="switchTab('tasks',this)">✅ Tasks</button>
+    <button class="tab-btn" id="tab-tasks" onclick="switchTab('tasks',this)" style="display:none;">✅ Tasks</button>
   </div>
 </nav>
 
@@ -1119,6 +1119,7 @@ async function registerMember() {
     });
     localStorage.setItem('bb_current', ic);
     renderDashboard();
+    checkTasksAccess();
     alert('✅ Account created! Welcome, ' + name + '!');
   } catch(e) { alert('Registration failed: ' + e.message); }
 }
@@ -1135,6 +1136,7 @@ async function loginMember() {
     if (atob(m.password || '') !== pass) return alert('Incorrect password!');
     localStorage.setItem('bb_current', ic);
     renderDashboard();
+    checkTasksAccess();
   } catch(e) { alert('Login failed: ' + e.message); }
 }
 
@@ -1165,6 +1167,7 @@ async function renderDashboard() {
 
 function logoutMember() {
   localStorage.removeItem('bb_current');
+  document.getElementById('tab-tasks').style.display = 'none';
   document.getElementById('m-auth').style.display = 'block';
   document.getElementById('m-dashboard').style.display = 'none';
   showAuthMode('login');
@@ -1625,15 +1628,26 @@ const DEPT_CONFIG = {
 
 async function checkTasksAccess() {
   const ic = localStorage.getItem('bb_current');
+  const tasksTab = document.getElementById('tab-tasks');
   document.getElementById('tasks-gate').style.display    = 'none';
   document.getElementById('tasks-no-dept').style.display = 'none';
   document.getElementById('tasks-board').style.display   = 'none';
-  if (!ic) { document.getElementById('tasks-gate').style.display = 'block'; return; }
+  if (!ic) {
+    tasksTab.style.display = 'none';
+    document.getElementById('tasks-gate').style.display = 'block';
+    return;
+  }
   try {
     const data = await supa.get(`bb_members?ic=eq.${encodeURIComponent(ic)}&select=name,department`);
     const member = data && data[0];
     const dept = member && member.department;
-    if (!dept || !DEPT_CONFIG[dept]) { document.getElementById('tasks-no-dept').style.display = 'block'; return; }
+    if (!dept || !DEPT_CONFIG[dept]) {
+      tasksTab.style.display = 'none';
+      document.getElementById('tasks-no-dept').style.display = 'block';
+      return;
+    }
+    // Member has a department — show the tab
+    tasksTab.style.display = 'block';
     const cfg = DEPT_CONFIG[dept];
     document.getElementById('tasks-dept-title').textContent = cfg.label + ' Department';
     document.getElementById('tasks-dept-sub').textContent   = 'Task Board';
@@ -1870,7 +1884,7 @@ window.addEventListener('load', () => {
   loadAnnouncements();
   renderOrderItems();
   const ic = localStorage.getItem('bb_current');
-  if (ic) renderDashboard();
+  if (ic) { renderDashboard(); checkTasksAccess(); }
   if (window.location.hash === '#admin') openAdmin();
 });
 window.addEventListener('hashchange', () => {
