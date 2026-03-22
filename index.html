@@ -166,6 +166,19 @@
   .task-modal-bg { display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.85); z-index: 8888; overflow-y: auto; padding: 30px 16px; }
   .task-modal { max-width: 480px; margin: 0 auto; background: #122040; border-radius: 16px; padding: 24px; border: 1px solid rgba(200,150,30,0.3); }
 
+  /* Form builder */
+  .ftype-btn { padding:12px 8px;border:2px solid #2a3a50;border-radius:10px;background:#122040;color:#8898bb;font-family:'Oswald',sans-serif;font-size:14px;font-weight:600;cursor:pointer;transition:all 0.2s;text-align:center;line-height:1.4; }
+  .ftype-btn:hover { border-color:var(--accent);color:var(--gold); }
+  .ftype-btn.ftype-active { border-color:var(--accent);background:rgba(200,150,30,0.12);color:var(--gold); }
+  .form-card-hub { background:var(--navy2);border-radius:14px;padding:16px 18px;margin-bottom:10px;border:1px solid rgba(255,255,255,0.07);display:flex;align-items:center;gap:14px;cursor:pointer;transition:all 0.2s; }
+  .form-card-hub:hover { border-color:rgba(200,150,30,0.4);background:#0f1e38; }
+  .form-card-icon { width:46px;height:46px;border-radius:12px;display:flex;align-items:center;justify-content:center;font-size:20px;flex-shrink:0; }
+  .form-card-name { font-family:'Oswald',sans-serif;font-size:17px;font-weight:600;color:#fff;line-height:1.2; }
+  .form-card-desc { font-size:11px;color:#8898bb;margin-top:2px; }
+  .form-card-arrow { font-size:22px;color:#2a3a50;margin-left:auto;flex-shrink:0; }
+  .fb-field-row { background:#122040;border-radius:10px;padding:12px 14px;margin-bottom:8px;display:flex;gap:10px;align-items:center; }
+  .task-status-btn { padding:5px 12px;border-radius:20px;border:1.5px solid;font-family:'Oswald',sans-serif;font-size:11px;font-weight:700;cursor:pointer;transition:all 0.2s;letter-spacing:0.5px; }
+
   /* Admin section navigation */
   .adm-section-btn { display:flex; align-items:center; justify-content:space-between; background:#0a1628; border:1px solid rgba(255,255,255,0.07); border-radius:14px; padding:14px 16px; cursor:pointer; transition:all 0.2s; }
   .adm-section-btn:hover { border-color:rgba(200,150,30,0.4); background:#0f1e38; }
@@ -243,7 +256,7 @@
       </div>
     </div>
     <button class="tab-btn active" id="tab-home" onclick="switchTab('home',this)">🏠 Home</button>
-    <button class="tab-btn" id="tab-order" onclick="switchTab('order',this)">👔 Order</button>
+    <button class="tab-btn" id="tab-order" onclick="switchTab('order',this)">📋 Forms</button>
     <button class="tab-btn" id="tab-member" onclick="switchTab('member',this)">🪪 Member</button>
     <button class="tab-btn" id="tab-tasks" onclick="switchTab('tasks',this)" style="display:none;">✅ Tasks</button>
   </div>
@@ -289,81 +302,41 @@
 <div class="page" id="page-order">
   <div style="width:100%;">
 
-    <!-- gate -->
-    <div class="card stripe-bg" id="order-gate" style="display:none;text-align:center;padding:40px 20px;">
-      <div style="font-size:56px;margin-bottom:16px;">🔒</div>
-      <div class="page-title" style="text-align:center;">Hold Up!</div>
-      <div class="page-subtitle" style="text-align:center;margin-bottom:10px;">Members Only</div>
-      <div style="font-size:13px;color:var(--muted);margin-bottom:24px;line-height:1.6;">You need to be a registered member to order uniforms.<br>Registration is free and only takes a minute!</div>
-      <button class="submit-btn" onclick="goToMemberTab()">🪪 Login / Register</button>
+    <!-- Gate: not logged in -->
+    <div class="dark-card" id="order-gate" style="display:none;text-align:center;padding:40px 20px;">
+      <div style="font-size:48px;margin-bottom:14px;">🔒</div>
+      <div class="page-title" style="text-align:center;">Members Only</div>
+      <div class="page-subtitle" style="text-align:center;margin-bottom:10px;">Login to Access Forms</div>
+      <div style="font-size:13px;color:var(--muted);margin-bottom:24px;line-height:1.6;">You need to be a registered member to submit forms.</div>
+      <button class="submit-btn gold" onclick="goToMemberTab()">🪪 Login / Register</button>
     </div>
 
-    <!-- form -->
+    <!-- Forms hub (logged in) -->
     <div id="order-logged-in" style="display:none;width:100%;">
 
-      <!-- member bar -->
-      <div style="background:#fff3e0;border:1.5px solid var(--accent);border-radius:12px;padding:12px 14px;margin-bottom:18px;display:flex;align-items:center;gap:12px;">
-        <div style="width:38px;height:38px;border-radius:50%;border:2px solid var(--accent);overflow:hidden;flex-shrink:0;display:flex;align-items:center;justify-content:center;background:#eee;">
-          <span id="order-pfp-ph" style="font-size:18px;">👤</span>
+      <!-- Member bar -->
+      <div style="background:rgba(200,150,30,0.08);border:1.5px solid rgba(200,150,30,0.3);border-radius:12px;padding:10px 14px;margin-bottom:18px;display:flex;align-items:center;gap:12px;">
+        <div style="width:34px;height:34px;border-radius:50%;border:2px solid var(--accent);overflow:hidden;flex-shrink:0;display:flex;align-items:center;justify-content:center;background:#1a2a40;">
+          <span id="order-pfp-ph" style="font-size:16px;">👤</span>
           <img id="order-pfp-img" src="" style="width:100%;height:100%;object-fit:cover;display:none;"/>
         </div>
         <div style="flex:1;">
-          <div style="font-family:'Oswald',sans-serif;font-size:14px;font-weight:600;color:var(--text);">Ordering as <span id="order-member-name" style="color:var(--accent);"></span></div>
-          <div style="font-size:11px;color:var(--muted);" id="order-member-rank"></div>
+          <div style="font-family:'Oswald',sans-serif;font-size:13px;font-weight:600;color:#fff;">Submitting as <span id="order-member-name" style="color:var(--gold);"></span></div>
+          <div style="font-size:11px;color:#8898bb;" id="order-member-rank"></div>
         </div>
-        <div id="order-member-squad" style="font-family:'Oswald',sans-serif;font-size:12px;font-weight:600;color:#fff;padding:4px 10px;border-radius:8px;background:var(--blue);"></div>
+        <div id="order-member-squad" style="font-family:'Oswald',sans-serif;font-size:11px;font-weight:600;color:var(--navy);padding:3px 10px;border-radius:6px;background:var(--gold);"></div>
       </div>
 
-      <div id="step-form">
-        <div class="card stripe-bg" style="margin-bottom:14px;">
-          <div class="page-title">Uniform</div>
-          <div class="page-subtitle">Order Form</div>
-          <div class="page-desc">Select items &amp; sizes below 👔</div>
+      <!-- Forms list — renders dynamically -->
+      <div id="forms-hub"></div>
 
-          <div class="note-box">⚠️ Orders are confirmed by the officer in charge. You will be contacted when your uniform is ready for collection.</div>
+      <!-- Inline form view -->
+      <div id="inline-form-view" style="display:none;"></div>
 
-          <!-- Uniform items -->
-          <div id="uniform-items"></div>
-
-          <!-- Notes -->
-          <div class="form-group" style="margin-top:4px;">
-            <label class="form-label">Additional Notes (optional)</label>
-            <textarea class="form-textarea" id="order-notes" placeholder="Any special requests or remarks..."></textarea>
-          </div>
-
-          <!-- Total -->
-          <div class="total-row">
-            <div class="total-label">Estimated Total</div>
-            <div class="total-val" id="order-total">RM 0.00</div>
-          </div>
-
-          <button class="submit-btn" style="margin-top:14px;" onclick="goToOrderReview()">👀 Review Order</button>
-        </div>
-      </div>
-
-      <!-- Review -->
-      <div id="step-review" style="display:none;">
-        <div class="card stripe-bg" style="margin-bottom:14px;">
-          <div class="page-title">Review</div>
-          <div class="page-subtitle">Your Order</div>
-          <div class="page-desc">Confirm before submitting 👇</div>
-          <div style="background:#fff;border-radius:14px;padding:20px;margin-bottom:18px;box-shadow:0 2px 8px rgba(0,0,0,0.08);" id="review-content"></div>
-          <div style="display:flex;gap:10px;">
-            <button class="submit-btn danger" style="flex:1;margin-top:0;" onclick="goBackOrder()">✏️ Edit</button>
-            <button class="submit-btn" style="flex:2;margin-top:0;" onclick="submitOrder()" id="confirm-btn">✅ Confirm &amp; Submit</button>
-          </div>
-        </div>
-      </div>
-
-      <div class="success-box" id="order-success" style="display:none;">
-        <div class="s-icon">🎉</div>
-        <div class="s-title">Order Submitted!</div>
-        <div class="s-msg">Order <strong id="s-ordernum" style="color:var(--accent);"></strong> has been received!<br><br>The officer in charge will contact you when your uniform is ready for collection.</div>
-      </div>
     </div>
-
   </div>
 </div>
+
 
 <!-- ───────── MEMBER ───────── -->
 <div class="page" id="page-member">
@@ -660,13 +633,13 @@
           <div class="adm-sec-arrow">›</div>
         </div>
 
-        <!-- Section: Orders & Products -->
+        <!-- Section: Forms & Orders -->
         <div class="adm-section-btn" id="sec-btn-orders" onclick="switchAdminSection('orders')">
           <div style="display:flex;align-items:center;gap:12px;">
-            <div class="adm-sec-icon" style="background:rgba(66,165,245,0.15);color:#42a5f5;">📦</div>
+            <div class="adm-sec-icon" style="background:rgba(66,165,245,0.15);color:#42a5f5;">📋</div>
             <div>
-              <div class="adm-sec-title">Orders &amp; Products</div>
-              <div class="adm-sec-sub">Manage uniform items &amp; member orders</div>
+              <div class="adm-sec-title">Forms &amp; Orders</div>
+              <div class="adm-sec-sub">Manage forms, products &amp; member submissions</div>
             </div>
           </div>
           <div class="adm-sec-arrow">›</div>
@@ -781,24 +754,69 @@
         </div>
       </div>
 
-      <!-- ── ORDERS & PRODUCTS SECTION ──────────────── -->
+      <!-- ── FORMS & ORDERS SECTION ────────────────────── -->
       <div id="adm-section-orders" style="display:none;">
         <div class="adm-section-header">
-          <div class="adm-sec-icon" style="background:rgba(66,165,245,0.15);color:#42a5f5;">📦</div>
+          <div class="adm-sec-icon" style="background:rgba(66,165,245,0.15);color:#42a5f5;">📋</div>
           <div>
-            <div class="adm-section-title">Orders &amp; Products</div>
-            <div class="adm-section-desc">Manage what members can order and track their requests</div>
+            <div class="adm-section-title">Forms &amp; Orders</div>
+            <div class="adm-section-desc">Create forms, manage products and view submissions</div>
           </div>
         </div>
 
         <!-- Sub-tabs -->
         <div style="display:flex;gap:6px;margin-bottom:18px;background:#0a1628;border-radius:10px;padding:5px;border:1px solid rgba(255,255,255,0.06);">
-          <button class="adm-subtab active-subtab" id="subtab-products" onclick="switchOrderSubtab('products')">🛒 Products</button>
-          <button class="adm-subtab" id="subtab-orders"   onclick="switchOrderSubtab('orders')">📋 Orders</button>
+          <button class="adm-subtab active-subtab" id="subtab-formbuilder" onclick="switchOrderSubtab('formbuilder')">📝 Forms</button>
+          <button class="adm-subtab" id="subtab-products"    onclick="switchOrderSubtab('products')">🛒 Products</button>
+          <button class="adm-subtab" id="subtab-orders"      onclick="switchOrderSubtab('orders')">📦 Submissions</button>
+        </div>
+
+        <!-- ── Form Builder sub-panel ── -->
+        <div id="subpanel-formbuilder">
+          <div style="background:#0a1628;border-radius:14px;padding:18px;margin-bottom:14px;border:1px solid rgba(255,255,255,0.08);">
+            <div style="font-family:'Oswald',sans-serif;font-size:16px;font-weight:600;color:var(--gold);margin-bottom:14px;" id="fb-form-title">➕ Add New Form</div>
+            <div class="form-group"><label class="form-label" style="color:#8898bb;">Form Name</label><input class="form-input" id="fb-name" type="text" placeholder="e.g. Annual Camp Registration" style="background:#122040;color:#fff;border-color:#2a3a50;"/></div>
+            <div class="form-group"><label class="form-label" style="color:#8898bb;">Description (optional)</label><input class="form-input" id="fb-desc" type="text" placeholder="Brief info about this form" style="background:#122040;color:#fff;border-color:#2a3a50;"/></div>
+
+            <!-- Type selector -->
+            <div class="form-group">
+              <label class="form-label" style="color:#8898bb;">Form Type</label>
+              <div style="display:flex;gap:8px;">
+                <button id="ftype-link" onclick="setFormType('link')" class="ftype-btn ftype-active" style="flex:1;">🔗 External Link<br><span style="font-size:10px;font-weight:400;opacity:0.7;">Google Form / URL</span></button>
+                <button id="ftype-builtin" onclick="setFormType('builtin')" class="ftype-btn" style="flex:1;">⚙️ Built-in Form<br><span style="font-size:10px;font-weight:400;opacity:0.7;">Created here</span></button>
+                <button id="ftype-uniform" onclick="setFormType('uniform')" class="ftype-btn" style="flex:1;">👔 Uniform Order<br><span style="font-size:10px;font-weight:400;opacity:0.7;">Product selector</span></button>
+              </div>
+            </div>
+
+            <!-- Link type fields -->
+            <div id="fb-link-fields">
+              <div class="form-group"><label class="form-label" style="color:#8898bb;">Form URL</label><input class="form-input" id="fb-url" type="url" placeholder="https://forms.google.com/..." style="background:#122040;color:#fff;border-color:#2a3a50;"/></div>
+            </div>
+
+            <!-- Built-in type fields -->
+            <div id="fb-builtin-fields" style="display:none;">
+              <div style="font-size:12px;color:#8898bb;margin-bottom:10px;">Add fields to your form. Members will fill these in when they submit.</div>
+              <div id="fb-fields-list"></div>
+              <button onclick="addFormField()" style="width:100%;padding:10px;background:rgba(200,150,30,0.1);border:1px dashed rgba(200,150,30,0.3);border-radius:10px;color:var(--gold);font-family:'Oswald',sans-serif;font-size:14px;font-weight:600;cursor:pointer;margin-bottom:12px;">➕ Add Field</button>
+            </div>
+
+            <!-- Uniform type: no extra config needed -->
+            <div id="fb-uniform-fields" style="display:none;">
+              <div class="note-box" style="background:rgba(200,150,30,0.08);border-color:rgba(200,150,30,0.3);color:#c8a870;">👔 This will use your current product list. Members select items and sizes when ordering.</div>
+            </div>
+
+            <input type="hidden" id="fb-edit-id"/>
+            <div style="display:flex;gap:8px;">
+              <button class="submit-btn gold" onclick="saveForm()" style="margin-top:4px;flex:1;">💾 Save Form</button>
+              <button class="submit-btn danger" onclick="clearFormBuilder()" style="margin-top:4px;width:auto;padding:15px 18px;">✕</button>
+            </div>
+          </div>
+          <!-- Forms list -->
+          <div id="admin-forms-list"></div>
         </div>
 
         <!-- Products sub-panel -->
-        <div id="subpanel-products">
+        <div id="subpanel-products" style="display:none;">
           <div style="background:#0a1628;border-radius:14px;padding:18px;margin-bottom:14px;border:1px solid rgba(255,255,255,0.08);">
             <div style="font-family:'Oswald',sans-serif;font-size:16px;font-weight:600;color:var(--gold);margin-bottom:14px;" id="prod-form-title">➕ Add New Product</div>
             <div class="form-group"><label class="form-label" style="color:#8898bb;">Product Name</label><input class="form-input" id="prod-name" type="text" placeholder="e.g. BB Uniform Shirt" style="background:#122040;color:#fff;border-color:#2a3a50;"/></div>
@@ -825,14 +843,19 @@
           <div id="admin-products-list"></div>
         </div>
 
-        <!-- Orders sub-panel -->
+        <!-- Submissions sub-panel -->
         <div id="subpanel-orders" style="display:none;">
-          <input class="form-input" id="admin-order-search" type="text" placeholder="Search by order no or member name..." oninput="renderAdminOrders()" style="background:#0a1628;color:#fff;border-color:#2a3a50;margin-bottom:14px;"/>
+          <div style="display:flex;gap:8px;margin-bottom:14px;flex-wrap:wrap;">
+            <input class="form-input" id="admin-order-search" type="text" placeholder="Search by order no or member name..." oninput="renderAdminOrders()" style="background:#0a1628;color:#fff;border-color:#2a3a50;flex:1;min-width:200px;"/>
+            <select id="admin-order-form-filter" onchange="renderAdminOrders()" style="background:#0a1628;color:#fff;border:2px solid #2a3a50;border-radius:10px;padding:10px 12px;font-family:'Roboto',sans-serif;font-size:13px;">
+              <option value="">All forms</option>
+            </select>
+          </div>
           <div id="admin-orders-list"></div>
         </div>
       </div>
 
-      <!-- ── DEPARTMENTS & TASKS SECTION ────────────── -->
+            <!-- ── DEPARTMENTS & TASKS SECTION ────────────── -->
       <div id="adm-section-tasks" style="display:none;">
         <div class="adm-section-header">
           <div class="adm-sec-icon" style="background:rgba(102,187,106,0.15);color:#66bb6a;">✅</div>
@@ -881,8 +904,8 @@
             <div class="form-row">
               <div class="form-group">
                 <label class="form-label" style="color:#8898bb;">Assign To</label>
-                <select class="form-select" id="task-assignee" style="background:#122040;color:#fff;border-color:#2a3a50;">
-                  <option value="">Select dept first...</option>
+                <select class="form-select" id="task-assignee" multiple style="background:#122040;color:#fff;border-color:#2a3a50;min-height:90px;" title="Hold Ctrl/Cmd to select multiple">
+                  <option value="" disabled>Select dept first...</option>
                 </select>
               </div>
               <div class="form-group">
@@ -1072,16 +1095,17 @@ function renderOrderItems() {
 
 function checkOrderAccess() {
   const ic = localStorage.getItem('bb_current');
-  const gate = document.getElementById('order-gate');
+  const gate     = document.getElementById('order-gate');
   const loggedIn = document.getElementById('order-logged-in');
   if (!ic) {
-    gate.style.display = 'block';
+    gate.style.display     = 'block';
     loggedIn.style.display = 'none';
   } else {
-    gate.style.display = 'none';
+    gate.style.display     = 'none';
     loggedIn.style.display = 'block';
     populateOrderBar(ic);
-    renderOrderItems();
+    loadCustomForms();
+    renderFormsHub();
   }
 }
 
@@ -1495,12 +1519,15 @@ function switchAdminSection(section) {
 function switchAdminTab(tab) { switchAdminSection(tab); }  // legacy compat
 
 function switchOrderSubtab(sub) {
-  ['products','orders'].forEach(s => {
-    document.getElementById('subpanel-' + s).style.display = s === sub ? 'block' : 'none';
-    document.getElementById('subtab-' + s).classList.toggle('active-subtab', s === sub);
+  ['formbuilder','products','orders'].forEach(s => {
+    const p = document.getElementById('subpanel-' + s);
+    const b = document.getElementById('subtab-' + s);
+    if (p) p.style.display = s === sub ? 'block' : 'none';
+    if (b) b.classList.toggle('active-subtab', s === sub);
   });
-  if (sub === 'products') renderAdminProducts();
-  if (sub === 'orders')   renderAdminOrders();
+  if (sub === 'formbuilder') renderAdminForms();
+  if (sub === 'products')    renderAdminProducts();
+  if (sub === 'orders')      renderAdminOrders();
 }
 
 function switchDeptTab(dept) {
@@ -1831,47 +1858,6 @@ async function checkTasksAccess() {
   } catch(e) { console.error(e); }
 }
 
-async function renderTasksBoard(dept) {
-  const cols = { todo: [], inprogress: [], done: [] };
-  try {
-    const tasks = await supa.get(`bb_tasks?department=eq.${dept}&order=created_at.desc`);
-    tasks.forEach(t => {
-      const key = t.status === 'inprogress' ? 'inprogress' : t.status === 'done' ? 'done' : 'todo';
-      cols[key].push(t);
-    });
-  } catch(e) { console.error(e); }
-
-  const today = new Date(); today.setHours(0,0,0,0);
-  ['todo','inprogress','done'].forEach(status => {
-    const el = document.getElementById('col-' + status);
-    const cnt = document.getElementById('count-' + status);
-    if (cnt) cnt.textContent = cols[status].length ? `(${cols[status].length})` : '';
-    if (!cols[status].length) { el.innerHTML = `<div style="color:#556;font-size:12px;text-align:center;padding:16px 0;">No tasks</div>`; return; }
-    el.innerHTML = cols[status].map(t => {
-      const prioClass = t.priority === 'high' ? 'prio-high' : t.priority === 'low' ? 'prio-low' : 'prio-medium';
-      const prioLabel = t.priority ? t.priority.charAt(0).toUpperCase() + t.priority.slice(1) : 'Medium';
-      let dueHtml = '';
-      if (t.due_date) {
-        const due = new Date(t.due_date); due.setHours(0,0,0,0);
-        const overdue = status !== 'done' && due < today;
-        const fmt = due.toLocaleDateString('en-MY', { day:'numeric', month:'short' });
-        dueHtml = `<span class="task-due${overdue ? ' overdue' : ''}">📅 ${fmt}</span>`;
-      }
-      const assigneeHtml = t.assignee_name ? `<span class="task-assignee">👤 ${t.assignee_name}</span>` : '';
-      window._taskMap = window._taskMap || {};
-      window._taskMap[t.id] = t;
-      return `<div class="task-card" onclick="openTaskDetail('${t.id}')">
-        <div class="task-card-title">${t.title}</div>
-        ${t.description ? `<div class="task-card-desc">${t.description.length > 80 ? t.description.slice(0,80)+'…' : t.description}</div>` : ''}
-        <div class="task-meta">
-          <span class="task-pill ${prioClass}">${prioLabel}</span>
-          ${assigneeHtml}
-          ${dueHtml}
-        </div>
-      </div>`;
-    }).join('');
-  });
-}
 
 function openTaskDetail(id) {
   const t = (window._taskMap && window._taskMap[id]) || {};
@@ -1901,57 +1887,6 @@ function closeTaskDetail() {
 let _adminTaskFilter = 'all';
 let _allAdminTasks = [];
 
-async function renderAdminTasks(filter) {
-  _adminTaskFilter = filter || 'all';
-  // Update filter button styles
-  ['all','logistics','secretariat','media'].forEach(f => {
-    const btn = document.getElementById('tf-' + f);
-    if (!btn) return;
-    const active = f === _adminTaskFilter;
-    const cfg = DEPT_CONFIG[f];
-    if (f === 'all') {
-      btn.style.background = active ? 'var(--accent)' : 'transparent';
-      btn.style.color = active ? 'var(--navy)' : 'var(--accent)';
-    } else {
-      btn.style.background = active ? (cfg.color + '33') : 'transparent';
-      btn.style.fontWeight = active ? '900' : '700';
-    }
-  });
-
-  const list = document.getElementById('admin-tasks-list');
-  list.innerHTML = '<div style="color:#888;text-align:center;padding:20px;"><span class="spinner"></span> Loading...</div>';
-  try {
-    const url = _adminTaskFilter === 'all'
-      ? 'bb_tasks?select=*&order=created_at.desc'
-      : `bb_tasks?department=eq.${_adminTaskFilter}&order=created_at.desc`;
-    _allAdminTasks = await supa.get(url);
-    if (!_allAdminTasks.length) { list.innerHTML = '<div style="color:#666;text-align:center;padding:20px;">No tasks yet.</div>'; return; }
-    const STATUS_COLORS = { todo:'#8898bb', inprogress:'#42a5f5', done:'#66bb6a', cancelled:'#ef5350' };
-    const STATUS_LABELS = { todo:'To Do', inprogress:'In Progress', done:'Done', cancelled:'Cancelled' };
-    list.innerHTML = _allAdminTasks.map(t => {
-      const dept = DEPT_CONFIG[t.department] || { label: t.department, cls: '' };
-      const prioClass = t.priority === 'high' ? 'prio-high' : t.priority === 'low' ? 'prio-low' : 'prio-medium';
-      const sc = STATUS_COLORS[t.status] || '#888';
-      return `<div style="background:#0a1628;border-radius:12px;padding:14px 16px;margin-bottom:10px;border:1px solid rgba(255,255,255,0.06);">
-        <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:8px;margin-bottom:8px;">
-          <div style="font-family:'Oswald',sans-serif;font-size:15px;font-weight:700;color:#fff;flex:1;">${t.title}</div>
-          <span class="dept-badge ${dept.cls}" style="font-size:10px;flex-shrink:0;">${dept.label}</span>
-        </div>
-        ${t.description ? `<div style="font-size:12px;color:#8898bb;margin-bottom:8px;line-height:1.5;">${t.description}</div>` : ''}
-        <div style="display:flex;gap:6px;flex-wrap:wrap;align-items:center;margin-bottom:10px;">
-          <span class="task-pill ${prioClass}">${t.priority||'medium'}</span>
-          ${t.assignee_name ? `<span style="font-size:11px;color:#8898bb;">👤 ${t.assignee_name}</span>` : ''}
-          ${t.due_date ? `<span style="font-size:11px;color:#8898bb;">📅 ${new Date(t.due_date).toLocaleDateString('en-MY',{day:'numeric',month:'short',year:'numeric'})}</span>` : ''}
-        </div>
-        <div style="display:flex;gap:5px;flex-wrap:wrap;align-items:center;">
-          ${['todo','inprogress','done'].map(s => `<button onclick="updateTaskStatus('${t.id}','${s}')" style="padding:4px 10px;border:1.5px solid ${s===t.status?STATUS_COLORS[s]:'#2a3a50'};border-radius:6px;background:${s===t.status?STATUS_COLORS[s]+'22':'transparent'};color:${s===t.status?STATUS_COLORS[s]:'#556'};font-size:11px;font-weight:700;cursor:pointer;font-family:'Oswald',sans-serif;">${STATUS_LABELS[s]}</button>`).join('')}
-          <button onclick="editAdminTask('${t.id}')" style="margin-left:auto;background:#1a3a6e;border:1px solid #2a4a8e;color:#fff;padding:4px 10px;border-radius:6px;cursor:pointer;font-size:11px;font-weight:700;">✏️ Edit</button>
-          <button onclick="deleteTask('${t.id}')" style="background:#3a1a1a;border:1px solid #6a2a2a;color:#ff6666;padding:4px 10px;border-radius:6px;cursor:pointer;font-size:11px;font-weight:700;">🗑️</button>
-        </div>
-      </div>`;
-    }).join('');
-  } catch(e) { list.innerHTML = '<div style="color:#f66;text-align:center;padding:20px;">Failed to load tasks.</div>'; }
-}
 
 function filterAdminTasks(filter) { switchDeptTab(filter); }
 
@@ -1969,6 +1904,121 @@ async function loadAssigneeOptions() {
       sel.appendChild(opt);
     });
   } catch(e) { console.error(e); }
+}
+
+
+async function renderTasksBoard(dept) {
+  const ic = localStorage.getItem('bb_current') || '';
+  const cols = { todo: [], inprogress: [], done: [] };
+  try {
+    const tasks = await supa.get(`bb_tasks?department=eq.${dept}&order=created_at.desc`);
+    tasks.forEach(t => {
+      const key = t.status === 'inprogress' ? 'inprogress' : t.status === 'done' ? 'done' : 'todo';
+      cols[key].push(t);
+    });
+  } catch(e) { console.error(e); }
+
+  const today = new Date(); today.setHours(0,0,0,0);
+  ['todo','inprogress','done'].forEach(status => {
+    const el  = document.getElementById('col-' + status);
+    const cnt = document.getElementById('count-' + status);
+    if (cnt) cnt.textContent = cols[status].length ? `(${cols[status].length})` : '';
+    if (!cols[status].length) { el.innerHTML = `<div style="color:#556;font-size:12px;text-align:center;padding:16px 0;">No tasks</div>`; return; }
+    el.innerHTML = cols[status].map(t => {
+      const prioClass = t.priority === 'high' ? 'prio-high' : t.priority === 'low' ? 'prio-low' : 'prio-medium';
+      const prioLabel = (t.priority||'medium').charAt(0).toUpperCase() + (t.priority||'medium').slice(1);
+      let dueHtml = '';
+      if (t.due_date) {
+        const due = new Date(t.due_date); due.setHours(0,0,0,0);
+        const overdue = status !== 'done' && due < today;
+        dueHtml = `<span class="task-due${overdue?' overdue':''}">📅 ${due.toLocaleDateString('en-MY',{day:'numeric',month:'short'})}</span>`;
+      }
+      const assigneeHtml = t.assignee_name ? `<span class="task-assignee">👤 ${t.assignee_name}</span>` : '';
+      window._taskMap = window._taskMap || {};
+      window._taskMap[t.id] = t;
+
+      // Status buttons for members (any dept member can update)
+      const statusBtns = `
+        <div style="display:flex;gap:4px;margin-top:10px;flex-wrap:wrap;">
+          ${['todo','inprogress','done'].map(s => {
+            const sc = s==='done'?'#66bb6a':s==='inprogress'?'#42a5f5':'#8898bb';
+            const sl = s==='inprogress'?'In Progress':s==='done'?'Done':'To Do';
+            const active = t.status === s;
+            return `<button onclick="memberUpdateTaskStatus('${t.id}','${s}','${dept}')" style="padding:3px 10px;border:1.5px solid ${active?sc:'#2a3a50'};border-radius:14px;background:${active?sc+'22':'transparent'};color:${active?sc:'#556'};font-size:10px;font-weight:700;cursor:pointer;font-family:'Oswald',sans-serif;">${sl}</button>`;
+          }).join('')}
+        </div>`;
+
+      return `<div class="task-card" onclick="openTaskDetail('${t.id}')">
+        <div class="task-card-title">${t.title}</div>
+        ${t.description ? `<div class="task-card-desc">${t.description.length>80?t.description.slice(0,80)+'…':t.description}</div>` : ''}
+        <div class="task-meta">
+          <span class="task-pill ${prioClass}">${prioLabel}</span>
+          ${assigneeHtml}
+          ${dueHtml}
+        </div>
+        ${statusBtns}
+      </div>`;
+    }).join('');
+  });
+}
+
+async function memberUpdateTaskStatus(id, status, dept) {
+  try {
+    await supa.patch(`bb_tasks?id=eq.${id}`, { status });
+    await renderTasksBoard(dept);
+  } catch(e) { alert('Failed to update.'); }
+}
+
+async function renderAdminTasks(filter) {
+  _adminTaskFilter = filter || 'all';
+  ['all','logistics','secretariat','media'].forEach(f => {
+    const btn = document.getElementById('dtab-' + f);
+    if (!btn) return;
+    const active = f === _adminTaskFilter;
+    const cfg = DEPT_CONFIG[f];
+    if (f === 'all') {
+      btn.style.background = active ? 'var(--accent)' : 'transparent';
+      btn.style.color      = active ? 'var(--navy)'   : 'var(--accent)';
+      btn.style.borderColor= active ? 'var(--accent)' : 'rgba(200,150,30,0.3)';
+    } else if (cfg) {
+      btn.style.background  = active ? cfg.color+'33' : 'transparent';
+      btn.style.fontWeight  = active ? '900' : '700';
+    }
+  });
+
+  const list = document.getElementById('admin-tasks-list');
+  list.innerHTML = '<div style="color:#888;text-align:center;padding:20px;"><span class="spinner"></span> Loading...</div>';
+  try {
+    const url = _adminTaskFilter === 'all'
+      ? 'bb_tasks?select=*&order=created_at.desc'
+      : `bb_tasks?department=eq.${_adminTaskFilter}&order=created_at.desc`;
+    _allAdminTasks = await supa.get(url);
+    if (!_allAdminTasks.length) { list.innerHTML = '<div style="color:#666;text-align:center;padding:20px;">No tasks yet.</div>'; return; }
+    const SC = { todo:'#8898bb', inprogress:'#42a5f5', done:'#66bb6a' };
+    const SL = { todo:'To Do', inprogress:'In Progress', done:'Done' };
+    list.innerHTML = _allAdminTasks.map(t => {
+      const dept = DEPT_CONFIG[t.department] || { label: t.department, cls:'' };
+      const prioClass = t.priority==='high'?'prio-high':t.priority==='low'?'prio-low':'prio-medium';
+      const sc = SC[t.status]||'#888';
+      return `<div style="background:#0a1628;border-radius:12px;padding:14px 16px;margin-bottom:10px;border:1px solid rgba(255,255,255,0.06);">
+        <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:8px;margin-bottom:8px;">
+          <div style="font-family:'Oswald',sans-serif;font-size:15px;font-weight:700;color:#fff;flex:1;">${t.title}</div>
+          <span class="dept-badge ${dept.cls}" style="font-size:10px;flex-shrink:0;">${dept.label}</span>
+        </div>
+        ${t.description ? `<div style="font-size:12px;color:#8898bb;margin-bottom:8px;line-height:1.5;">${t.description}</div>` : ''}
+        <div style="display:flex;gap:6px;flex-wrap:wrap;align-items:center;margin-bottom:10px;">
+          <span class="task-pill ${prioClass}">${t.priority||'medium'}</span>
+          ${t.assignee_name ? `<span style="font-size:11px;color:#8898bb;">👤 ${t.assignee_name}</span>` : ''}
+          ${t.due_date ? `<span style="font-size:11px;color:#8898bb;">📅 ${new Date(t.due_date).toLocaleDateString('en-MY',{day:'numeric',month:'short',year:'numeric'})}</span>` : ''}
+        </div>
+        <div style="display:flex;gap:5px;flex-wrap:wrap;align-items:center;">
+          ${['todo','inprogress','done'].map(s=>`<button onclick="updateTaskStatus('${t.id}','${s}')" style="padding:4px 10px;border:1.5px solid ${s===t.status?SC[s]:'#2a3a50'};border-radius:6px;background:${s===t.status?SC[s]+'22':'transparent'};color:${s===t.status?SC[s]:'#556'};font-size:11px;font-weight:700;cursor:pointer;font-family:'Oswald',sans-serif;">${SL[s]}</button>`).join('')}
+          <button onclick="editAdminTask('${t.id}')" style="margin-left:auto;background:#1a3a6e;border:1px solid #2a4a8e;color:#fff;padding:4px 10px;border-radius:6px;cursor:pointer;font-size:11px;font-weight:700;">✏️</button>
+          <button onclick="deleteTask('${t.id}')" style="background:#3a1a1a;border:1px solid #6a2a2a;color:#f66;padding:4px 10px;border-radius:6px;cursor:pointer;font-size:11px;font-weight:700;">🗑️</button>
+        </div>
+      </div>`;
+    }).join('');
+  } catch(e) { list.innerHTML = '<div style="color:#f66;text-align:center;padding:20px;">Failed to load tasks.</div>'; }
 }
 
 function clearTaskForm() {
@@ -2053,11 +2103,338 @@ async function deleteTask(id) {
   } catch(e) { alert('Failed to delete task.'); }
 }
 
+// ── Forms system ──────────────────────────────────────────────────────────
+let _customForms = [];
+let _currentFormType = 'link';
+let _fbFields = [];
+let _currentFormData = null; // form being viewed by member
+
+function loadCustomForms() {
+  try { _customForms = JSON.parse(localStorage.getItem('bb_custom_forms') || '[]'); } catch(e) { _customForms = []; }
+}
+function saveCustomForms() {
+  localStorage.setItem('bb_custom_forms', JSON.stringify(_customForms));
+}
+
+function setFormType(type) {
+  _currentFormType = type;
+  ['link','builtin','uniform'].forEach(t => {
+    document.getElementById('ftype-' + t).classList.toggle('ftype-active', t === type);
+    const fields = document.getElementById('fb-' + t + '-fields');
+    if (fields) fields.style.display = t === type ? 'block' : 'none';
+  });
+}
+
+function addFormField() {
+  const id = Date.now();
+  _fbFields.push({ id, label: '', type: 'text', required: false });
+  renderFbFields();
+}
+
+function renderFbFields() {
+  const container = document.getElementById('fb-fields-list');
+  if (!container) return;
+  container.innerHTML = _fbFields.map((f, i) => `
+    <div class="fb-field-row">
+      <input type="text" value="${f.label}" oninput="_fbFields[${i}].label=this.value" placeholder="Field label e.g. Full Name" style="flex:1;background:#0a1628;color:#fff;border:2px solid #2a3a50;border-radius:8px;padding:8px 10px;font-family:'Roboto',sans-serif;font-size:13px;"/>
+      <select onchange="_fbFields[${i}].type=this.value" style="background:#0a1628;color:#fff;border:2px solid #2a3a50;border-radius:8px;padding:8px;font-size:12px;">
+        <option value="text" ${f.type==='text'?'selected':''}>Text</option>
+        <option value="textarea" ${f.type==='textarea'?'selected':''}>Long text</option>
+        <option value="number" ${f.type==='number'?'selected':''}>Number</option>
+        <option value="date" ${f.type==='date'?'selected':''}>Date</option>
+        <option value="select" ${f.type==='select'?'selected':''}>Dropdown</option>
+      </select>
+      <label style="display:flex;align-items:center;gap:4px;color:#8898bb;font-size:11px;cursor:pointer;">
+        <input type="checkbox" ${f.required?'checked':''} onchange="_fbFields[${i}].required=this.checked"/> Req
+      </label>
+      <button onclick="_fbFields.splice(${i},1);renderFbFields()" style="background:#3a1a1a;border:1px solid #6a2a2a;color:#f66;padding:5px 9px;border-radius:7px;cursor:pointer;font-size:13px;">✕</button>
+    </div>
+    ${f.type==='select' ? `<input type="text" value="${f.options||''}" oninput="_fbFields[${i}].options=this.value" placeholder="Options: e.g. Yes, No, Maybe" style="width:100%;background:#0a1628;color:#fff;border:2px solid #2a3a50;border-radius:8px;padding:8px 10px;font-family:'Roboto',sans-serif;font-size:12px;margin-bottom:8px;"/>` : ''}
+  `).join('');
+}
+
+function clearFormBuilder() {
+  document.getElementById('fb-name').value = '';
+  document.getElementById('fb-desc').value = '';
+  document.getElementById('fb-url').value  = '';
+  document.getElementById('fb-edit-id').value = '';
+  document.getElementById('fb-form-title').textContent = '➕ Add New Form';
+  _fbFields = [];
+  renderFbFields();
+  setFormType('link');
+}
+
+function saveForm() {
+  const name    = document.getElementById('fb-name').value.trim();
+  const desc    = document.getElementById('fb-desc').value.trim();
+  const editId  = document.getElementById('fb-edit-id').value;
+  const type    = _currentFormType;
+  if (!name) return alert('Please enter a form name.');
+  let formData = { id: editId || 'form_' + Date.now(), name, desc, type, active: true };
+  if (type === 'link') {
+    const url = document.getElementById('fb-url').value.trim();
+    if (!url) return alert('Please enter a URL.');
+    formData.url = url;
+  } else if (type === 'builtin') {
+    if (!_fbFields.length) return alert('Please add at least one field.');
+    formData.fields = JSON.parse(JSON.stringify(_fbFields));
+  } else if (type === 'uniform') {
+    formData.fields = [];
+  }
+  const idx = _customForms.findIndex(f => f.id === formData.id);
+  if (idx >= 0) _customForms[idx] = formData; else _customForms.push(formData);
+  saveCustomForms();
+  clearFormBuilder();
+  renderAdminForms();
+  renderFormsHub();
+  alert('✅ Form saved!');
+}
+
+function editForm(id) {
+  const f = _customForms.find(x => x.id === id);
+  if (!f) return;
+  document.getElementById('fb-form-title').textContent = '✏️ Edit: ' + f.name;
+  document.getElementById('fb-name').value  = f.name;
+  document.getElementById('fb-desc').value  = f.desc || '';
+  document.getElementById('fb-edit-id').value = f.id;
+  _fbFields = f.fields ? JSON.parse(JSON.stringify(f.fields)) : [];
+  if (f.type === 'link') { document.getElementById('fb-url').value = f.url || ''; }
+  setFormType(f.type || 'link');
+  renderFbFields();
+}
+
+function deleteForm(id) {
+  if (!confirm('Delete this form?')) return;
+  _customForms = _customForms.filter(f => f.id !== id);
+  saveCustomForms();
+  renderAdminForms();
+  renderFormsHub();
+}
+
+function renderAdminForms() {
+  loadCustomForms();
+  const container = document.getElementById('admin-forms-list');
+  if (!container) return;
+  // Pre-populate filter dropdown
+  const filter = document.getElementById('admin-order-form-filter');
+  if (filter) {
+    filter.innerHTML = '<option value="">All forms</option>' + _customForms.map(f => `<option value="${f.id}">${f.name}</option>`).join('');
+  }
+  if (!_customForms.length) { container.innerHTML = '<div style="color:#8898bb;text-align:center;padding:20px;font-size:13px;">No forms yet. Create one above.</div>'; return; }
+  const icons = { link:'🔗', builtin:'⚙️', uniform:'👔' };
+  const typeLabel = { link:'External Link', builtin:'Built-in Form', uniform:'Uniform Order' };
+  container.innerHTML = _customForms.map(f => `
+    <div style="background:#0a1628;border-radius:12px;padding:14px 16px;margin-bottom:10px;border:1px solid rgba(255,255,255,0.06);display:flex;align-items:center;gap:12px;">
+      <div style="width:42px;height:42px;border-radius:10px;background:rgba(200,150,30,0.1);display:flex;align-items:center;justify-content:center;font-size:20px;flex-shrink:0;">${icons[f.type]||'📋'}</div>
+      <div style="flex:1;">
+        <div style="font-family:'Oswald',sans-serif;font-size:15px;font-weight:600;color:#fff;">${f.name}</div>
+        <div style="font-size:11px;color:#8898bb;">${typeLabel[f.type]||''} ${f.desc ? '· '+f.desc : ''}</div>
+      </div>
+      <button onclick="editForm('${f.id}')" style="background:#1a3a6e;border:1px solid #2a4a8e;color:#fff;padding:6px 12px;border-radius:8px;cursor:pointer;font-size:12px;font-weight:600;">✏️</button>
+      <button onclick="deleteForm('${f.id}')" style="background:#3a1a1a;border:1px solid #6a2a2a;color:#f66;padding:6px 12px;border-radius:8px;cursor:pointer;font-size:12px;">🗑️</button>
+    </div>
+  `).join('');
+}
+
+// ── Forms hub (member side) ───────────────────────────────────────────────
+function renderFormsHub() {
+  loadCustomForms();
+  const hub = document.getElementById('forms-hub');
+  if (!hub) return;
+  // Always include uniform order form + leave form built-in + custom forms
+  const builtinForms = [
+    { id:'__leave__', name:'Leave Application', desc:'Submit a leave request', type:'builtin', icon:'📝',
+      fields:[
+        { id:'lf1', label:'Reason for Leave', type:'textarea', required:true },
+        { id:'lf2', label:'Start Date', type:'date', required:true },
+        { id:'lf3', label:'End Date', type:'date', required:true },
+        { id:'lf4', label:'Contact During Leave', type:'text', required:false },
+      ]
+    },
+    { id:'__uniform__', name:'Uniform Order', desc:'Order BB uniform items', type:'uniform', icon:'👔' },
+  ];
+  const allForms = [...builtinForms, ..._customForms.filter(f => f.active !== false)];
+
+  if (!allForms.length) { hub.innerHTML = '<div style="color:#8898bb;text-align:center;padding:30px;font-size:13px;">No forms available.</div>'; return; }
+
+  const typeColors = { builtin:'rgba(102,187,106,0.12)', uniform:'rgba(200,150,30,0.12)', link:'rgba(66,165,245,0.12)' };
+  const typeIcons  = { builtin:'⚙️', uniform:'👔', link:'🔗' };
+  hub.innerHTML = allForms.map(f => {
+    const icon = f.icon || typeIcons[f.type] || '📋';
+    const bg   = typeColors[f.type] || 'rgba(200,150,30,0.08)';
+    return `<div class="form-card-hub" onclick="openFormForMember('${f.id}')">
+      <div class="form-card-icon" style="background:${bg};">${icon}</div>
+      <div style="flex:1;">
+        <div class="form-card-name">${f.name}</div>
+        <div class="form-card-desc">${f.desc || ''}</div>
+      </div>
+      <div class="form-card-arrow">›</div>
+    </div>`;
+  }).join('');
+}
+
+function openFormForMember(formId) {
+  loadCustomForms();
+  const builtinLeave = { id:'__leave__', name:'Leave Application', desc:'Submit a leave request', type:'builtin', icon:'📝',
+    fields:[
+      { id:'lf1', label:'Reason for Leave', type:'textarea', required:true },
+      { id:'lf2', label:'Start Date', type:'date', required:true },
+      { id:'lf3', label:'End Date', type:'date', required:true },
+      { id:'lf4', label:'Contact During Leave', type:'text', required:false },
+    ]
+  };
+  const allForms = [builtinLeave, { id:'__uniform__', name:'Uniform Order', type:'uniform' }, ..._customForms];
+  const form = allForms.find(f => f.id === formId);
+  if (!form) return;
+
+  if (form.type === 'link') {
+    window.open(form.url, '_blank');
+    return;
+  }
+  if (form.type === 'uniform') {
+    // Show the uniform order form
+    document.getElementById('forms-hub').style.display = 'none';
+    document.getElementById('inline-form-view').style.display = 'block';
+    renderUniformOrderInline();
+    return;
+  }
+  // Built-in form
+  _currentFormData = form;
+  document.getElementById('forms-hub').style.display = 'none';
+  document.getElementById('inline-form-view').style.display = 'block';
+  renderBuiltinFormInline(form);
+}
+
+function backToFormsHub() {
+  document.getElementById('forms-hub').style.display = 'block';
+  document.getElementById('inline-form-view').style.display = 'none';
+  _currentFormData = null;
+  // Reset uniform order state
+  UNIFORM_ITEMS.forEach(i => { itemQtys[i.key] = 0; delete itemSizes[i.key]; });
+  updateTotal();
+}
+
+function renderBuiltinFormInline(form) {
+  const container = document.getElementById('inline-form-view');
+  const fieldsHtml = form.fields.map((f, i) => {
+    const inputHtml = f.type === 'textarea'
+      ? `<textarea class="form-textarea" id="bff-${i}" placeholder="Your answer..." style="margin-top:6px;"></textarea>`
+      : f.type === 'select'
+      ? `<select class="form-select" id="bff-${i}" style="margin-top:6px;"><option value="">Select...</option>${(f.options||'').split(',').map(o=>`<option>${o.trim()}</option>`).join('')}</select>`
+      : `<input class="form-input" type="${f.type||'text'}" id="bff-${i}" placeholder="Your answer..." style="margin-top:6px;"/>`;
+    return `<div class="form-group">
+      <label class="form-label">${f.label}${f.required?' <span style="color:#f66;">*</span>':''}</label>
+      ${inputHtml}
+    </div>`;
+  }).join('');
+
+  container.innerHTML = `
+    <div class="card stripe-bg">
+      <button onclick="backToFormsHub()" style="display:flex;align-items:center;gap:6px;background:none;border:none;color:#8898bb;font-family:'Oswald',sans-serif;font-size:13px;cursor:pointer;padding:0;margin-bottom:16px;">‹ Back to Forms</button>
+      <div class="page-title">${form.name}</div>
+      ${form.desc ? `<div class="page-desc">${form.desc}</div>` : ''}
+      <hr class="divider"/>
+      ${fieldsHtml}
+      <button class="submit-btn gold" onclick="submitBuiltinForm('${form.id}')">📤 Submit</button>
+      <div class="success-box" id="builtin-success" style="display:none;">
+        <div class="s-icon">✅</div>
+        <div class="s-title">Submitted!</div>
+        <div class="s-msg">Your form has been received.</div>
+      </div>
+    </div>`;
+}
+
+async function submitBuiltinForm(formId) {
+  loadCustomForms();
+  const builtinLeave = { id:'__leave__', name:'Leave Application', type:'builtin',
+    fields:[
+      { id:'lf1', label:'Reason for Leave', type:'textarea', required:true },
+      { id:'lf2', label:'Start Date', type:'date', required:true },
+      { id:'lf3', label:'End Date', type:'date', required:true },
+      { id:'lf4', label:'Contact During Leave', type:'text', required:false },
+    ]
+  };
+  const allForms = [builtinLeave, ..._customForms];
+  const form = allForms.find(f => f.id === formId);
+  if (!form) return;
+
+  const answers = {};
+  let valid = true;
+  form.fields.forEach((f, i) => {
+    const el = document.getElementById('bff-' + i);
+    const val = el ? el.value.trim() : '';
+    if (f.required && !val) { valid = false; el && (el.style.borderColor = '#f66'); return; }
+    answers[f.label] = val;
+    el && (el.style.borderColor = '');
+  });
+  if (!valid) { alert('Please fill in all required fields.'); return; }
+
+  const ic = localStorage.getItem('bb_current') || '';
+  try {
+    await supa.post('bb_orders', {
+      order_number: 'FORM-' + Date.now().toString(36).toUpperCase(),
+      ic, member_name: document.getElementById('order-member-name').textContent,
+      rank: document.getElementById('order-member-rank').textContent,
+      items: JSON.stringify({ form_name: form.name, answers }),
+      notes: form.name,
+      status: 'pending',
+      created_at: new Date().toISOString(),
+    });
+    document.getElementById('builtin-success').style.display = 'block';
+    document.getElementById('builtin-success').scrollIntoView({ behavior:'smooth' });
+  } catch(e) { alert('Failed to submit: ' + e.message); }
+}
+
+function renderUniformOrderInline() {
+  const container = document.getElementById('inline-form-view');
+  container.innerHTML = `
+    <button onclick="backToFormsHub()" style="display:flex;align-items:center;gap:6px;background:none;border:none;color:#8898bb;font-family:'Oswald',sans-serif;font-size:13px;cursor:pointer;padding:0;margin-bottom:16px;">‹ Back to Forms</button>
+    <div id="step-form">
+      <div class="card stripe-bg" style="margin-bottom:14px;">
+        <div class="page-title">Uniform</div>
+        <div class="page-subtitle">Order Form</div>
+        <div class="page-desc">Select items &amp; sizes 👔</div>
+        <div class="note-box">⚠️ Orders are confirmed by the officer in charge. You will be contacted when ready.</div>
+        <div id="uniform-items"></div>
+        <div class="form-group" style="margin-top:8px;">
+          <label class="form-label">Additional Notes (optional)</label>
+          <textarea class="form-textarea" id="order-notes" placeholder="Any special requests..."></textarea>
+        </div>
+        <div class="total-row">
+          <div class="total-label">Estimated Total</div>
+          <div class="total-val" id="order-total">RM 0.00</div>
+        </div>
+        <button class="submit-btn" style="margin-top:14px;" onclick="goToOrderReview()">👀 Review Order</button>
+      </div>
+    </div>
+    <div id="step-review" style="display:none;">
+      <div class="card stripe-bg">
+        <div class="page-title">Review</div>
+        <div class="page-subtitle">Your Order</div>
+        <div class="page-desc">Confirm before submitting 👇</div>
+        <div style="background:#fff;border-radius:14px;padding:20px;margin-bottom:18px;" id="review-content"></div>
+        <div style="display:flex;gap:10px;">
+          <button class="submit-btn danger" style="flex:1;margin-top:0;" onclick="goBackOrder()">✏️ Edit</button>
+          <button class="submit-btn" style="flex:2;margin-top:0;" onclick="submitOrder()" id="confirm-btn">✅ Confirm &amp; Submit</button>
+        </div>
+      </div>
+    </div>
+    <div class="success-box" id="order-success" style="display:none;">
+      <div class="s-icon">🎉</div>
+      <div class="s-title">Order Submitted!</div>
+      <div class="s-msg">Order <strong id="s-ordernum" style="color:var(--accent);"></strong> received! The officer will contact you when ready.</div>
+    </div>`;
+  renderOrderItems();
+}
+
+// ── Tasks: multi-assignee + member status editing ─────────────────────────
+
 // ── Init ──────────────────────────────────────────────────────────────────
 window.addEventListener('load', () => {
   loadPrices();
   loadGallery();
   loadAnnouncements();
+  loadCustomForms();
   renderOrderItems();
   const ic = localStorage.getItem('bb_current');
   if (ic) { renderDashboard(); checkTasksAccess(); }
