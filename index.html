@@ -1003,316 +1003,593 @@
 // ── Supabase ──────────────────────────────────────────────────────────────
 const SUPA_URL = 'https://mjfclxcklkbgsivvvlfe.supabase.co';
 const SUPA_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im1qZmNseGNrbGtiZ3NpdnZ2bGZlIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzQxODUyMDYsImV4cCI6MjA4OTc2MTIwNn0.ZYsaHnPJ1LXrk4iYP5pYgNKjyksXPsK8ZxkXPFeEcOM';
-
 const supa = {
   async req(method, path, body) {
     const r = await fetch(SUPA_URL + '/rest/v1/' + path, {
       method,
-      headers: { 'apikey': SUPA_KEY, 'Authorization': 'Bearer ' + SUPA_KEY, 'Content-Type': 'application/json', 'Prefer': method === 'POST' ? 'return=representation' : '' },
+      headers: { apikey: SUPA_KEY, Authorization: 'Bearer ' + SUPA_KEY, 'Content-Type': 'application/json', Prefer: method === 'POST' ? 'return=representation' : '' },
       body: body ? JSON.stringify(body) : undefined
     });
     if (!r.ok) { const e = await r.text(); throw new Error(e); }
     return r.status === 204 ? null : r.json();
   },
-  get: (p) => supa.req('GET', p),
-  post: (p, b) => supa.req('POST', p, b),
-  patch: (p, b) => supa.req('PATCH', p, b),
-  delete: (p) => supa.req('DELETE', p),
+  get: function(p)    { return supa.req('GET', p); },
+  post: function(p,b) { return supa.req('POST', p, b); },
+  patch: function(p,b){ return supa.req('PATCH', p, b); },
+  delete: function(p) { return supa.req('DELETE', p); }
 };
 
 const ADMIN_PASSWORD = 'bb2024admin';
 
-// ── Uniform items & prices ────────────────────────────────────────────────
+// ── Uniform items ──────────────────────────────────────────────────────────
 const DEFAULT_UNIFORM_ITEMS = [
-  { key: 'shirt',      name: 'BB Uniform Shirt',     hasSize: 'shirt'    },
-  { key: 'trousers',   name: 'BB Uniform Trousers',  hasSize: 'trousers' },
-  { key: 'belt',       name: 'BB Belt',              hasSize: false      },
-  { key: 'cap',        name: 'BB Cap',               hasSize: false      },
-  { key: 'haversack',  name: 'Haversack',            hasSize: false      },
-  { key: 'lanyard',    name: 'Lanyard',              hasSize: false      },
+  { key: 'shirt',     name: 'BB Uniform Shirt',    hasSize: 'shirt'    },
+  { key: 'trousers',  name: 'BB Uniform Trousers', hasSize: 'trousers' },
+  { key: 'belt',      name: 'BB Belt',             hasSize: false      },
+  { key: 'cap',       name: 'BB Cap',              hasSize: false      },
+  { key: 'haversack', name: 'Haversack',           hasSize: false      },
+  { key: 'lanyard',   name: 'Lanyard',             hasSize: false      }
 ];
-let UNIFORM_ITEMS = (() => {
-  try { const s = localStorage.getItem('bb_uniform_items'); return s ? JSON.parse(s) : DEFAULT_UNIFORM_ITEMS; } catch(e) { return DEFAULT_UNIFORM_ITEMS; }
+var UNIFORM_ITEMS = (function() {
+  try { var s = localStorage.getItem('bb_uniform_items'); return s ? JSON.parse(s) : DEFAULT_UNIFORM_ITEMS; } catch(e) { return DEFAULT_UNIFORM_ITEMS; }
 })();
 
-let prices = {};
-let itemQtys   = {}; // { shirt: 1, ... }
-let itemSizes  = {}; // { shirt: 'M', trousers: '30' }
+var prices   = {};
+var itemQtys = {};
+var itemSizes = {};
 
-// Load prices from localStorage (admin sets them)
 function loadPrices() {
   try { prices = JSON.parse(localStorage.getItem('bb_prices') || '{}'); } catch(e) { prices = {}; }
-  UNIFORM_ITEMS.forEach(item => {
-    const p = prices[item.key] || 0;
-    const el = document.getElementById(item.key + '-price-label');
-    if (el) el.textContent = p ? `RM ${p.toFixed(2)}` : 'RM TBA';
+  UNIFORM_ITEMS.forEach(function(item) {
+    var p  = prices[item.key] || 0;
+    var el = document.getElementById(item.key + '-price-label');
+    if (el) el.textContent = p ? 'RM ' + p.toFixed(2) : 'RM TBA';
   });
 }
 
 function updateTotal() {
-  let total = 0;
-  UNIFORM_ITEMS.forEach(item => {
-    const qty = itemQtys[item.key] || 0;
-    const p = prices[item.key] || 0;
-    total += qty * p;
+  var total = 0;
+  UNIFORM_ITEMS.forEach(function(item) {
+    total += (itemQtys[item.key] || 0) * (prices[item.key] || 0);
   });
-  document.getElementById('order-total').textContent = `RM ${total.toFixed(2)}`;
+  var el = document.getElementById('order-total');
+  if (el) el.textContent = 'RM ' + total.toFixed(2);
 }
 
 function changeQty(key, delta) {
-  const current = itemQtys[key] || 0;
-  const next = Math.max(0, current + delta);
+  var current = itemQtys[key] || 0;
+  var next    = Math.max(0, current + delta);
   itemQtys[key] = next;
-  document.getElementById(key + '-qty').textContent = next;
-  const item = UNIFORM_ITEMS.find(i => i.key === key);
-  const wrap = document.getElementById(key + '-size-wrap');
-  const card = document.getElementById('ui-' + key);
-  if (wrap) wrap.style.display = (next > 0 && item && item.sizes && item.sizes.length) ? 'block' : 'none';
+  var qtyEl = document.getElementById(key + '-qty');
+  if (qtyEl) qtyEl.textContent = next;
+  var item  = UNIFORM_ITEMS.find(function(i) { return i.key === key; });
+  var sizes = (item && item.sizes && item.sizes.length) ? item.sizes : [];
+  var wrap  = document.getElementById(key + '-size-wrap');
+  var card  = document.getElementById('ui-' + key);
+  if (wrap) wrap.style.display = (next > 0 && sizes.length) ? 'block' : 'none';
   if (card) card.classList.toggle('has-qty', next > 0);
-  if (next === 0 && itemSizes[key]) delete itemSizes[key];
+  if (next === 0) delete itemSizes[key];
   updateTotal();
 }
 
 function selectSize(item, size, btn) {
   itemSizes[item] = size;
-  const grid = document.getElementById(item + '-size-grid');
-  grid.querySelectorAll('.size-btn').forEach(b => b.classList.remove('selected'));
+  var grid = document.getElementById(item + '-size-grid');
+  if (grid) grid.querySelectorAll('.size-btn').forEach(function(b) { b.classList.remove('selected'); });
   btn.classList.add('selected');
+}
+
+function saveUniformItems() {
+  localStorage.setItem('bb_uniform_items', JSON.stringify(UNIFORM_ITEMS));
 }
 
 // ── Navigation ────────────────────────────────────────────────────────────
 function switchTab(tab, btn) {
-  document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
-  document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+  document.querySelectorAll('.page').forEach(function(p) { p.classList.remove('active'); });
+  document.querySelectorAll('.tab-btn').forEach(function(b) { b.classList.remove('active'); });
   document.getElementById('page-' + tab).classList.add('active');
   btn.classList.add('active');
-  if (tab === 'order') checkOrderAccess();
-  if (tab === 'tasks') checkTasksAccess();
+  if (tab === 'order')  checkOrderAccess();
+  if (tab === 'tasks')  checkTasksAccess();
 }
 
 function goToMemberTab() {
   switchTab('member', document.getElementById('tab-member'));
 }
 
-// ── Order access ─────────────────────────────────────────────────────────
-function renderOrderItems() {
-  const container = document.getElementById('uniform-items');
-  if (!container) return;
-  if (!UNIFORM_ITEMS.length) { container.innerHTML = '<div style="color:var(--muted);text-align:center;padding:20px;font-size:13px;">No products available yet.</div>'; return; }
-  container.innerHTML = UNIFORM_ITEMS.map(item => {
-    const sizes = item.sizes || (item.hasSize === 'shirt' ? ['S','M','L','XL','XXL','XXXL'] : item.hasSize === 'trousers' ? ['26','28','30','32','34','36'] : []);
-    const sizeOptions = sizes.map(s => `<button class="size-btn" onclick="selectSize('${item.key}','${s}',this)">${s}</button>`).join('');
-    const imgHtml = item.image
-      ? `<img src="${item.image}" style="width:44px;height:44px;object-fit:cover;border-radius:8px;flex-shrink:0;" alt="${item.name}"/>`
-      : `<span class="uniform-icon">👔</span>`;
-    const priceLabel = item.price ? `RM ${parseFloat(item.price).toFixed(2)}` : 'RM TBA';
-    return `<div class="uniform-item" id="ui-${item.key}">
-      <div class="uniform-item-header">
-        ${imgHtml}
-        <div class="uniform-name">${item.name}</div>
-        <div class="uniform-price">${priceLabel}</div>
-      </div>
-      <div class="qty-ctrl">
-        <button class="qty-btn" onclick="changeQty('${item.key}',-1)">−</button>
-        <div class="qty-display" id="${item.key}-qty">0</div>
-        <button class="qty-btn" onclick="changeQty('${item.key}',1)">+</button>
-        <span style="font-size:12px;color:var(--muted);margin-left:4px;">pcs</span>
-      </div>
-      ${sizes.length ? `<div id="${item.key}-size-wrap" style="display:none;margin-top:12px;">
-        <div class="form-label">Size</div>
-        <div class="size-grid" id="${item.key}-size-grid">${sizeOptions}</div>
-      </div>` : ''}
-    </div>`;
-  }).join('');
-  // reset qtys
-  UNIFORM_ITEMS.forEach(i => { itemQtys[i.key] = 0; delete itemSizes[i.key]; });
-  updateTotal();
-}
-
+// ── Order / Forms access ──────────────────────────────────────────────────
 function checkOrderAccess() {
-  const ic = localStorage.getItem('bb_current');
-  const gate     = document.getElementById('order-gate');
-  const loggedIn = document.getElementById('order-logged-in');
-  if (!ic) {
-    gate.style.display     = 'block';
-    loggedIn.style.display = 'none';
-  } else {
-    gate.style.display     = 'none';
-    loggedIn.style.display = 'block';
-    populateOrderBar(ic);
-    loadCustomForms();
-    renderFormsHub();
-  }
+  var ic = localStorage.getItem('bb_current');
+  var gate     = document.getElementById('order-gate');
+  var loggedIn = document.getElementById('order-logged-in');
+  if (!ic) { gate.style.display = 'block'; loggedIn.style.display = 'none'; return; }
+  gate.style.display = 'none'; loggedIn.style.display = 'block';
+  populateOrderBar(ic);
+  loadCustomForms();
+  renderFormsHub();
 }
 
 async function populateOrderBar(ic) {
   try {
-    const data = await supa.get(`bb_members?ic=eq.${encodeURIComponent(ic)}&select=*`);
+    var data = await supa.get('bb_members?ic=eq.' + encodeURIComponent(ic) + '&select=*');
     if (!data || !data.length) return;
-    const m = data[0];
-    document.getElementById('order-member-name').textContent = m.name;
-    document.getElementById('order-member-rank').textContent = m.rank || '';
-    const squadEl = document.getElementById('order-member-squad-inline');
-    if (squadEl) squadEl.textContent = m.squad ? m.squad + ' Squad ·' : '';
-    document.getElementById('order-member-squad').textContent = m.squad ? m.squad + ' Squad' : '—';
-    const pfp = localStorage.getItem('bb_pfp_' + ic);
-    if (pfp) { document.getElementById('order-pfp-img').src = pfp; document.getElementById('order-pfp-img').style.display = 'block'; document.getElementById('order-pfp-ph').style.display = 'none'; }
+    var m = data[0];
+    var nameEl  = document.getElementById('order-member-name');
+    var rankEl  = document.getElementById('order-member-rank');
+    var squadIl = document.getElementById('order-member-squad-inline');
+    var squadEl = document.getElementById('order-member-squad');
+    if (nameEl)  nameEl.textContent  = m.name;
+    if (rankEl)  rankEl.textContent  = m.rank || '';
+    if (squadIl) squadIl.textContent = m.squad ? m.squad + ' Squad \xb7' : '';
+    if (squadEl) squadEl.textContent = m.squad ? m.squad + ' Squad' : '\u2014';
+    var pfp = localStorage.getItem('bb_pfp_' + ic);
+    if (pfp) {
+      var img = document.getElementById('order-pfp-img');
+      var ph  = document.getElementById('order-pfp-ph');
+      if (img) { img.src = pfp; img.style.display = 'block'; }
+      if (ph)  ph.style.display = 'none';
+    }
   } catch(e) { console.error(e); }
 }
 
-// ── Order form ────────────────────────────────────────────────────────────
-function goToOrderReview() {
-  const ic = localStorage.getItem('bb_current');
-  if (!ic) { alert('Please login first.'); return; }
+// ── Uniform order form ─────────────────────────────────────────────────────
+function renderOrderItems() {
+  var container = document.getElementById('uniform-items');
+  if (!container) return;
+  if (!UNIFORM_ITEMS.length) {
+    container.innerHTML = '<div style="color:var(--muted);text-align:center;padding:20px;font-size:13px;">No products available yet.</div>';
+    return;
+  }
+  var html = '';
+  UNIFORM_ITEMS.forEach(function(item) {
+    var sizes = item.sizes && item.sizes.length ? item.sizes : [];
+    var sizeButtons = '';
+    sizes.forEach(function(s) {
+      sizeButtons += '<button class="size-btn" onclick="selectSize(\'' + item.key + '\',\'' + s + '\',this)">' + s + '</button>';
+    });
+    var imgHtml = item.image
+      ? '<img src="' + item.image + '" style="width:44px;height:44px;object-fit:cover;border-radius:8px;flex-shrink:0;" alt="' + item.name + '"/>'
+      : '<span class="uniform-icon">\ud83d\udc54</span>';
+    var priceLabel = item.price ? 'RM ' + parseFloat(item.price).toFixed(2) : 'RM TBA';
+    var sizeWrap = sizes.length
+      ? '<div id="' + item.key + '-size-wrap" style="display:none;margin-top:12px;"><div class="form-label">Size</div><div class="size-grid" id="' + item.key + '-size-grid">' + sizeButtons + '</div></div>'
+      : '';
+    html += '<div class="uniform-item" id="ui-' + item.key + '">'
+      + '<div class="uniform-item-header">' + imgHtml + '<div class="uniform-name">' + item.name + '</div><div class="uniform-price" id="' + item.key + '-price-label">' + priceLabel + '</div></div>'
+      + '<div class="qty-ctrl">'
+      + '<button class="qty-btn" onclick="changeQty(\'' + item.key + '\',-1)">\u2212</button>'
+      + '<div class="qty-display" id="' + item.key + '-qty">0</div>'
+      + '<button class="qty-btn" onclick="changeQty(\'' + item.key + '\',1)">+</button>'
+      + '<span style="font-size:12px;color:var(--muted);margin-left:4px;">pcs</span></div>'
+      + sizeWrap + '</div>';
+  });
+  container.innerHTML = html;
+  UNIFORM_ITEMS.forEach(function(i) { itemQtys[i.key] = 0; delete itemSizes[i.key]; });
+  updateTotal();
+}
 
-  const lines = [];
-  let hasAny = false;
-  UNIFORM_ITEMS.forEach(item => {
-    const qty = itemQtys[item.key] || 0;
+function goToOrderReview() {
+  var ic = localStorage.getItem('bb_current') || '';
+  var lines = [];
+  var hasAny = false;
+  var valid  = true;
+  UNIFORM_ITEMS.forEach(function(item) {
+    var qty = itemQtys[item.key] || 0;
     if (qty > 0) {
       hasAny = true;
-      const size = item.hasSize ? (itemSizes[item.key] || '') : '';
-      if (item.hasSize && !size) { alert(`Please select a size for ${item.name}`); return; }
-      const p = prices[item.key] || 0;
-      lines.push({ name: item.name, qty, size, subtotal: qty * p });
+      var sizes = item.sizes && item.sizes.length ? item.sizes : [];
+      var size  = itemSizes[item.key] || '';
+      if (sizes.length && !size) { alert('Please select a size for ' + item.name); valid = false; return; }
+      var p = prices[item.key] || 0;
+      lines.push({ name: item.name, qty: qty, size: size, subtotal: qty * p });
     }
   });
-  if (!hasAny) { alert('Please add at least one item to your order.'); return; }
-
-  let html = '';
-  lines.forEach(l => {
-    html += `<div class="review-row"><span class="review-label">${l.name}</span><span class="review-value">x${l.qty}${l.size ? ` (${l.size})` : ''} ${l.subtotal > 0 ? '— RM ' + l.subtotal.toFixed(2) : ''}</span></div>`;
+  if (!valid) return;
+  if (!hasAny) { alert('Please add at least one item.'); return; }
+  var html = '';
+  lines.forEach(function(l) {
+    html += '<div class="review-row"><span class="review-label">' + l.name + '</span><span class="review-value">x' + l.qty + (l.size ? ' (' + l.size + ')' : '') + (l.subtotal ? ' \u2014 RM ' + l.subtotal.toFixed(2) : '') + '</span></div>';
   });
-  const total = lines.reduce((s, l) => s + l.subtotal, 0);
-  html += `<hr style="border:none;border-top:1px dashed #eee;margin:10px 0;"><div class="review-row"><span class="review-label">Total</span><span class="review-value" style="color:var(--accent);font-size:16px;">RM ${total.toFixed(2)}</span></div>`;
-  const notes = document.getElementById('order-notes').value.trim();
-  if (notes) html += `<div class="review-row"><span class="review-label">Notes</span><span class="review-value">${notes}</span></div>`;
-
-  document.getElementById('review-content').innerHTML = html;
-  document.getElementById('step-form').style.display = 'none';
-  document.getElementById('step-review').style.display = 'block';
+  var total = lines.reduce(function(s, l) { return s + l.subtotal; }, 0);
+  html += '<hr style="border:none;border-top:1px dashed #eee;margin:10px 0;"><div class="review-row"><span class="review-label">Total</span><span class="review-value" style="color:var(--accent);font-size:16px;">RM ' + total.toFixed(2) + '</span></div>';
+  var notes = (document.getElementById('order-notes') || {}).value || '';
+  if (notes.trim()) html += '<div class="review-row"><span class="review-label">Notes</span><span class="review-value">' + notes.trim() + '</span></div>';
+  var rc = document.getElementById('review-content');
+  if (rc) rc.innerHTML = html;
+  var sf = document.getElementById('step-form');   if (sf) sf.style.display = 'none';
+  var sr = document.getElementById('step-review'); if (sr) sr.style.display = 'block';
   window.scrollTo({ top: 0, behavior: 'smooth' });
 }
 
 function goBackOrder() {
-  document.getElementById('step-review').style.display = 'none';
-  document.getElementById('step-form').style.display = 'block';
+  var sf = document.getElementById('step-form');   if (sf) sf.style.display = 'block';
+  var sr = document.getElementById('step-review'); if (sr) sr.style.display = 'none';
 }
 
 async function submitOrder() {
-  const btn = document.getElementById('confirm-btn');
-  btn.innerHTML = '<span class="spinner"></span> Submitting...';
-  btn.disabled = true;
-
-  const ic = localStorage.getItem('bb_current');
-  let memberData = {};
+  var btn = document.getElementById('confirm-btn');
+  if (btn) { btn.innerHTML = '<span class="spinner"></span> Submitting...'; btn.disabled = true; }
+  var ic = localStorage.getItem('bb_current') || '';
+  var memberData = {};
   try {
-    const d = await supa.get(`bb_members?ic=eq.${encodeURIComponent(ic)}&select=*`);
-    memberData = d && d[0] ? d[0] : {};
+    var d = await supa.get('bb_members?ic=eq.' + encodeURIComponent(ic) + '&select=*');
+    memberData = (d && d[0]) ? d[0] : {};
   } catch(e) {}
-
-  const items = {};
-  UNIFORM_ITEMS.forEach(item => {
-    const qty = itemQtys[item.key] || 0;
-    if (qty > 0) items[item.key] = { qty, size: itemSizes[item.key] || null, price: prices[item.key] || 0 };
+  var items = {};
+  UNIFORM_ITEMS.forEach(function(item) {
+    var qty = itemQtys[item.key] || 0;
+    if (qty > 0) items[item.key] = { qty: qty, size: itemSizes[item.key] || null, price: prices[item.key] || 0 };
   });
-
-  const orderNum = 'BB-' + Date.now().toString(36).toUpperCase();
-  const payload = {
-    order_number: orderNum,
-    ic,
-    member_name: memberData.name || ic,
-    rank: memberData.rank || '',
-    squad: memberData.squad || '',
-    items: JSON.stringify(items),
-    notes: document.getElementById('order-notes').value.trim(),
-    status: 'pending',
-    created_at: new Date().toISOString(),
-  };
-
+  var orderNum = 'BB-' + Date.now().toString(36).toUpperCase();
   try {
-    await supa.post('bb_orders', payload);
-    document.getElementById('step-review').style.display = 'none';
-    document.getElementById('s-ordernum').textContent = orderNum;
-    const successBox = document.getElementById('order-success');
-    successBox.style.display = 'block';
-    successBox.scrollIntoView({ behavior: 'smooth' });
-    // reset
-    UNIFORM_ITEMS.forEach(i => { itemQtys[i.key] = 0; delete itemSizes[i.key]; document.getElementById(i.key+'-qty').textContent = '0'; const w = document.getElementById(i.key+'-size-wrap'); if(w) w.style.display='none'; document.getElementById('ui-'+i.key).classList.remove('has-qty'); });
-    document.getElementById('order-notes').value = '';
+    await supa.post('bb_orders', {
+      order_number: orderNum, ic: ic,
+      member_name: memberData.name || ic, rank: memberData.rank || '', squad: memberData.squad || '',
+      items: JSON.stringify(items), notes: (document.getElementById('order-notes') || {}).value || '',
+      status: 'pending', created_at: new Date().toISOString()
+    });
+    var sf = document.getElementById('step-review'); if (sf) sf.style.display = 'none';
+    var sn = document.getElementById('s-ordernum');  if (sn) sn.textContent = orderNum;
+    var sb = document.getElementById('order-success'); if (sb) { sb.style.display = 'block'; sb.scrollIntoView({ behavior: 'smooth' }); }
+    UNIFORM_ITEMS.forEach(function(i) {
+      itemQtys[i.key] = 0; delete itemSizes[i.key];
+      var el = document.getElementById(i.key + '-qty'); if (el) el.textContent = '0';
+      var w  = document.getElementById(i.key + '-size-wrap'); if (w) w.style.display = 'none';
+      var c  = document.getElementById('ui-' + i.key); if (c) c.classList.remove('has-qty');
+    });
+    var on = document.getElementById('order-notes'); if (on) on.value = '';
     updateTotal();
   } catch(e) {
-    alert('Failed to submit order. Please try again.\n' + e.message);
-    btn.innerHTML = '✅ Confirm &amp; Submit';
-    btn.disabled = false;
+    alert('Failed to submit: ' + e.message);
+    if (btn) { btn.innerHTML = '\u2705 Confirm &amp; Submit'; btn.disabled = false; }
   }
 }
 
-// ── Auth modes ────────────────────────────────────────────────────────────
-function showAuthMode(mode) {
-  ['login','forgot','register'].forEach(m => {
-    document.getElementById('auth-' + m).style.display = m === mode ? 'block' : 'none';
+// ── Forms system ──────────────────────────────────────────────────────────
+var _customForms     = [];
+var _currentFormType = 'link';
+var _fbFields        = [];
+
+function loadCustomForms() {
+  try { _customForms = JSON.parse(localStorage.getItem('bb_custom_forms') || '[]'); } catch(e) { _customForms = []; }
+}
+function saveCustomForms() { localStorage.setItem('bb_custom_forms', JSON.stringify(_customForms)); }
+
+function setFormType(type) {
+  _currentFormType = type;
+  ['link','builtin','uniform'].forEach(function(t) {
+    var btn = document.getElementById('ftype-' + t);
+    var fields = document.getElementById('fb-' + t + '-fields');
+    if (btn) btn.classList.toggle('ftype-active', t === type);
+    if (fields) fields.style.display = t === type ? 'block' : 'none';
   });
-  ['login','register'].forEach(m => {
-    const btn = document.getElementById('btn-' + m);
+}
+
+function addFormField() {
+  _fbFields.push({ id: 'f' + Date.now(), label: '', type: 'text', required: false });
+  renderFbFields();
+}
+
+function renderFbFields() {
+  var container = document.getElementById('fb-fields-list');
+  if (!container) return;
+  var html = '';
+  _fbFields.forEach(function(f, i) {
+    var types = ['text','textarea','number','date','select'];
+    var opts = types.map(function(t) {
+      return '<option value="' + t + '"' + (f.type === t ? ' selected' : '') + '>' + t + '</option>';
+    }).join('');
+    html += '<div class="fb-field-row">'
+      + '<input type="text" value="' + (f.label||'') + '" data-fi="' + i + '" data-fk="label" placeholder="Field label" style="flex:1;background:#0a1628;color:#fff;border:2px solid #2a3a50;border-radius:8px;padding:8px 10px;font-size:13px;"/>'
+      + '<select data-fi="' + i + '" data-fk="type" style="background:#0a1628;color:#fff;border:2px solid #2a3a50;border-radius:8px;padding:8px;font-size:12px;">' + opts + '</select>'
+      + '<label style="display:flex;align-items:center;gap:4px;color:#8898bb;font-size:11px;cursor:pointer;"><input type="checkbox" data-fi="' + i + '" data-fk="required"' + (f.required ? ' checked' : '') + '/> Req</label>'
+      + '<button data-fi="' + i + '" data-fk="del" style="background:#3a1a1a;border:1px solid #6a2a2a;color:#f66;padding:5px 9px;border-radius:7px;cursor:pointer;font-size:13px;">\u2715</button>'
+      + '</div>'
+      + (f.type === 'select' ? '<input type="text" value="' + (f.options||'') + '" data-fi="' + i + '" data-fk="options" placeholder="Options: Yes, No, Maybe" style="width:100%;background:#0a1628;color:#fff;border:2px solid #2a3a50;border-radius:8px;padding:8px 10px;font-size:12px;margin-bottom:8px;"/>' : '');
+  });
+  container.innerHTML = html;
+  container.querySelectorAll('[data-fi]').forEach(function(el) {
+    var event = el.type === 'checkbox' ? 'change' : 'input';
+    el.addEventListener(event, function() {
+      var i  = parseInt(el.getAttribute('data-fi'));
+      var fk = el.getAttribute('data-fk');
+      if (fk === 'del') { _fbFields.splice(i, 1); renderFbFields(); return; }
+      _fbFields[i][fk] = el.type === 'checkbox' ? el.checked : el.value;
+      if (fk === 'type') renderFbFields();
+    });
+  });
+}
+
+function clearFormBuilder() {
+  ['fb-name','fb-desc','fb-url','fb-edit-id'].forEach(function(id) {
+    var el = document.getElementById(id); if (el) el.value = '';
+  });
+  var t = document.getElementById('fb-form-title'); if (t) t.textContent = '\u2795 Add New Form';
+  _fbFields = [];
+  renderFbFields();
+  setFormType('link');
+}
+
+function saveForm() {
+  var name   = (document.getElementById('fb-name') || {}).value || '';
+  var desc   = (document.getElementById('fb-desc') || {}).value || '';
+  var editId = (document.getElementById('fb-edit-id') || {}).value || '';
+  var type   = _currentFormType;
+  name = name.trim();
+  if (!name) { alert('Please enter a form name.'); return; }
+  var formData = { id: editId || 'form_' + Date.now(), name: name, desc: desc.trim(), type: type, active: true };
+  if (type === 'link') {
+    var url = ((document.getElementById('fb-url') || {}).value || '').trim();
+    if (!url) { alert('Please enter a URL.'); return; }
+    formData.url = url;
+  } else if (type === 'builtin') {
+    if (!_fbFields.length) { alert('Please add at least one field.'); return; }
+    formData.fields = JSON.parse(JSON.stringify(_fbFields));
+  }
+  var idx = _customForms.findIndex(function(f) { return f.id === formData.id; });
+  if (idx >= 0) _customForms[idx] = formData; else _customForms.push(formData);
+  saveCustomForms();
+  clearFormBuilder();
+  renderAdminForms();
+  renderFormsHub();
+  alert('\u2705 Form saved!');
+}
+
+function editForm(id) {
+  var f = _customForms.find(function(x) { return x.id === id; });
+  if (!f) return;
+  var t = document.getElementById('fb-form-title'); if (t) t.textContent = '\u270f\ufe0f Edit: ' + f.name;
+  var n = document.getElementById('fb-name'); if (n) n.value = f.name;
+  var d = document.getElementById('fb-desc'); if (d) d.value = f.desc || '';
+  var e = document.getElementById('fb-edit-id'); if (e) e.value = f.id;
+  _fbFields = f.fields ? JSON.parse(JSON.stringify(f.fields)) : [];
+  if (f.type === 'link') { var u = document.getElementById('fb-url'); if (u) u.value = f.url || ''; }
+  setFormType(f.type || 'link');
+  renderFbFields();
+}
+
+function deleteForm(id) {
+  var f = _customForms.find(function(x) { return x.id === id; });
+  if (!f || !confirm('Delete form "' + f.name + '"?')) return;
+  _customForms = _customForms.filter(function(x) { return x.id !== id; });
+  saveCustomForms();
+  renderAdminForms();
+  renderFormsHub();
+}
+
+function renderAdminForms() {
+  loadCustomForms();
+  var container = document.getElementById('admin-forms-list');
+  if (!container) return;
+  var filter = document.getElementById('admin-order-form-filter');
+  if (filter) {
+    var opts = '<option value="">All forms</option>';
+    _customForms.forEach(function(f) { opts += '<option value="' + f.id + '">' + f.name + '</option>'; });
+    filter.innerHTML = opts;
+  }
+  if (!_customForms.length) { container.innerHTML = '<div style="color:#8898bb;text-align:center;padding:20px;font-size:13px;">No forms yet.</div>'; return; }
+  var icons = { link: '\ud83d\udd17', builtin: '\u2699\ufe0f', uniform: '\ud83d\udc54' };
+  var typeLabel = { link: 'External Link', builtin: 'Built-in Form', uniform: 'Uniform Order' };
+  var html = '';
+  _customForms.forEach(function(f) {
+    html += '<div style="background:#0a1628;border-radius:12px;padding:14px 16px;margin-bottom:10px;border:1px solid rgba(255,255,255,0.06);display:flex;align-items:center;gap:12px;">'
+      + '<div style="width:42px;height:42px;border-radius:10px;background:rgba(200,150,30,0.1);display:flex;align-items:center;justify-content:center;font-size:20px;flex-shrink:0;">' + (icons[f.type] || '\ud83d\udccb') + '</div>'
+      + '<div style="flex:1;"><div style="font-family:\'Oswald\',sans-serif;font-size:15px;font-weight:600;color:#fff;">' + f.name + '</div>'
+      + '<div style="font-size:11px;color:#8898bb;">' + (typeLabel[f.type] || '') + (f.desc ? ' \xb7 ' + f.desc : '') + '</div></div>'
+      + '<button data-edit-form="' + f.id + '" style="background:#1a3a6e;border:1px solid #2a4a8e;color:#fff;padding:6px 12px;border-radius:8px;cursor:pointer;font-size:12px;font-weight:600;">\u270f\ufe0f</button>'
+      + '<button data-del-form="' + f.id + '" style="background:#3a1a1a;border:1px solid #6a2a2a;color:#f66;padding:6px 12px;border-radius:8px;cursor:pointer;font-size:12px;">\ud83d\uddd1\ufe0f</button>'
+      + '</div>';
+  });
+  container.innerHTML = html;
+  container.querySelectorAll('[data-edit-form]').forEach(function(btn) {
+    btn.addEventListener('click', function() { editForm(btn.getAttribute('data-edit-form')); });
+  });
+  container.querySelectorAll('[data-del-form]').forEach(function(btn) {
+    btn.addEventListener('click', function() { deleteForm(btn.getAttribute('data-del-form')); });
+  });
+}
+
+// ── Forms hub (member side) ───────────────────────────────────────────────
+var BUILTIN_LEAVE = {
+  id: '__leave__', name: 'Leave Application', desc: 'Submit a leave request', type: 'builtin', icon: '\ud83d\udcdd',
+  fields: [
+    { id: 'lf1', label: 'Reason for Leave',     type: 'textarea', required: true  },
+    { id: 'lf2', label: 'Start Date',            type: 'date',     required: true  },
+    { id: 'lf3', label: 'End Date',              type: 'date',     required: true  },
+    { id: 'lf4', label: 'Contact During Leave',  type: 'text',     required: false }
+  ]
+};
+
+function renderFormsHub() {
+  loadCustomForms();
+  var hub = document.getElementById('forms-hub');
+  if (!hub) return;
+  var all = [
+    { id: '__leave__',  name: 'Leave Application', desc: 'Submit a leave request',  type: 'builtin', icon: '\ud83d\udcdd' },
+    { id: '__uniform__',name: 'Uniform Order',      desc: 'Order BB uniform items',  type: 'uniform', icon: '\ud83d\udc54' }
+  ].concat(_customForms.filter(function(f) { return f.active !== false; }));
+  if (!all.length) { hub.innerHTML = '<div style="color:#8898bb;text-align:center;padding:30px;font-size:13px;">No forms available.</div>'; return; }
+  var bgMap = { builtin: 'rgba(102,187,106,0.12)', uniform: 'rgba(200,150,30,0.12)', link: 'rgba(66,165,245,0.12)' };
+  var html = '';
+  all.forEach(function(f) {
+    var icon = f.icon || (f.type === 'link' ? '\ud83d\udd17' : '\ud83d\udccb');
+    var bg   = bgMap[f.type] || 'rgba(200,150,30,0.08)';
+    html += '<div class="form-card-hub" data-open-form="' + f.id + '">'
+      + '<div class="form-card-icon" style="background:' + bg + ';">' + icon + '</div>'
+      + '<div style="flex:1;"><div class="form-card-name">' + f.name + '</div><div class="form-card-desc">' + (f.desc||'') + '</div></div>'
+      + '<div class="form-card-arrow">\u203a</div></div>';
+  });
+  hub.innerHTML = html;
+  hub.querySelectorAll('[data-open-form]').forEach(function(el) {
+    el.addEventListener('click', function() { openFormForMember(el.getAttribute('data-open-form')); });
+  });
+}
+
+function openFormForMember(formId) {
+  loadCustomForms();
+  if (formId === '__uniform__') {
+    document.getElementById('forms-hub').style.display = 'none';
+    document.getElementById('inline-form-view').style.display = 'block';
+    renderUniformOrderInline();
+    return;
+  }
+  var all = [BUILTIN_LEAVE].concat(_customForms);
+  var form = all.find(function(f) { return f.id === formId; });
+  if (!form) return;
+  if (form.type === 'link') { window.open(form.url, '_blank'); return; }
+  document.getElementById('forms-hub').style.display = 'none';
+  document.getElementById('inline-form-view').style.display = 'block';
+  renderBuiltinFormInline(form);
+}
+
+function backToFormsHub() {
+  document.getElementById('forms-hub').style.display = 'block';
+  document.getElementById('inline-form-view').style.display = 'none';
+  UNIFORM_ITEMS.forEach(function(i) { itemQtys[i.key] = 0; delete itemSizes[i.key]; });
+  updateTotal();
+}
+
+function renderBuiltinFormInline(form) {
+  var container = document.getElementById('inline-form-view');
+  var fieldsHtml = '';
+  (form.fields || []).forEach(function(f, i) {
+    var req = f.required ? ' <span style="color:#f66;">*</span>' : '';
+    var inp = '';
+    if (f.type === 'textarea') {
+      inp = '<textarea class="form-textarea" id="bff-' + i + '" placeholder="Your answer..." style="margin-top:6px;"></textarea>';
+    } else if (f.type === 'select') {
+      var opts = '<option value="">Select...</option>';
+      (f.options || '').split(',').forEach(function(o) { var t = o.trim(); if (t) opts += '<option>' + t + '</option>'; });
+      inp = '<select class="form-select" id="bff-' + i + '" style="margin-top:6px;">' + opts + '</select>';
+    } else {
+      inp = '<input class="form-input" type="' + (f.type||'text') + '" id="bff-' + i + '" placeholder="Your answer..." style="margin-top:6px;"/>';
+    }
+    fieldsHtml += '<div class="form-group"><label class="form-label">' + f.label + req + '</label>' + inp + '</div>';
+  });
+  container.innerHTML = '<div class="card stripe-bg">'
+    + '<button onclick="backToFormsHub()" style="display:flex;align-items:center;gap:6px;background:none;border:none;color:#8898bb;font-family:\'Oswald\',sans-serif;font-size:13px;cursor:pointer;padding:0;margin-bottom:16px;">\u2039 Back to Forms</button>'
+    + '<div class="page-title">' + form.name + '</div>'
+    + (form.desc ? '<div class="page-desc">' + form.desc + '</div>' : '')
+    + '<hr class="divider"/>' + fieldsHtml
+    + '<button class="submit-btn gold" data-submit-form="' + form.id + '">\ud83d\udce4 Submit</button>'
+    + '<div class="success-box" id="builtin-success" style="display:none;"><div class="s-icon">\u2705</div><div class="s-title">Submitted!</div><div class="s-msg">Your form has been received.</div></div>'
+    + '</div>';
+  container.querySelector('[data-submit-form]').addEventListener('click', function() {
+    submitBuiltinForm(form);
+  });
+}
+
+async function submitBuiltinForm(form) {
+  var answers = {};
+  var valid   = true;
+  (form.fields || []).forEach(function(f, i) {
+    var el  = document.getElementById('bff-' + i);
+    var val = el ? el.value.trim() : '';
+    if (f.required && !val) {
+      valid = false;
+      if (el) el.style.borderColor = '#f66';
+      return;
+    }
+    if (el) el.style.borderColor = '';
+    answers[f.label] = val;
+  });
+  if (!valid) { alert('Please fill in all required fields.'); return; }
+  var ic   = localStorage.getItem('bb_current') || '';
+  var name = (document.getElementById('order-member-name') || {}).textContent || ic;
+  var rank = (document.getElementById('order-member-rank') || {}).textContent || '';
+  try {
+    await supa.post('bb_orders', {
+      order_number: 'FORM-' + Date.now().toString(36).toUpperCase(),
+      ic: ic, member_name: name, rank: rank,
+      items: JSON.stringify({ form_name: form.name, answers: answers }),
+      notes: form.name, status: 'pending', created_at: new Date().toISOString()
+    });
+    var sb = document.getElementById('builtin-success');
+    if (sb) { sb.style.display = 'block'; sb.scrollIntoView({ behavior: 'smooth' }); }
+  } catch(e) { alert('Failed to submit: ' + e.message); }
+}
+
+function renderUniformOrderInline() {
+  var container = document.getElementById('inline-form-view');
+  container.innerHTML = '<button onclick="backToFormsHub()" style="display:flex;align-items:center;gap:6px;background:none;border:none;color:#8898bb;font-family:\'Oswald\',sans-serif;font-size:13px;cursor:pointer;padding:0;margin-bottom:16px;">\u2039 Back to Forms</button>'
+    + '<div id="step-form"><div class="card stripe-bg" style="margin-bottom:14px;">'
+    + '<div class="page-title">Uniform</div><div class="page-subtitle">Order Form</div><div class="page-desc">Select items &amp; sizes \ud83d\udc54</div>'
+    + '<div class="note-box">\u26a0\ufe0f Orders are confirmed by the officer in charge. You will be contacted when ready.</div>'
+    + '<div id="uniform-items"></div>'
+    + '<div class="form-group" style="margin-top:8px;"><label class="form-label">Additional Notes (optional)</label><textarea class="form-textarea" id="order-notes" placeholder="Any special requests..."></textarea></div>'
+    + '<div class="total-row"><div class="total-label">Estimated Total</div><div class="total-val" id="order-total">RM 0.00</div></div>'
+    + '<button class="submit-btn" style="margin-top:14px;" onclick="goToOrderReview()">\ud83d\udc40 Review Order</button>'
+    + '</div></div>'
+    + '<div id="step-review" style="display:none;"><div class="card stripe-bg">'
+    + '<div class="page-title">Review</div><div class="page-subtitle">Your Order</div><div class="page-desc">Confirm before submitting \ud83d\udc47</div>'
+    + '<div style="background:#fff;border-radius:14px;padding:20px;margin-bottom:18px;" id="review-content"></div>'
+    + '<div style="display:flex;gap:10px;"><button class="submit-btn danger" style="flex:1;margin-top:0;" onclick="goBackOrder()">\u270f\ufe0f Edit</button><button class="submit-btn" style="flex:2;margin-top:0;" onclick="submitOrder()" id="confirm-btn">\u2705 Confirm &amp; Submit</button></div>'
+    + '</div></div>'
+    + '<div class="success-box" id="order-success" style="display:none;"><div class="s-icon">\ud83c\udf89</div><div class="s-title">Order Submitted!</div><div class="s-msg">Order <strong id="s-ordernum" style="color:var(--accent);"></strong> received! The officer will contact you when ready.</div></div>';
+  renderOrderItems();
+}
+
+// ── Auth ───────────────────────────────────────────────────────────────────
+function showAuthMode(mode) {
+  ['login','forgot','register'].forEach(function(m) {
+    var el = document.getElementById('auth-' + m);
+    if (el) el.style.display = m === mode ? 'block' : 'none';
+  });
+  ['login','register'].forEach(function(m) {
+    var btn = document.getElementById('btn-' + m);
     if (btn) btn.classList.toggle('active', m === mode);
   });
 }
 
 function togglePassVis(inputId, btnId) {
-  const inp = document.getElementById(inputId);
-  const btn = document.getElementById(btnId);
-  if (inp.type === 'password') { inp.type = 'text'; btn.textContent = '🙈'; }
-  else { inp.type = 'password'; btn.textContent = '👁️'; }
+  var inp = document.getElementById(inputId);
+  var btn = document.getElementById(btnId);
+  if (!inp) return;
+  if (inp.type === 'password') { inp.type = 'text'; if (btn) btn.textContent = '\ud83d\ude48'; }
+  else { inp.type = 'password'; if (btn) btn.textContent = '\ud83d\udc41\ufe0f'; }
 }
 
-// ── Register ──────────────────────────────────────────────────────────────
 async function registerMember() {
-  const name    = document.getElementById('reg-fullname').value.trim();
-  const ic      = document.getElementById('reg-ic').value.trim().replace(/\s/g,'');
-  const rank    = document.getElementById('reg-rank').value;
-  const squad   = document.getElementById('reg-squad').value;
-  const pass    = document.getElementById('reg-pass').value;
-  const pass2   = document.getElementById('reg-pass2').value;
-  const question= document.getElementById('reg-question').value;
-  const answer  = document.getElementById('reg-answer').value.trim().toLowerCase();
-
-  if (!name) return alert('Please enter your full name.');
-  if (!ic) return alert('Please enter your IC number.');
-  if (!rank) return alert('Please select your rank.');
-  if (!squad) return alert('Please select your squad.');
+  var name     = (document.getElementById('reg-fullname') || {}).value || '';
+  var ic       = ((document.getElementById('reg-ic') || {}).value || '').trim().replace(/\s/g,'');
+  var rank     = (document.getElementById('reg-rank') || {}).value || '';
+  var squad    = (document.getElementById('reg-squad') || {}).value || '';
+  var pass     = (document.getElementById('reg-pass') || {}).value || '';
+  var pass2    = (document.getElementById('reg-pass2') || {}).value || '';
+  var question = (document.getElementById('reg-question') || {}).value || '';
+  var answer   = ((document.getElementById('reg-answer') || {}).value || '').trim().toLowerCase();
+  name = name.trim();
+  if (!name)           return alert('Please enter your full name.');
+  if (!ic)             return alert('Please enter your IC number.');
+  if (!rank)           return alert('Please select your rank.');
+  if (!squad)          return alert('Please select your squad.');
   if (pass.length < 6) return alert('Password must be at least 6 characters.');
-  if (pass !== pass2) return alert('Passwords do not match!');
-  if (!question) return alert('Please select a security question.');
-  if (!answer) return alert('Please answer the security question.');
-
+  if (pass !== pass2)  return alert('Passwords do not match!');
+  if (!question)       return alert('Please select a security question.');
+  if (!answer)         return alert('Please answer the security question.');
   try {
-    const existing = await supa.get(`bb_members?ic=eq.${encodeURIComponent(ic)}&select=ic`);
-    if (existing && existing.length > 0) return alert('An account with this IC already exists. Please login.');
-
+    var existing = await supa.get('bb_members?ic=eq.' + encodeURIComponent(ic) + '&select=ic');
+    if (existing && existing.length) return alert('An account with this IC already exists.');
     await supa.post('bb_members', {
-      ic, name, rank, squad,
-      password: btoa(pass),
-      security_question: question,
-      security_answer: answer,
-      joined_at: new Date().toISOString(),
+      ic: ic, name: name, rank: rank, squad: squad,
+      password: btoa(pass), security_question: question, security_answer: answer,
+      joined_at: new Date().toISOString()
     });
     localStorage.setItem('bb_current', ic);
     renderDashboard();
     checkTasksAccess();
-    alert('✅ Account created! Welcome, ' + name + '!');
+    alert('\u2705 Account created! Welcome, ' + name + '!');
   } catch(e) { alert('Registration failed: ' + e.message); }
 }
 
-// ── Login ─────────────────────────────────────────────────────────────────
 async function loginMember() {
-  const ic   = document.getElementById('login-ic').value.trim().replace(/\s/g,'');
-  const pass = document.getElementById('login-pass').value;
+  var ic   = ((document.getElementById('login-ic') || {}).value || '').trim().replace(/\s/g,'');
+  var pass = (document.getElementById('login-pass') || {}).value || '';
   if (!ic || !pass) return alert('Please fill in all fields.');
   try {
-    const data = await supa.get(`bb_members?ic=eq.${encodeURIComponent(ic)}&select=*`);
+    var data = await supa.get('bb_members?ic=eq.' + encodeURIComponent(ic) + '&select=*');
     if (!data || !data.length) return alert('No account found with this IC number.');
-    const m = data[0];
+    var m = data[0];
     if (atob(m.password || '') !== pass) return alert('Incorrect password!');
     localStorage.setItem('bb_current', ic);
     renderDashboard();
@@ -1320,86 +1597,207 @@ async function loginMember() {
   } catch(e) { alert('Login failed: ' + e.message); }
 }
 
-// ── Dashboard ─────────────────────────────────────────────────────────────
 async function renderDashboard() {
-  const ic = localStorage.getItem('bb_current');
+  var ic = localStorage.getItem('bb_current');
   if (!ic) return;
-  document.getElementById('m-auth').style.display = 'none';
+  document.getElementById('m-auth').style.display      = 'none';
   document.getElementById('m-dashboard').style.display = 'block';
-
   try {
-    const data = await supa.get(`bb_members?ic=eq.${encodeURIComponent(ic)}&select=*`);
+    var data = await supa.get('bb_members?ic=eq.' + encodeURIComponent(ic) + '&select=*');
     if (!data || !data.length) return;
-    const m = data[0];
-    document.getElementById('m-display-name').textContent = m.name;
-    document.getElementById('m-display-ic').textContent   = 'IC: ' + m.ic;
-    document.getElementById('m-rank-val').textContent     = m.rank || '—';
-    document.getElementById('m-squad-val').textContent    = m.squad ? m.squad + ' Squad' : '—';
-    const joined = m.joined_at ? new Date(m.joined_at).toLocaleDateString('en-MY', { day:'numeric', month:'short', year:'numeric' }) : '—';
-    document.getElementById('m-since-val').textContent = joined;
+    var m = data[0];
+    var set = function(id, val) { var el = document.getElementById(id); if (el) el.textContent = val; };
+    set('m-display-name', m.name);
+    set('m-display-ic',   'IC: ' + m.ic);
+    set('m-rank-val',     m.rank  || '\u2014');
+    set('m-squad-val',    m.squad ? m.squad + ' Squad' : '\u2014');
+    set('m-since-val',    m.joined_at ? new Date(m.joined_at).toLocaleDateString('en-MY', { day:'numeric', month:'short', year:'numeric' }) : '\u2014');
+    var pfp = localStorage.getItem('bb_pfp_' + ic);
+    if (pfp) {
+      var img = document.getElementById('m-pfp-img');
+      var ph  = document.getElementById('m-pfp-ph');
+      if (img) { img.src = pfp; img.style.display = 'block'; }
+      if (ph)  ph.style.display = 'none';
+    }
     loadBadges(ic);
-    // pfp
-    const pfp = localStorage.getItem('bb_pfp_' + ic);
-    if (pfp) { document.getElementById('m-pfp-img').src = pfp; document.getElementById('m-pfp-img').style.display = 'block'; document.getElementById('m-pfp-ph').style.display = 'none'; }
   } catch(e) { console.error(e); }
 }
 
-
-
 function logoutMember() {
   localStorage.removeItem('bb_current');
-  document.getElementById('tab-tasks').style.display = 'none';
-  document.getElementById('m-auth').style.display = 'block';
+  document.getElementById('tab-tasks').style.display  = 'none';
+  document.getElementById('m-auth').style.display     = 'block';
   document.getElementById('m-dashboard').style.display = 'none';
   showAuthMode('login');
 }
 
 function uploadPfp(input) {
-  const file = input.files[0];
+  var file = input.files[0];
   if (!file) return;
-  const reader = new FileReader();
-  reader.onload = e => {
-    const data = e.target.result;
-    const ic = localStorage.getItem('bb_current');
-    localStorage.setItem('bb_pfp_' + ic, data);
-    document.getElementById('m-pfp-img').src = data;
-    document.getElementById('m-pfp-img').style.display = 'block';
-    document.getElementById('m-pfp-ph').style.display = 'none';
+  var reader = new FileReader();
+  reader.onload = function(e) {
+    var ic = localStorage.getItem('bb_current');
+    localStorage.setItem('bb_pfp_' + ic, e.target.result);
+    var img = document.getElementById('m-pfp-img');
+    var ph  = document.getElementById('m-pfp-ph');
+    if (img) { img.src = e.target.result; img.style.display = 'block'; }
+    if (ph)  ph.style.display = 'none';
   };
   reader.readAsDataURL(file);
 }
 
-// ── Forgot password ───────────────────────────────────────────────────────
 async function loadSecurityQuestion() {
-  const ic = document.getElementById('forgot-ic').value.trim().replace(/\s/g,'');
+  var ic = ((document.getElementById('forgot-ic') || {}).value || '').trim().replace(/\s/g,'');
   if (!ic) return alert('Please enter your IC number.');
   try {
-    const data = await supa.get(`bb_members?ic=eq.${encodeURIComponent(ic)}&select=security_question`);
+    var data = await supa.get('bb_members?ic=eq.' + encodeURIComponent(ic) + '&select=security_question');
     if (!data || !data.length) return alert('No account found with this IC.');
-    document.getElementById('forgot-question-box').textContent = '❓ ' + data[0].security_question;
-    document.getElementById('forgot-step2').style.display = 'block';
+    var box = document.getElementById('forgot-question-box');
+    if (box) box.textContent = '\u2753 ' + data[0].security_question;
+    var s2 = document.getElementById('forgot-step2');
+    if (s2) s2.style.display = 'block';
   } catch(e) { alert('Failed: ' + e.message); }
 }
 
 async function resetPassword() {
-  const ic   = document.getElementById('forgot-ic').value.trim().replace(/\s/g,'');
-  const ans  = document.getElementById('forgot-answer').value.trim().toLowerCase();
-  const p1   = document.getElementById('forgot-newpass').value;
-  const p2   = document.getElementById('forgot-newpass2').value;
+  var ic  = ((document.getElementById('forgot-ic') || {}).value || '').trim().replace(/\s/g,'');
+  var ans = ((document.getElementById('forgot-answer') || {}).value || '').trim().toLowerCase();
+  var p1  = (document.getElementById('forgot-newpass') || {}).value || '';
+  var p2  = (document.getElementById('forgot-newpass2') || {}).value || '';
   if (p1.length < 6) return alert('Password must be at least 6 characters.');
-  if (p1 !== p2) return alert('Passwords do not match!');
+  if (p1 !== p2)     return alert('Passwords do not match!');
   try {
-    const data = await supa.get(`bb_members?ic=eq.${encodeURIComponent(ic)}&select=security_answer`);
+    var data = await supa.get('bb_members?ic=eq.' + encodeURIComponent(ic) + '&select=security_answer');
     if (!data || !data.length) return alert('Account not found.');
     if (data[0].security_answer !== ans) return alert('Incorrect answer!');
-    await supa.patch(`bb_members?ic=eq.${encodeURIComponent(ic)}`, { password: btoa(p1) });
-    alert('✅ Password reset! Please login.');
+    await supa.patch('bb_members?ic=eq.' + encodeURIComponent(ic), { password: btoa(p1) });
+    alert('\u2705 Password reset! Please login.');
     showAuthMode('login');
   } catch(e) { alert('Failed: ' + e.message); }
 }
 
-// ── Gallery ───────────────────────────────────────────────────────────────
-let galleryImages = [];
+// ── Tasks ──────────────────────────────────────────────────────────────────
+var DEPT_CONFIG = {
+  logistics:   { label: 'Logistics',   color: '#42a5f5', cls: 'dept-logistics'   },
+  secretariat: { label: 'Secretariat', color: '#ce93d8', cls: 'dept-secretariat' },
+  media:       { label: 'Media',       color: '#ffb74d', cls: 'dept-media'       }
+};
+
+async function checkTasksAccess() {
+  var ic = localStorage.getItem('bb_current');
+  var tab = document.getElementById('tab-tasks');
+  ['tasks-gate','tasks-no-dept','tasks-board'].forEach(function(id) {
+    var el = document.getElementById(id); if (el) el.style.display = 'none';
+  });
+  if (!ic) { if (tab) tab.style.display = 'none'; var g = document.getElementById('tasks-gate'); if (g) g.style.display = 'block'; return; }
+  try {
+    var data = await supa.get('bb_members?ic=eq.' + encodeURIComponent(ic) + '&select=name,department');
+    var m    = data && data[0];
+    var dept = m && m.department;
+    if (!dept || !DEPT_CONFIG[dept]) {
+      if (tab) tab.style.display = 'none';
+      var nd = document.getElementById('tasks-no-dept'); if (nd) nd.style.display = 'block';
+      return;
+    }
+    if (tab) tab.style.display = 'block';
+    var cfg = DEPT_CONFIG[dept];
+    var dt  = document.getElementById('tasks-dept-title');  if (dt) dt.textContent = cfg.label + ' Department';
+    var ds  = document.getElementById('tasks-dept-sub');    if (ds) ds.textContent = 'Task Board';
+    var db  = document.getElementById('tasks-dept-badge');
+    if (db) db.innerHTML = '<span class="dept-badge ' + cfg.cls + '">' + cfg.label + '</span>';
+    var board = document.getElementById('tasks-board'); if (board) board.style.display = 'block';
+    await renderTasksBoard(dept);
+  } catch(e) { console.error(e); }
+}
+
+async function renderTasksBoard(dept) {
+  var cols = { todo: [], inprogress: [], done: [] };
+  try {
+    var tasks = await supa.get('bb_tasks?department=eq.' + dept + '&order=created_at.desc');
+    tasks.forEach(function(t) {
+      var k = t.status === 'inprogress' ? 'inprogress' : t.status === 'done' ? 'done' : 'todo';
+      cols[k].push(t);
+    });
+  } catch(e) { console.error(e); }
+  window._taskMap = window._taskMap || {};
+  var today = new Date(); today.setHours(0,0,0,0);
+  ['todo','inprogress','done'].forEach(function(status) {
+    var el  = document.getElementById('col-' + status);
+    var cnt = document.getElementById('count-' + status);
+    if (cnt) cnt.textContent = cols[status].length ? '(' + cols[status].length + ')' : '';
+    if (!el) return;
+    if (!cols[status].length) { el.innerHTML = '<div style="color:#556;font-size:12px;text-align:center;padding:16px 0;">No tasks</div>'; return; }
+    var html = '';
+    cols[status].forEach(function(t) {
+      window._taskMap[t.id] = t;
+      var pc = t.priority === 'high' ? 'prio-high' : t.priority === 'low' ? 'prio-low' : 'prio-medium';
+      var pl = (t.priority || 'medium').charAt(0).toUpperCase() + (t.priority || 'medium').slice(1);
+      var dueHtml = '';
+      if (t.due_date) {
+        var due = new Date(t.due_date); due.setHours(0,0,0,0);
+        var overdue = status !== 'done' && due < today;
+        dueHtml = '<span class="task-due' + (overdue ? ' overdue' : '') + '">\ud83d\udcc5 ' + due.toLocaleDateString('en-MY', { day:'numeric', month:'short' }) + '</span>';
+      }
+      var assignHtml = t.assignee_name ? '<span class="task-assignee">\ud83d\udc64 ' + t.assignee_name + '</span>' : '';
+      var sc = { todo:'#8898bb', inprogress:'#42a5f5', done:'#66bb6a' };
+      var sl = { todo:'To Do', inprogress:'In Progress', done:'Done' };
+      var stBtns = '<div style="display:flex;gap:4px;margin-top:10px;flex-wrap:wrap;">';
+      ['todo','inprogress','done'].forEach(function(s) {
+        var active = t.status === s;
+        stBtns += '<button data-task-id="' + t.id + '" data-task-status="' + s + '" data-dept="' + dept + '" style="padding:3px 10px;border:1.5px solid ' + (active ? sc[s] : '#2a3a50') + ';border-radius:14px;background:' + (active ? sc[s] + '22' : 'transparent') + ';color:' + (active ? sc[s] : '#556') + ';font-size:10px;font-weight:700;cursor:pointer;font-family:\'Oswald\',sans-serif;">' + sl[s] + '</button>';
+      });
+      stBtns += '</div>';
+      html += '<div class="task-card" data-task-open="' + t.id + '">'
+        + '<div class="task-card-title">' + t.title + '</div>'
+        + (t.description ? '<div class="task-card-desc">' + (t.description.length > 80 ? t.description.slice(0,80) + '\u2026' : t.description) + '</div>' : '')
+        + '<div class="task-meta"><span class="task-pill ' + pc + '">' + pl + '</span>' + assignHtml + dueHtml + '</div>'
+        + stBtns + '</div>';
+    });
+    el.innerHTML = html;
+    el.querySelectorAll('[data-task-open]').forEach(function(card) {
+      card.addEventListener('click', function(e) {
+        if (e.target.closest('[data-task-id]')) return;
+        openTaskDetail(card.getAttribute('data-task-open'));
+      });
+    });
+    el.querySelectorAll('[data-task-id]').forEach(function(btn) {
+      btn.addEventListener('click', function(e) {
+        e.stopPropagation();
+        memberUpdateTaskStatus(btn.getAttribute('data-task-id'), btn.getAttribute('data-task-status'), btn.getAttribute('data-dept'));
+      });
+    });
+  });
+}
+
+function openTaskDetail(id) {
+  var t = (window._taskMap && window._taskMap[id]) || {};
+  var set = function(elId, val) { var el = document.getElementById(elId); if (el) el.textContent = val; };
+  set('tdm-title', t.title || '');
+  set('tdm-desc',  t.description || 'No description.');
+  var pc = t.priority === 'high' ? 'prio-high' : t.priority === 'low' ? 'prio-low' : 'prio-medium';
+  var pl = (t.priority || 'medium').charAt(0).toUpperCase() + (t.priority || 'medium').slice(1);
+  var sl = t.status === 'inprogress' ? 'In Progress' : t.status === 'done' ? 'Done' : 'To Do';
+  var sc = t.status === 'done' ? '#66bb6a' : t.status === 'inprogress' ? '#42a5f5' : '#8898bb';
+  var dept = DEPT_CONFIG[t.department] || {};
+  var meta = document.getElementById('tdm-meta');
+  if (meta) meta.innerHTML = '<span class="task-pill ' + pc + '">' + pl + '</span>'
+    + '<span class="task-pill" style="background:' + sc + '22;color:' + sc + ';border:1px solid ' + sc + '44;">' + sl + '</span>'
+    + (dept.cls ? '<span class="dept-badge ' + dept.cls + '">' + dept.label + '</span>' : '');
+  set('tdm-assignee', t.assignee_name || '\u2014');
+  set('tdm-due', t.due_date ? new Date(t.due_date).toLocaleDateString('en-MY', { day:'numeric', month:'short', year:'numeric' }) : '\u2014');
+  var modal = document.getElementById('task-detail-modal');
+  if (modal) modal.style.display = 'block';
+}
+
+function closeTaskDetail() { var m = document.getElementById('task-detail-modal'); if (m) m.style.display = 'none'; }
+
+async function memberUpdateTaskStatus(id, status, dept) {
+  try { await supa.patch('bb_tasks?id=eq.' + id, { status: status }); await renderTasksBoard(dept); }
+  catch(e) { alert('Failed to update.'); }
+}
+
+// ── Gallery ────────────────────────────────────────────────────────────────
+var galleryImages = [];
 
 function loadGallery() {
   try { galleryImages = JSON.parse(localStorage.getItem('bb_gallery') || '[]'); } catch(e) { galleryImages = []; }
@@ -1407,39 +1805,35 @@ function loadGallery() {
 }
 
 function renderGallery() {
-  const grid = document.getElementById('gallery-grid');
-  const adminGrid = document.getElementById('admin-gallery-grid');
-  const noPhotos = document.getElementById('no-photos');
+  var grid      = document.getElementById('gallery-grid');
+  var adminGrid = document.getElementById('admin-gallery-grid');
+  var noPhotos  = document.getElementById('no-photos');
   if (!galleryImages.length) {
-    if (grid) grid.innerHTML = '';
+    if (grid)      grid.innerHTML = '';
     if (adminGrid) adminGrid.innerHTML = '';
-    if (noPhotos) noPhotos.style.display = 'block';
+    if (noPhotos)  noPhotos.style.display = 'block';
     return;
   }
   if (noPhotos) noPhotos.style.display = 'none';
-  const publicHtml = galleryImages.map((img, i) => `
-    <div class="gallery-img-wrap">
-      <img src="${img}" alt="Photo ${i+1}"/>
-    </div>`).join('');
-  const adminHtml = galleryImages.map((img, i) => `
-    <div class="gallery-img-wrap">
-      <img src="${img}" alt="Photo ${i+1}"/>
-      <button class="del-btn" onclick="deleteGalleryImage(${i})">✕</button>
-    </div>`).join('');
-  if (grid) grid.innerHTML = publicHtml;
-  if (adminGrid) adminGrid.innerHTML = adminHtml;
+  var pubHtml = '', admHtml = '';
+  galleryImages.forEach(function(img, i) {
+    pubHtml += '<div class="gallery-img-wrap"><img src="' + img + '" alt="Photo ' + (i+1) + '"/></div>';
+    admHtml += '<div class="gallery-img-wrap"><img src="' + img + '" alt="Photo ' + (i+1) + '"/><button class="del-btn" data-gi="' + i + '">\u2715</button></div>';
+  });
+  if (grid)      grid.innerHTML = pubHtml;
+  if (adminGrid) {
+    adminGrid.innerHTML = admHtml;
+    adminGrid.querySelectorAll('[data-gi]').forEach(function(btn) {
+      btn.addEventListener('click', function() { deleteGalleryImage(parseInt(btn.getAttribute('data-gi'))); });
+    });
+  }
 }
 
 function handleGalleryUpload(input) {
-  const files = Array.from(input.files);
-  files.forEach(file => {
-    const reader = new FileReader();
-    reader.onload = e => {
-      galleryImages.push(e.target.result);
-      localStorage.setItem('bb_gallery', JSON.stringify(galleryImages));
-      renderGallery();
-    };
-    reader.readAsDataURL(file);
+  Array.from(input.files).forEach(function(file) {
+    var r = new FileReader();
+    r.onload = function(e) { galleryImages.push(e.target.result); localStorage.setItem('bb_gallery', JSON.stringify(galleryImages)); renderGallery(); };
+    r.readAsDataURL(file);
   });
 }
 
@@ -1449,8 +1843,8 @@ function deleteGalleryImage(idx) {
   renderGallery();
 }
 
-// ── Announcements ─────────────────────────────────────────────────────────
-let announcements = [];
+// ── Announcements ──────────────────────────────────────────────────────────
+var announcements = [];
 
 function loadAnnouncements() {
   try { announcements = JSON.parse(localStorage.getItem('bb_announcements') || '[]'); } catch(e) { announcements = []; }
@@ -1458,29 +1852,26 @@ function loadAnnouncements() {
 }
 
 function renderAnnouncements() {
-  const list = document.getElementById('announcements-list');
+  var list = document.getElementById('announcements-list');
+  if (!list) return;
   if (!announcements.length) { list.innerHTML = '<div style="color:#8898bb;font-size:13px;text-align:center;padding:20px;">No announcements yet.</div>'; return; }
-  const isAdmin = localStorage.getItem('bb_admin') === '1';
-  list.innerHTML = announcements.slice().reverse().map((a, ri) => {
-    const i = announcements.length - 1 - ri;
-    return `<div class="announcement-item">
-      <div class="ann-date">${a.date}</div>
-      <div class="ann-title">${a.title}</div>
-      <div class="ann-body">${a.body}</div>
-      ${isAdmin ? `<button onclick="deleteAnnouncement(${i})" style="margin-top:8px;background:none;border:none;color:#c04040;font-size:11px;cursor:pointer;font-weight:700;">✕ Delete</button>` : ''}
-    </div>`;
-  }).join('');
+  var html = '';
+  announcements.slice().reverse().forEach(function(a) {
+    html += '<div class="announcement-item"><div class="ann-date">' + a.date + '</div><div class="ann-title">' + a.title + '</div><div class="ann-body">' + a.body + '</div></div>';
+  });
+  list.innerHTML = html;
 }
 
 function addAnnouncement() {
-  const title = document.getElementById('ann-title-input').value.trim();
-  const body  = document.getElementById('ann-body-input').value.trim();
-  if (!title || !body) return alert('Please fill in both title and message.');
-  const date = new Date().toLocaleDateString('en-MY', { day:'numeric', month:'short', year:'numeric' }).toUpperCase();
-  announcements.push({ title, body, date });
+  var title = (document.getElementById('ann-title-input') || {}).value || '';
+  var body  = (document.getElementById('ann-body-input')  || {}).value || '';
+  title = title.trim(); body = body.trim();
+  if (!title || !body) { alert('Please fill in both title and message.'); return; }
+  var date = new Date().toLocaleDateString('en-MY', { day:'numeric', month:'short', year:'numeric' }).toUpperCase();
+  announcements.push({ title: title, body: body, date: date });
   localStorage.setItem('bb_announcements', JSON.stringify(announcements));
-  document.getElementById('ann-title-input').value = '';
-  document.getElementById('ann-body-input').value = '';
+  var ti = document.getElementById('ann-title-input'); if (ti) ti.value = '';
+  var bi = document.getElementById('ann-body-input');  if (bi) bi.value = '';
   renderAnnouncements();
   renderAdminAnnList();
 }
@@ -1492,17 +1883,197 @@ function deleteAnnouncement(idx) {
   renderAdminAnnList();
 }
 
-// ── Admin ─────────────────────────────────────────────────────────────────
+function renderAdminAnnList() {
+  var container = document.getElementById('admin-ann-list');
+  if (!container) return;
+  if (!announcements.length) { container.innerHTML = '<div style="color:#556;font-size:12px;text-align:center;padding:10px;">No announcements yet.</div>'; return; }
+  var html = '<div style="font-family:\'Oswald\',sans-serif;font-size:13px;font-weight:600;color:#8898bb;margin-bottom:8px;letter-spacing:1px;">EXISTING ANNOUNCEMENTS</div>';
+  var rev = announcements.slice().reverse();
+  rev.forEach(function(a, ri) {
+    var i = announcements.length - 1 - ri;
+    html += '<div style="background:#122040;border-radius:10px;padding:12px;margin-bottom:8px;border-left:3px solid var(--accent);display:flex;justify-content:space-between;align-items:flex-start;gap:10px;">'
+      + '<div style="flex:1;"><div style="font-family:\'Oswald\',sans-serif;font-size:14px;color:#fff;font-weight:600;">' + a.title + '</div><div style="font-size:11px;color:#8898bb;margin-top:2px;">' + a.date + '</div></div>'
+      + '<button data-del-ann="' + i + '" style="background:none;border:none;color:#f66;font-size:16px;cursor:pointer;flex-shrink:0;">\ud83d\uddd1\ufe0f</button></div>';
+  });
+  container.innerHTML = html;
+  container.querySelectorAll('[data-del-ann]').forEach(function(btn) {
+    btn.addEventListener('click', function() { deleteAnnouncement(parseInt(btn.getAttribute('data-del-ann'))); });
+  });
+}
+
+// ── Badges ─────────────────────────────────────────────────────────────────
+var DEFAULT_BB_BADGES = [
+  { id:'bb1',  name:'BB Enrolment',          cat:'Core'       },
+  { id:'bb2',  name:"BB Founder's Award",    cat:'Core'       },
+  { id:'bb3',  name:"President's Award",     cat:'Core'       },
+  { id:'bb4',  name:'First Aid (Basic)',      cat:'Skills'     },
+  { id:'bb5',  name:'First Aid (Advanced)',   cat:'Skills'     },
+  { id:'bb6',  name:'Fire Safety',            cat:'Skills'     },
+  { id:'bb7',  name:'Marching',               cat:'Drill'      },
+  { id:'bb8',  name:'Best Driller',           cat:'Drill'      },
+  { id:'bb9',  name:'Leadership',             cat:'Leadership' },
+  { id:'bb10', name:'Community Service',      cat:'Service'    },
+  { id:'bb11', name:'Best Camper',            cat:'Outdoor'    },
+  { id:'bb12', name:'Orienteering',           cat:'Outdoor'    },
+  { id:'bb13', name:'Swimming (Beginner)',     cat:'Sports'     },
+  { id:'bb14', name:'Swimming (Proficiency)', cat:'Sports'     },
+  { id:'bb15', name:'Music & Worship',        cat:'Arts'       }
+];
+
+function getBadgeDefs() {
+  try { return JSON.parse(localStorage.getItem('bb_badge_defs') || 'null') || DEFAULT_BB_BADGES; }
+  catch(e) { return DEFAULT_BB_BADGES; }
+}
+function saveBadgeDefs(defs) { localStorage.setItem('bb_badge_defs', JSON.stringify(defs)); }
+
+function loadBadges(ic) {
+  var saved     = JSON.parse(localStorage.getItem('bb_badges_' + ic) || '{}');
+  var defs      = getBadgeDefs();
+  var container = document.getElementById('badges-list');
+  if (!container) return;
+  var cats = [];
+  defs.forEach(function(b) { if (cats.indexOf(b.cat) === -1) cats.push(b.cat); });
+  if (!cats.length) { container.innerHTML = '<div style="color:#8898bb;font-size:13px;text-align:center;padding:16px;">No badges defined yet.</div>'; return; }
+  var html = '';
+  cats.forEach(function(cat) {
+    var catBadges = defs.filter(function(b) { return b.cat === cat && b.name !== '(Add badges below)'; });
+    if (!catBadges.length) return;
+    html += '<div style="margin-bottom:16px;">'
+      + '<div style="font-size:10px;font-weight:700;letter-spacing:2px;color:var(--gold);text-transform:uppercase;margin-bottom:8px;">' + cat + '</div>';
+    catBadges.forEach(function(b) {
+      var entry   = saved[b.id] || { earned: false, date: '' };
+      var chkBg   = entry.earned ? 'rgba(200,150,30,0.2)' : 'transparent';
+      var chkBord = entry.earned ? 'var(--gold)' : '#2a3a50';
+      var chkTxt  = entry.earned ? '\u2713' : '';
+      var txtCol  = entry.earned ? '#fff' : '#8898bb';
+      var opacity = entry.earned ? '' : 'opacity:0.4;';
+      html += '<div style="display:flex;align-items:center;gap:10px;padding:8px 0;border-bottom:1px solid rgba(255,255,255,0.05);">'
+        + '<div data-badge-id="' + b.id + '" data-ic="' + ic + '" style="width:22px;height:22px;border-radius:6px;border:2px solid ' + chkBord + ';background:' + chkBg + ';display:flex;align-items:center;justify-content:center;cursor:pointer;flex-shrink:0;font-size:13px;">' + chkTxt + '</div>'
+        + '<div style="flex:1;font-size:13px;color:' + txtCol + ';">' + b.name + '</div>'
+        + '<input type="date" id="badge-date-' + b.id + '" value="' + (entry.date||'') + '" style="background:#0a1628;color:#8898bb;border:1px solid #2a3a50;border-radius:7px;padding:4px 8px;font-size:11px;width:130px;' + opacity + '"/>'
+        + '</div>';
+    });
+    html += '</div>';
+  });
+  container.innerHTML = html;
+  container.querySelectorAll('[data-badge-id]').forEach(function(el) {
+    el.addEventListener('click', function() { toggleBadge(el.getAttribute('data-badge-id'), el.getAttribute('data-ic')); });
+  });
+}
+
+function toggleBadge(badgeId, ic) {
+  var saved = JSON.parse(localStorage.getItem('bb_badges_' + ic) || '{}');
+  var curr  = saved[badgeId] || { earned: false, date: '' };
+  saved[badgeId] = { earned: !curr.earned, date: curr.date };
+  localStorage.setItem('bb_badges_' + ic, JSON.stringify(saved));
+  loadBadges(ic);
+}
+
+function saveBadges() {
+  var ic = localStorage.getItem('bb_current');
+  if (!ic) return;
+  var defs  = getBadgeDefs();
+  var saved = JSON.parse(localStorage.getItem('bb_badges_' + ic) || '{}');
+  defs.forEach(function(b) {
+    var el = document.getElementById('badge-date-' + b.id);
+    if (el) { if (!saved[b.id]) saved[b.id] = { earned: false, date: '' }; saved[b.id].date = el.value; }
+  });
+  localStorage.setItem('bb_badges_' + ic, JSON.stringify(saved));
+  alert('\u2705 Badges saved!');
+}
+
+function renderAdminBadges() {
+  var defs      = getBadgeDefs();
+  var cats      = [];
+  defs.forEach(function(b) { if (cats.indexOf(b.cat) === -1) cats.push(b.cat); });
+  var container = document.getElementById('admin-badges-content');
+  if (!container) return;
+  var html = '';
+  cats.forEach(function(cat) {
+    var catBadges = defs.filter(function(b) { return b.cat === cat && b.name !== '(Add badges below)'; });
+    var inputKey  = 'nb_' + cat.replace(/[^a-zA-Z0-9]/g,'_');
+    var rows = catBadges.length
+      ? catBadges.map(function(b) {
+          return '<div style="display:flex;align-items:center;gap:8px;padding:7px 0;border-bottom:1px solid rgba(255,255,255,0.05);">'
+            + '<div style="flex:1;font-size:13px;color:#ccc;">' + b.name + '</div>'
+            + '<button data-del-badge="' + b.id + '" style="background:none;border:none;color:#f66;font-size:14px;cursor:pointer;padding:2px 8px;">\u2715</button></div>';
+        }).join('')
+      : '<div style="font-size:12px;color:#556;padding:6px 0;">No badges yet \u2014 add one below.</div>';
+    html += '<div style="background:#0a1628;border-radius:12px;padding:14px 16px;margin-bottom:12px;border:1px solid rgba(255,255,255,0.07);">'
+      + '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;">'
+      + '<div style="font-family:\'Oswald\',sans-serif;font-size:15px;font-weight:700;color:var(--gold);">' + cat + '</div>'
+      + '<button data-del-cat="' + cat + '" style="background:#3a1a1a;border:1px solid #6a2a2a;color:#f66;padding:4px 12px;border-radius:7px;cursor:pointer;font-size:11px;font-weight:700;">\ud83d\uddd1\ufe0f Delete section</button>'
+      + '</div>' + rows
+      + '<div style="display:flex;gap:8px;margin-top:10px;">'
+      + '<input type="text" id="' + inputKey + '" placeholder="New badge name..." style="flex:1;background:#122040;color:#fff;border:1.5px solid #2a3a50;border-radius:8px;padding:8px 10px;font-size:13px;outline:none;"/>'
+      + '<button data-add-badge="' + cat + '" style="background:rgba(200,150,30,0.15);border:1px solid rgba(200,150,30,0.35);color:var(--gold);padding:8px 14px;border-radius:8px;cursor:pointer;font-size:13px;font-weight:700;white-space:nowrap;">+ Add</button>'
+      + '</div></div>';
+  });
+  html += '<div style="background:#0a1628;border-radius:12px;padding:14px 16px;border:1px dashed rgba(200,150,30,0.3);">'
+    + '<div style="font-family:\'Oswald\',sans-serif;font-size:14px;font-weight:600;color:#8898bb;margin-bottom:10px;">\u2795 Add New Section</div>'
+    + '<div style="display:flex;gap:8px;">'
+    + '<input type="text" id="new-cat-name" placeholder="Section name e.g. Leadership" style="flex:1;background:#122040;color:#fff;border:1.5px solid #2a3a50;border-radius:8px;padding:8px 10px;font-size:13px;outline:none;"/>'
+    + '<button id="btn-add-cat" style="background:var(--accent);border:none;color:var(--navy);padding:8px 18px;border-radius:8px;cursor:pointer;font-size:14px;font-weight:700;">+ Add</button>'
+    + '</div></div>';
+  container.innerHTML = html;
+  container.querySelectorAll('[data-del-cat]').forEach(function(btn) {
+    btn.addEventListener('click', function() {
+      var cat = btn.getAttribute('data-del-cat');
+      if (!confirm('Delete the "' + cat + '" section and all its badges?')) return;
+      saveBadgeDefs(getBadgeDefs().filter(function(b) { return b.cat !== cat; }));
+      renderAdminBadges();
+    });
+  });
+  container.querySelectorAll('[data-del-badge]').forEach(function(btn) {
+    btn.addEventListener('click', function() {
+      var id    = btn.getAttribute('data-del-badge');
+      var badge = getBadgeDefs().find(function(b) { return b.id === id; });
+      if (!badge || !confirm('Delete badge "' + badge.name + '"?')) return;
+      saveBadgeDefs(getBadgeDefs().filter(function(b) { return b.id !== id; }));
+      renderAdminBadges();
+    });
+  });
+  container.querySelectorAll('[data-add-badge]').forEach(function(btn) {
+    btn.addEventListener('click', function() {
+      var cat    = btn.getAttribute('data-add-badge');
+      var key    = 'nb_' + cat.replace(/[^a-zA-Z0-9]/g,'_');
+      var input  = document.getElementById(key);
+      var name   = input ? input.value.trim() : '';
+      if (!name) { alert('Please enter a badge name.'); return; }
+      var defs   = getBadgeDefs().filter(function(b) { return !(b.cat === cat && b.name === '(Add badges below)'); });
+      defs.push({ id: 'b_' + Date.now(), name: name, cat: cat });
+      saveBadgeDefs(defs);
+      if (input) input.value = '';
+      renderAdminBadges();
+    });
+  });
+  var addCatBtn = document.getElementById('btn-add-cat');
+  if (addCatBtn) addCatBtn.addEventListener('click', function() {
+    var input = document.getElementById('new-cat-name');
+    var name  = input ? input.value.trim() : '';
+    if (!name) { alert('Please enter a section name.'); return; }
+    var defs  = getBadgeDefs();
+    if (defs.some(function(b) { return b.cat === name; })) { alert('Section already exists.'); return; }
+    defs.push({ id: 'b_' + Date.now(), name: '(Add badges below)', cat: name });
+    saveBadgeDefs(defs);
+    if (input) input.value = '';
+    renderAdminBadges();
+  });
+}
+
+// ── Admin ──────────────────────────────────────────────────────────────────
+var ADMIN_SECTIONS = ['members','orders','tasks','announcements','badges','gallery'];
+
 function openAdmin() {
   document.getElementById('admin-overlay').style.display = 'block';
   document.body.style.overflow = 'hidden';
   if (localStorage.getItem('bb_admin') === '1') {
     document.getElementById('admin-login-box').style.display = 'none';
-    document.getElementById('admin-panel').style.display = 'block';
+    document.getElementById('admin-panel').style.display     = 'block';
     backToAdminHome();
   } else {
     document.getElementById('admin-login-box').style.display = 'block';
-    document.getElementById('admin-panel').style.display = 'none';
+    document.getElementById('admin-panel').style.display     = 'none';
   }
 }
 
@@ -1512,56 +2083,46 @@ function closeAdmin() {
 }
 
 function adminLogin() {
-  const pass = document.getElementById('admin-pass').value;
-  if (pass !== ADMIN_PASSWORD) return alert('Wrong password!');
+  var pass = (document.getElementById('admin-pass') || {}).value || '';
+  if (pass !== ADMIN_PASSWORD) { alert('Wrong password!'); return; }
   localStorage.setItem('bb_admin', '1');
   document.getElementById('admin-login-box').style.display = 'none';
-  document.getElementById('admin-panel').style.display = 'block';
+  document.getElementById('admin-panel').style.display     = 'block';
   backToAdminHome();
-  renderGallery(); renderAnnouncements();
+  renderGallery();
+  renderAnnouncements();
 }
 
-const ADMIN_SECTIONS = ['members','orders','tasks','announcements','badges','gallery'];
-
 function backToAdminHome() {
-  // Show section nav, hide back bar, hide all panels
   document.getElementById('adm-back-bar').style.display = 'none';
-  ADMIN_SECTIONS.forEach(s => {
-    const el = document.getElementById('adm-section-' + s);
-    if (el) el.style.display = 'none';
-    const btn = document.getElementById('sec-btn-' + s);
-    if (btn) btn.classList.remove('active-section');
+  ADMIN_SECTIONS.forEach(function(s) {
+    var el = document.getElementById('adm-section-' + s); if (el) el.style.display = 'none';
   });
-  // Show the section buttons
-  document.querySelectorAll('.adm-section-btn').forEach(b => b.style.display = 'flex');
+  document.querySelectorAll('.adm-section-btn').forEach(function(b) { b.style.display = 'flex'; });
 }
 
 function switchAdminSection(section) {
-  // Hide all section buttons, show back bar
-  document.querySelectorAll('.adm-section-btn').forEach(b => b.style.display = 'none');
+  document.querySelectorAll('.adm-section-btn').forEach(function(b) { b.style.display = 'none'; });
   document.getElementById('adm-back-bar').style.display = 'block';
-  // Hide all panels then show target
-  ADMIN_SECTIONS.forEach(s => {
-    const el = document.getElementById('adm-section-' + s);
-    if (el) el.style.display = 'none';
+  ADMIN_SECTIONS.forEach(function(s) {
+    var el = document.getElementById('adm-section-' + s); if (el) el.style.display = 'none';
   });
-  const target = document.getElementById('adm-section-' + section);
+  var target = document.getElementById('adm-section-' + section);
   if (target) target.style.display = 'block';
-  // Trigger data loads
   if (section === 'members')       renderAdminList();
-  if (section === 'orders')        { switchOrderSubtab('products'); }
-  if (section === 'tasks')         { switchDeptTab('all'); }
+  if (section === 'orders')        switchOrderSubtab('formbuilder');
+  if (section === 'tasks')         switchDeptTab('all');
   if (section === 'announcements') renderAdminAnnList();
   if (section === 'badges')        renderAdminBadges();
   if (section === 'gallery')       renderGallery();
 }
 
-function switchAdminTab(tab) { switchAdminSection(tab); }  // legacy compat
+function switchAdminTab(tab) { switchAdminSection(tab); }
 
 function switchOrderSubtab(sub) {
-  ['formbuilder','products','orders'].forEach(s => {
-    const p = document.getElementById('subpanel-' + s);
-    const b = document.getElementById('subtab-' + s);
+  ['formbuilder','products','orders'].forEach(function(s) {
+    var p = document.getElementById('subpanel-' + s);
+    var b = document.getElementById('subtab-' + s);
     if (p) p.style.display = s === sub ? 'block' : 'none';
     if (b) b.classList.toggle('active-subtab', s === sub);
   });
@@ -1571,119 +2132,108 @@ function switchOrderSubtab(sub) {
 }
 
 function switchDeptTab(dept) {
-  ['all','logistics','secretariat','media'].forEach(d => {
-    const btn = document.getElementById('dtab-' + d);
+  ['all','logistics','secretariat','media'].forEach(function(d) {
+    var btn = document.getElementById('dtab-' + d);
     if (!btn) return;
-    const isActive = d === dept;
-    btn.classList.toggle('active-dept-tab', isActive);
-    if (isActive && d !== 'all') {
-      const cfg = { logistics:'#42a5f5', secretariat:'#ce93d8', media:'#ffb74d' };
-      btn.style.background = cfg[d] + '22';
-    } else if (!isActive) {
-      btn.style.background = 'transparent';
+    var active = d === dept;
+    btn.classList.toggle('active-dept-tab', active);
+    if (d !== 'all') {
+      var cfg = DEPT_CONFIG[d];
+      btn.style.background = active && cfg ? cfg.color + '33' : 'transparent';
     }
   });
   renderAdminTasks(dept);
 }
 
 function toggleTaskForm() {
-  const body    = document.getElementById('task-form-body');
-  const chevron = document.getElementById('task-form-chevron');
-  const label   = document.getElementById('task-form-toggle-label');
-  const open    = body.style.display === 'none';
-  body.style.display    = open ? 'block' : 'none';
-  chevron.style.transform = open ? 'rotate(90deg)' : 'rotate(0deg)';
-  label.textContent = open ? '✕ Close Form' : '➕ Add New Task';
+  var body    = document.getElementById('task-form-body');
+  var chevron = document.getElementById('task-form-chevron');
+  var label   = document.getElementById('task-form-toggle-label');
+  var open    = body && body.style.display === 'none';
+  if (body)    body.style.display    = open ? 'block' : 'none';
+  if (chevron) chevron.style.transform = open ? 'rotate(90deg)' : 'rotate(0deg)';
+  if (label)   label.textContent     = open ? '\u2715 Close Form' : '\u2795 Add New Task';
 }
 
-// ── Members ───────────────────────────────────────────────────────────────
+// ── Admin Members ─────────────────────────────────────────────────────────
 async function renderAdminList() {
-  const search = (document.getElementById('admin-search')?.value || '').toLowerCase();
-  const list = document.getElementById('admin-members-list');
+  var search = ((document.getElementById('admin-search') || {}).value || '').toLowerCase();
+  var list   = document.getElementById('admin-members-list');
+  if (!list) return;
   list.innerHTML = '<div style="color:#888;text-align:center;padding:20px;"><span class="spinner"></span> Loading...</div>';
   try {
-    const members = await supa.get('bb_members?select=*&order=joined_at.desc');
-    const filtered = members.filter(m =>
-      (m.name||'').toLowerCase().includes(search) || (m.ic||'').includes(search)
-    );
+    var members = await supa.get('bb_members?select=*&order=joined_at.desc');
+    var filtered = members.filter(function(m) {
+      return (m.name||'').toLowerCase().includes(search) || (m.ic||'').includes(search);
+    });
     if (!filtered.length) { list.innerHTML = '<div style="color:#666;text-align:center;padding:20px;">No members found.</div>'; return; }
-    // Store in window map for safe access
     window._adminMembers = {};
-    filtered.forEach(m => { window._adminMembers[m.ic] = m; });
-    list.innerHTML = filtered.map(m => `
-      <div class="admin-row" style="cursor:pointer;" onclick="openEditMember('${m.ic.replace(/'/g,"\\'")}')">
-        <div style="flex:1;">
-          <div class="admin-name">${m.name}</div>
-          <div class="admin-sub">IC: ${m.ic} · ${m.squad ? m.squad+' Squad' : 'No squad'} · ${m.rank||'No rank'}</div>
-        </div>
-        <div class="admin-rank-badge">${m.rank||'—'}</div>
-        <div style="color:#8898bb;font-size:18px;margin-left:8px;">›</div>
-      </div>
-    `).join('');
+    filtered.forEach(function(m) { window._adminMembers[m.ic] = m; });
+    var html = '';
+    filtered.forEach(function(m) {
+      html += '<div class="admin-row" data-edit-ic="' + m.ic + '" style="cursor:pointer;">'
+        + '<div style="flex:1;"><div class="admin-name">' + m.name + '</div>'
+        + '<div class="admin-sub">IC: ' + m.ic + ' \xb7 ' + (m.squad ? m.squad + ' Squad' : 'No squad') + ' \xb7 ' + (m.rank||'No rank') + '</div></div>'
+        + '<div class="admin-rank-badge">' + (m.rank||'\u2014') + '</div>'
+        + '<div style="color:#8898bb;font-size:18px;margin-left:8px;">\u203a</div></div>';
+    });
+    list.innerHTML = html;
+    list.querySelectorAll('[data-edit-ic]').forEach(function(row) {
+      row.addEventListener('click', function() { openEditMember(row.getAttribute('data-edit-ic')); });
+    });
   } catch(e) { list.innerHTML = '<div style="color:#f66;text-align:center;padding:20px;">Failed to load.</div>'; }
 }
 
 function openAddMember() {
-  document.getElementById('em-modal-title').textContent = '➕ Add New Member';
-  document.getElementById('em-name').value   = '';
-  document.getElementById('em-ic').value     = '';
-  document.getElementById('em-ic').readOnly  = false;
-  document.getElementById('em-rank').value   = '';
-  document.getElementById('em-squad').value  = '';
-  document.getElementById('em-dept').value   = '';
-  document.getElementById('em-joined').value = '';
-  document.getElementById('em-original-ic').value = '';
-  document.getElementById('em-delete-btn').style.display = 'none';
+  ['em-name','em-ic','em-joined'].forEach(function(id) { var el = document.getElementById(id); if (el) el.value = ''; });
+  ['em-rank','em-squad','em-dept'].forEach(function(id) { var el = document.getElementById(id); if (el) el.value = ''; });
+  var ic = document.getElementById('em-ic'); if (ic) ic.readOnly = false;
+  var ti = document.getElementById('em-modal-title'); if (ti) ti.textContent = '\u2795 Add New Member';
+  var db = document.getElementById('em-delete-btn'); if (db) db.style.display = 'none';
+  var oi = document.getElementById('em-original-ic'); if (oi) oi.value = '';
   document.getElementById('edit-member-modal').style.display = 'block';
 }
 
 function openEditMember(ic) {
-  const m = (window._adminMembers && window._adminMembers[ic]) || { ic };
-  document.getElementById('em-modal-title').textContent = '✏️ Edit Member';
-  document.getElementById('em-name').value   = m.name  || '';
-  document.getElementById('em-ic').value     = m.ic    || '';
-  document.getElementById('em-ic').readOnly  = true;
-  document.getElementById('em-rank').value   = m.rank  || '';
-  document.getElementById('em-squad').value  = m.squad || '';
-  document.getElementById('em-dept').value   = m.department || '';
-  document.getElementById('em-joined').value = m.joined_at ? m.joined_at.slice(0,10) : '';
-  document.getElementById('em-original-ic').value = m.ic || '';
-  document.getElementById('em-delete-btn').style.display = 'inline-block';
+  var m = (window._adminMembers && window._adminMembers[ic]) || { ic: ic };
+  var set = function(id, val) { var el = document.getElementById(id); if (el) el.value = val || ''; };
+  set('em-name',  m.name);
+  set('em-ic',    m.ic);
+  set('em-rank',  m.rank);
+  set('em-squad', m.squad);
+  set('em-dept',  m.department);
+  set('em-joined', m.joined_at ? m.joined_at.slice(0,10) : '');
+  set('em-original-ic', m.ic);
+  var icEl = document.getElementById('em-ic'); if (icEl) icEl.readOnly = true;
+  var ti   = document.getElementById('em-modal-title'); if (ti) ti.textContent = '\u270f\ufe0f Edit Member';
+  var db   = document.getElementById('em-delete-btn'); if (db) db.style.display = 'inline-block';
   document.getElementById('edit-member-modal').style.display = 'block';
 }
 
-function closeEditMember() {
-  document.getElementById('edit-member-modal').style.display = 'none';
-}
+function closeEditMember() { document.getElementById('edit-member-modal').style.display = 'none'; }
 
 async function saveEditMember() {
-  const originalIc = document.getElementById('em-original-ic').value;
-  const ic         = document.getElementById('em-ic').value.trim().replace(/\s/g,'');
-  const name       = document.getElementById('em-name').value.trim();
-  const rank       = document.getElementById('em-rank').value;
-  const squad      = document.getElementById('em-squad').value;
-  const department = document.getElementById('em-dept').value;
-  const joinedRaw  = document.getElementById('em-joined').value;
-  const joined_at  = joinedRaw ? new Date(joinedRaw).toISOString() : null;
+  var originalIc = (document.getElementById('em-original-ic') || {}).value || '';
+  var ic         = ((document.getElementById('em-ic') || {}).value || '').trim().replace(/\s/g,'');
+  var name       = ((document.getElementById('em-name') || {}).value || '').trim();
+  var rank       = (document.getElementById('em-rank') || {}).value || '';
+  var squad      = (document.getElementById('em-squad') || {}).value || '';
+  var department = (document.getElementById('em-dept') || {}).value || '';
+  var joinedRaw  = (document.getElementById('em-joined') || {}).value || '';
+  var joined_at  = joinedRaw ? new Date(joinedRaw).toISOString() : null;
   if (!name) return alert('Name cannot be empty.');
   if (!ic)   return alert('IC number cannot be empty.');
   try {
     if (!originalIc) {
-      // Adding new member — generate a temporary password = IC number (member can't change it)
-      const existing = await supa.get(`bb_members?ic=eq.${encodeURIComponent(ic)}&select=ic`);
+      var existing = await supa.get('bb_members?ic=eq.' + encodeURIComponent(ic) + '&select=ic');
       if (existing && existing.length) return alert('A member with this IC already exists.');
-      const defaultPass = btoa(ic); // default password = IC number
-      await supa.post('bb_members', {
-        ic, name, rank, squad, department,
-        password: defaultPass,
-        joined_at: joined_at || new Date().toISOString(),
-      });
-      alert(`✅ Member added!\n\nDefault password is their IC number: ${ic}\nThey can reset it using the Forgot Password option.`);
+      await supa.post('bb_members', { ic: ic, name: name, rank: rank, squad: squad, department: department, password: btoa(ic), joined_at: joined_at || new Date().toISOString() });
+      alert('\u2705 Member added!\n\nDefault password is their IC number: ' + ic);
     } else {
-      const updates = { name, rank, squad, department };
+      var updates = { name: name, rank: rank, squad: squad, department: department };
       if (joined_at) updates.joined_at = joined_at;
-      await supa.patch(`bb_members?ic=eq.${encodeURIComponent(originalIc)}`, updates);
-      alert('✅ Member updated!');
+      await supa.patch('bb_members?ic=eq.' + encodeURIComponent(originalIc), updates);
+      alert('\u2705 Member updated!');
     }
     closeEditMember();
     renderAdminList();
@@ -1691,999 +2241,348 @@ async function saveEditMember() {
 }
 
 async function deleteEditMember() {
-  const ic   = document.getElementById('em-original-ic').value;
-  const name = document.getElementById('em-name').value;
-  if (!confirm(`Delete member "${name}"? This cannot be undone.`)) return;
+  var ic   = (document.getElementById('em-original-ic') || {}).value || '';
+  var name = (document.getElementById('em-name') || {}).value || '';
+  if (!confirm('Delete member "' + name + '"? This cannot be undone.')) return;
   try {
-    await supa.delete(`bb_members?ic=eq.${encodeURIComponent(ic)}`);
+    await supa.delete('bb_members?ic=eq.' + encodeURIComponent(ic));
     closeEditMember();
     renderAdminList();
-    alert('🗑️ Member deleted.');
+    alert('\ud83d\uddd1\ufe0f Member deleted.');
   } catch(e) { alert('Failed: ' + e.message); }
 }
 
-// ── Orders ────────────────────────────────────────────────────────────────
+// ── Admin Orders ───────────────────────────────────────────────────────────
 async function renderAdminOrders() {
-  const search     = (document.getElementById('admin-order-search')?.value || '').toLowerCase();
-  const formFilter = document.getElementById('admin-order-form-filter')?.value || '';
-  const list       = document.getElementById('admin-orders-list');
-  list.innerHTML   = '<div style="color:#888;text-align:center;padding:20px;"><span class="spinner"></span> Loading...</div>';
+  var search     = ((document.getElementById('admin-order-search') || {}).value || '').toLowerCase();
+  var formFilter = (document.getElementById('admin-order-form-filter') || {}).value || '';
+  var list       = document.getElementById('admin-orders-list');
+  if (!list) return;
+  list.innerHTML = '<div style="color:#888;text-align:center;padding:20px;"><span class="spinner"></span> Loading...</div>';
   try {
-    const orders = await supa.get('bb_orders?select=*&order=created_at.desc');
-    let filtered = orders.filter(o =>
-      (o.order_number||'').toLowerCase().includes(search) ||
-      (o.member_name||'').toLowerCase().includes(search)
-    );
-    if (formFilter) filtered = filtered.filter(o => (o.notes||'').includes(formFilter) || (o.form_id||'') === formFilter);
+    var orders   = await supa.get('bb_orders?select=*&order=created_at.desc');
+    var filtered = orders.filter(function(o) {
+      return (o.order_number||'').toLowerCase().includes(search) || (o.member_name||'').toLowerCase().includes(search);
+    });
+    if (formFilter) filtered = filtered.filter(function(o) { return (o.notes||'').includes(formFilter) || (o.form_id||'') === formFilter; });
     if (!filtered.length) { list.innerHTML = '<div style="color:#666;text-align:center;padding:20px;">No submissions found.</div>'; return; }
-    const STATUS_COLORS = { pending:'#e8b830', processing:'#42a5f5', ready:'#66bb6a', collected:'#888', cancelled:'#ef5350' };
-    const STATUS_OPTIONS = ['pending','processing','ready','collected','cancelled'];
-    list.innerHTML = filtered.map(o => {
-      let itemsDisplay = '';
+    var SC = { pending:'#e8b830', processing:'#42a5f5', ready:'#66bb6a', collected:'#888', cancelled:'#ef5350' };
+    var SL = ['pending','processing','ready','collected','cancelled'];
+    var html = '';
+    filtered.forEach(function(o) {
+      var itemsDisplay = '';
       try {
-        const items = JSON.parse(o.items||'{}');
+        var items = JSON.parse(o.items || '{}');
         if (items.form_name) {
-          // Built-in form submission
-          itemsDisplay = `<div style="font-size:12px;color:#42a5f5;margin-bottom:6px;">📋 ${items.form_name}</div>`;
+          itemsDisplay = '<div style="font-size:12px;color:#42a5f5;margin-bottom:6px;">\ud83d\udccb ' + items.form_name + '</div>';
           if (items.answers) {
-            itemsDisplay += Object.entries(items.answers).map(([k,v]) =>
-              `<div style="font-size:11px;color:#8898bb;">${k}: <span style="color:#ccc;">${v}</span></div>`
-            ).join('');
+            Object.entries(items.answers).forEach(function(kv) {
+              itemsDisplay += '<div style="font-size:11px;color:#8898bb;">' + kv[0] + ': <span style="color:#ccc;">' + kv[1] + '</span></div>';
+            });
           }
         } else {
-          // Uniform order
-          itemsDisplay = Object.entries(items).map(([k,v]) => {
-            const prod = UNIFORM_ITEMS.find(i=>i.key===k);
-            return `<div style="font-size:12px;color:#8898bb;">${prod?.name||k} ×${v.qty}${v.size?' ('+v.size+')':''}</div>`;
-          }).join('');
+          Object.entries(items).forEach(function(kv) {
+            var prod = UNIFORM_ITEMS.find(function(i) { return i.key === kv[0]; });
+            var v = kv[1];
+            itemsDisplay += '<div style="font-size:12px;color:#8898bb;">' + (prod ? prod.name : kv[0]) + ' \xd7' + v.qty + (v.size ? ' (' + v.size + ')' : '') + '</div>';
+          });
         }
       } catch(e) {}
-      const status = o.status || 'pending';
-      const sc = STATUS_COLORS[status] || '#888';
-      const created = o.created_at ? new Date(o.created_at).toLocaleDateString('en-MY',{day:'numeric',month:'short',year:'numeric'}) : '';
-      return `<div style="background:#0a1628;border-radius:12px;padding:14px 16px;margin-bottom:10px;border:1px solid rgba(255,255,255,0.06);">
-        <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:8px;">
-          <div>
-            <div style="font-family:'Oswald',sans-serif;font-size:15px;font-weight:700;color:#fff;">${o.order_number}</div>
-            <div style="font-size:11px;color:#8898bb;">${o.member_name||o.ic} · ${o.rank||''} · ${created}</div>
-          </div>
-          <div style="font-size:11px;font-weight:600;padding:3px 10px;border-radius:20px;background:${sc}22;color:${sc};border:1px solid ${sc}44;font-family:'Oswald',sans-serif;">${status.toUpperCase()}</div>
-        </div>
-        <div style="margin-bottom:10px;">${itemsDisplay}</div>
-        ${o.notes && !JSON.parse(o.items||'{}').form_name ? `<div style="font-size:12px;color:#8898bb;margin-bottom:8px;">📝 ${o.notes}</div>` : ''}
-        <div style="display:flex;gap:5px;flex-wrap:wrap;">
-          ${STATUS_OPTIONS.map(s=>`<button onclick="updateOrderStatus('${o.order_number}','${s}')" style="padding:3px 10px;border:1.5px solid ${s===status?STATUS_COLORS[s]:'#2a3a50'};border-radius:6px;background:${s===status?STATUS_COLORS[s]+'22':'transparent'};color:${s===status?STATUS_COLORS[s]:'#556'};font-size:11px;font-weight:700;cursor:pointer;font-family:'Oswald',sans-serif;">${s}</button>`).join('')}
-          <button onclick="deleteSubmission('${o.order_number}')" style="margin-left:auto;background:#3a1a1a;border:1px solid #6a2a2a;color:#f66;padding:3px 10px;border-radius:6px;cursor:pointer;font-size:11px;font-weight:700;">🗑️</button>
-        </div>
-      </div>`;
-    }).join('');
+      var status  = o.status || 'pending';
+      var sc      = SC[status] || '#888';
+      var created = o.created_at ? new Date(o.created_at).toLocaleDateString('en-MY', { day:'numeric', month:'short', year:'numeric' }) : '';
+      var btns = SL.map(function(s) {
+        var active = s === status;
+        return '<button data-order-num="' + o.order_number + '" data-order-status="' + s + '" style="padding:3px 10px;border:1.5px solid ' + (active ? SC[s] : '#2a3a50') + ';border-radius:6px;background:' + (active ? SC[s] + '22' : 'transparent') + ';color:' + (active ? SC[s] : '#556') + ';font-size:11px;font-weight:700;cursor:pointer;font-family:\'Oswald\',sans-serif;">' + s + '</button>';
+      }).join('');
+      html += '<div style="background:#0a1628;border-radius:12px;padding:14px 16px;margin-bottom:10px;border:1px solid rgba(255,255,255,0.06);">'
+        + '<div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:8px;">'
+        + '<div><div style="font-family:\'Oswald\',sans-serif;font-size:15px;font-weight:700;color:#fff;">' + o.order_number + '</div>'
+        + '<div style="font-size:11px;color:#8898bb;">' + (o.member_name||o.ic) + ' \xb7 ' + (o.rank||'') + ' \xb7 ' + created + '</div></div>'
+        + '<div style="font-size:11px;font-weight:600;padding:3px 10px;border-radius:20px;background:' + sc + '22;color:' + sc + ';border:1px solid ' + sc + '44;font-family:\'Oswald\',sans-serif;">' + status.toUpperCase() + '</div></div>'
+        + '<div style="margin-bottom:10px;">' + itemsDisplay + '</div>'
+        + '<div style="display:flex;gap:5px;flex-wrap:wrap;">' + btns
+        + '<button data-del-sub="' + o.order_number + '" style="margin-left:auto;background:#3a1a1a;border:1px solid #6a2a2a;color:#f66;padding:3px 10px;border-radius:6px;cursor:pointer;font-size:11px;font-weight:700;">\ud83d\uddd1\ufe0f</button>'
+        + '</div></div>';
+    });
+    list.innerHTML = html;
+    list.querySelectorAll('[data-order-status]').forEach(function(btn) {
+      btn.addEventListener('click', function() { updateOrderStatus(btn.getAttribute('data-order-num'), btn.getAttribute('data-order-status')); });
+    });
+    list.querySelectorAll('[data-del-sub]').forEach(function(btn) {
+      btn.addEventListener('click', function() {
+        if (!confirm('Delete this submission?')) return;
+        supa.delete('bb_orders?order_number=eq.' + encodeURIComponent(btn.getAttribute('data-del-sub')))
+          .then(function() { renderAdminOrders(); }).catch(function(e) { alert('Failed: ' + e.message); });
+      });
+    });
   } catch(e) { list.innerHTML = '<div style="color:#f66;text-align:center;padding:20px;">Failed to load.</div>'; }
 }
 
-async function deleteSubmission(orderNum) {
-  if (!confirm('Delete this submission?')) return;
-  try {
-    await supa.delete(`bb_orders?order_number=eq.${encodeURIComponent(orderNum)}`);
-    renderAdminOrders();
-  } catch(e) { alert('Failed: ' + e.message); }
-}
-    if (!filtered.length) { list.innerHTML = '<div style="color:#666;text-align:center;padding:20px;">No orders yet.</div>'; return; }
-    const STATUS_OPTIONS = ['pending','processing','ready','collected','cancelled'];
-    const STATUS_COLORS  = { pending:'#e8b830', processing:'#42a5f5', ready:'#66bb6a', collected:'#888', cancelled:'#ef5350' };
-    list.innerHTML = filtered.map(o => {
-      let items = {};
-      try { items = JSON.parse(o.items||'{}'); } catch(e) {}
-      const itemLines = Object.entries(items).map(([k,v]) => {
-        const prod = UNIFORM_ITEMS.find(i=>i.key===k);
-        return `${prod?.name||k} ×${v.qty}${v.size?' ('+v.size+')':''}`;
-      }).join(', ');
-      const status = o.status || 'pending';
-      const created = o.created_at ? new Date(o.created_at).toLocaleDateString('en-MY') : '';
-      return `<div style="background:#0a1628;border-radius:12px;padding:14px 16px;margin-bottom:10px;border:1px solid rgba(255,255,255,0.06);">
-        <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:8px;">
-          <div>
-
 async function updateOrderStatus(orderNum, status) {
-  try {
-    await supa.patch(`bb_orders?order_number=eq.${encodeURIComponent(orderNum)}`, { status });
-    renderAdminOrders();
-  } catch(e) { alert('Failed to update status.'); }
+  try { await supa.patch('bb_orders?order_number=eq.' + encodeURIComponent(orderNum), { status: status }); renderAdminOrders(); }
+  catch(e) { alert('Failed to update status.'); }
 }
 
-// ── Products ──────────────────────────────────────────────────────────────
+// ── Admin Products ─────────────────────────────────────────────────────────
 function renderAdminProducts() {
-  const list = document.getElementById('admin-products-list');
+  var list = document.getElementById('admin-products-list');
   if (!list) return;
-  if (!UNIFORM_ITEMS.length) {
-    list.innerHTML = '<div style="color:#8898bb;text-align:center;padding:20px;">No products yet. Add one above.</div>';
-    return;
-  }
-  list.innerHTML = UNIFORM_ITEMS.map(item => `
-    <div style="background:#0a1628;border-radius:12px;padding:12px 14px;margin-bottom:10px;display:flex;align-items:center;gap:12px;border:1px solid rgba(255,255,255,0.06);">
-      ${item.image ? `<img src="${item.image}" style="width:50px;height:50px;object-fit:cover;border-radius:8px;flex-shrink:0;" alt="${item.name}"/>`
-        : `<div style="width:50px;height:50px;border-radius:8px;background:#1a2a40;display:flex;align-items:center;justify-content:center;font-size:22px;flex-shrink:0;">👔</div>`}
-      <div style="flex:1;">
-        <div style="font-family:'Oswald',sans-serif;font-size:15px;font-weight:600;color:#fff;">${item.name}</div>
-        <div style="font-size:11px;color:#8898bb;">RM ${item.price ? parseFloat(item.price).toFixed(2) : 'TBA'} · Sizes: ${item.sizes && item.sizes.length ? item.sizes.join(', ') : 'None'}</div>
-      </div>
-      <button onclick="editProduct('${item.key}')" style="background:#1a3a6e;border:1px solid #2a4a8e;color:#fff;padding:6px 12px;border-radius:8px;cursor:pointer;font-size:12px;font-weight:600;">✏️</button>
-      <button onclick="deleteProduct('${item.key}')" style="background:#3a1a1a;border:1px solid #6a2a2a;color:#ff6666;padding:6px 12px;border-radius:8px;cursor:pointer;font-size:12px;font-weight:600;">🗑️</button>
-    </div>
-  `).join('');
+  if (!UNIFORM_ITEMS.length) { list.innerHTML = '<div style="color:#8898bb;text-align:center;padding:20px;font-size:13px;">No products yet. Add one above.</div>'; return; }
+  var html = '';
+  UNIFORM_ITEMS.forEach(function(item) {
+    var imgHtml = item.image
+      ? '<img src="' + item.image + '" style="width:50px;height:50px;object-fit:cover;border-radius:8px;flex-shrink:0;" alt="' + item.name + '"/>'
+      : '<div style="width:50px;height:50px;border-radius:8px;background:#1a2a40;display:flex;align-items:center;justify-content:center;font-size:22px;flex-shrink:0;">\ud83d\udc54</div>';
+    html += '<div style="background:#0a1628;border-radius:12px;padding:12px 14px;margin-bottom:10px;display:flex;align-items:center;gap:12px;border:1px solid rgba(255,255,255,0.06);">'
+      + imgHtml + '<div style="flex:1;">'
+      + '<div style="font-family:\'Oswald\',sans-serif;font-size:15px;font-weight:600;color:#fff;">' + item.name + '</div>'
+      + '<div style="font-size:11px;color:#8898bb;">RM ' + (item.price ? parseFloat(item.price).toFixed(2) : 'TBA') + ' \xb7 Sizes: ' + ((item.sizes && item.sizes.length) ? item.sizes.join(', ') : 'None') + '</div>'
+      + '</div>'
+      + '<button data-edit-prod="' + item.key + '" style="background:#1a3a6e;border:1px solid #2a4a8e;color:#fff;padding:6px 12px;border-radius:8px;cursor:pointer;font-size:12px;font-weight:600;">\u270f\ufe0f</button>'
+      + '<button data-del-prod="' + item.key + '" style="background:#3a1a1a;border:1px solid #6a2a2a;color:#f66;padding:6px 12px;border-radius:8px;cursor:pointer;font-size:12px;">\ud83d\uddd1\ufe0f</button>'
+      + '</div>';
+  });
+  list.innerHTML = html;
+  list.querySelectorAll('[data-edit-prod]').forEach(function(btn) { btn.addEventListener('click', function() { editProduct(btn.getAttribute('data-edit-prod')); }); });
+  list.querySelectorAll('[data-del-prod]').forEach(function(btn) { btn.addEventListener('click', function() { deleteProduct(btn.getAttribute('data-del-prod')); }); });
 }
 
 function previewProductImg(input) {
-  const file = input.files[0];
-  if (!file) return;
-  const reader = new FileReader();
-  reader.onload = e => {
+  var file = input.files[0]; if (!file) return;
+  var reader = new FileReader();
+  reader.onload = function(e) {
     document.getElementById('prod-img-data').value = e.target.result;
-    document.getElementById('prod-img-prev-img').src = e.target.result;
-    document.getElementById('prod-img-preview').style.display = 'block';
-    document.getElementById('prod-img-placeholder').style.display = 'none';
+    var prev = document.getElementById('prod-img-prev-img'); if (prev) prev.src = e.target.result;
+    var pv   = document.getElementById('prod-img-preview'); if (pv) pv.style.display = 'block';
+    var ph   = document.getElementById('prod-img-placeholder'); if (ph) ph.style.display = 'none';
   };
   reader.readAsDataURL(file);
 }
 
 function clearProductForm() {
-  document.getElementById('prod-name').value = '';
-  document.getElementById('prod-price').value = '';
-  document.getElementById('prod-sizes').value = '';
-  document.getElementById('prod-img-data').value = '';
-  document.getElementById('prod-img-prev-img').src = '';
-  document.getElementById('prod-img-preview').style.display = 'none';
-  document.getElementById('prod-img-placeholder').style.display = 'block';
-  document.getElementById('prod-edit-key').value = '';
-  document.getElementById('prod-form-title').textContent = '➕ Add New Product';
+  ['prod-name','prod-price','prod-sizes','prod-img-data','prod-edit-key'].forEach(function(id) { var el = document.getElementById(id); if (el) el.value = ''; });
+  var pi = document.getElementById('prod-img-prev-img'); if (pi) pi.src = '';
+  var pv = document.getElementById('prod-img-preview');  if (pv) pv.style.display = 'none';
+  var ph = document.getElementById('prod-img-placeholder'); if (ph) ph.style.display = 'block';
+  var ft = document.getElementById('prod-form-title'); if (ft) ft.textContent = '\u2795 Add New Product';
 }
 
 function saveProduct() {
-  const name    = document.getElementById('prod-name').value.trim();
-  const price   = parseFloat(document.getElementById('prod-price').value) || 0;
-  const sizesRaw = document.getElementById('prod-sizes').value.trim();
-  const sizes   = sizesRaw ? sizesRaw.split(',').map(s => s.trim()).filter(Boolean) : [];
-  const image   = document.getElementById('prod-img-data').value;
-  const editKey = document.getElementById('prod-edit-key').value;
-  if (!name) return alert('Please enter a product name.');
-  const key = editKey || name.toLowerCase().replace(/[^a-z0-9]/g,'_') + '_' + Date.now();
-  const item = { key, name, price, sizes, image };
-  const idx = UNIFORM_ITEMS.findIndex(i => i.key === key);
-  if (idx >= 0) UNIFORM_ITEMS[idx] = item;
-  else UNIFORM_ITEMS.push(item);
+  var name     = ((document.getElementById('prod-name') || {}).value || '').trim();
+  var price    = parseFloat((document.getElementById('prod-price') || {}).value) || 0;
+  var sizesRaw = ((document.getElementById('prod-sizes') || {}).value || '').trim();
+  var sizes    = sizesRaw ? sizesRaw.split(',').map(function(s) { return s.trim(); }).filter(Boolean) : [];
+  var image    = (document.getElementById('prod-img-data') || {}).value || '';
+  var editKey  = (document.getElementById('prod-edit-key') || {}).value || '';
+  if (!name) { alert('Please enter a product name.'); return; }
+  var key  = editKey || name.toLowerCase().replace(/[^a-z0-9]/g,'_') + '_' + Date.now();
+  var item = { key: key, name: name, price: price, sizes: sizes, image: image };
+  var idx  = UNIFORM_ITEMS.findIndex(function(i) { return i.key === key; });
+  if (idx >= 0) UNIFORM_ITEMS[idx] = item; else UNIFORM_ITEMS.push(item);
   saveUniformItems();
+  loadPrices();
   renderOrderItems();
   clearProductForm();
   renderAdminProducts();
-  alert('✅ Product saved!');
+  alert('\u2705 Product saved!');
 }
 
 function editProduct(key) {
-  const item = UNIFORM_ITEMS.find(i => i.key === key);
+  var item = UNIFORM_ITEMS.find(function(i) { return i.key === key; });
   if (!item) return;
-  document.getElementById('prod-name').value   = item.name;
-  document.getElementById('prod-price').value  = item.price || '';
-  document.getElementById('prod-sizes').value  = (item.sizes || []).join(', ');
-  document.getElementById('prod-edit-key').value = key;
-  document.getElementById('prod-form-title').textContent = '✏️ Edit: ' + item.name;
+  var set = function(id, val) { var el = document.getElementById(id); if (el) el.value = val || ''; };
+  set('prod-name',     item.name);
+  set('prod-price',    item.price || '');
+  set('prod-sizes',    (item.sizes || []).join(', '));
+  set('prod-edit-key', key);
+  var ft = document.getElementById('prod-form-title'); if (ft) ft.textContent = '\u270f\ufe0f Edit: ' + item.name;
   if (item.image) {
-    document.getElementById('prod-img-data').value = item.image;
-    document.getElementById('prod-img-prev-img').src = item.image;
-    document.getElementById('prod-img-preview').style.display = 'block';
-    document.getElementById('prod-img-placeholder').style.display = 'none';
-  } else { clearProductForm(); document.getElementById('prod-name').value = item.name; document.getElementById('prod-price').value = item.price||''; document.getElementById('prod-sizes').value = (item.sizes||[]).join(', '); document.getElementById('prod-edit-key').value = key; }
-  document.getElementById('prod-name').scrollIntoView({ behavior:'smooth' });
+    set('prod-img-data', item.image);
+    var pi = document.getElementById('prod-img-prev-img'); if (pi) pi.src = item.image;
+    var pv = document.getElementById('prod-img-preview');  if (pv) pv.style.display = 'block';
+    var ph = document.getElementById('prod-img-placeholder'); if (ph) ph.style.display = 'none';
+  }
+  var pn = document.getElementById('prod-name'); if (pn) pn.scrollIntoView({ behavior: 'smooth' });
 }
 
 function deleteProduct(key) {
-  const item = UNIFORM_ITEMS.find(i => i.key === key);
-  if (!confirm(`Delete "${item?.name}"?`)) return;
-  UNIFORM_ITEMS.splice(UNIFORM_ITEMS.findIndex(i=>i.key===key), 1);
+  var item = UNIFORM_ITEMS.find(function(i) { return i.key === key; });
+  if (!confirm('Delete "' + (item ? item.name : key) + '"?')) return;
+  UNIFORM_ITEMS.splice(UNIFORM_ITEMS.findIndex(function(i) { return i.key === key; }), 1);
   saveUniformItems();
+  loadPrices();
   renderOrderItems();
   renderAdminProducts();
 }
 
-function saveUniformItems() {
-  localStorage.setItem('bb_uniform_items', JSON.stringify(UNIFORM_ITEMS));
-}
-
-// ── Home: Announcements admin list ────────────────────────────────────────
-function renderAdminAnnList() {
-  const container = document.getElementById('admin-ann-list');
-  if (!container) return;
-  if (!announcements.length) { container.innerHTML = '<div style="color:#556;font-size:12px;text-align:center;padding:10px;">No announcements yet.</div>'; return; }
-  container.innerHTML = `<div style="font-family:'Oswald',sans-serif;font-size:13px;font-weight:600;color:#8898bb;margin-bottom:8px;letter-spacing:1px;">EXISTING ANNOUNCEMENTS</div>`
-    + announcements.slice().reverse().map((a, ri) => {
-      const i = announcements.length - 1 - ri;
-      return `<div style="background:#122040;border-radius:10px;padding:12px;margin-bottom:8px;border-left:3px solid var(--accent);display:flex;justify-content:space-between;align-items:flex-start;gap:10px;">
-        <div style="flex:1;">
-          <div style="font-family:'Oswald',sans-serif;font-size:14px;color:#fff;font-weight:600;">${a.title}</div>
-          <div style="font-size:11px;color:#8898bb;margin-top:2px;">${a.date}</div>
-        </div>
-        <button onclick="deleteAnnouncement(${i})" style="background:none;border:none;color:#f66;font-size:16px;cursor:pointer;flex-shrink:0;">🗑️</button>
-      </div>`;
-    }).join('');
-}
-
-// ── Tasks ──────────────────────────────────────────────────────────────────
-const DEPT_CONFIG = {
-  logistics:   { label: 'Logistics',   color: '#42a5f5', cls: 'dept-logistics'   },
-  secretariat: { label: 'Secretariat', color: '#ce93d8', cls: 'dept-secretariat' },
-  media:       { label: 'Media',       color: '#ffb74d', cls: 'dept-media'       },
-};
-
-async function checkTasksAccess() {
-  const ic = localStorage.getItem('bb_current');
-  const tasksTab = document.getElementById('tab-tasks');
-  document.getElementById('tasks-gate').style.display    = 'none';
-  document.getElementById('tasks-no-dept').style.display = 'none';
-  document.getElementById('tasks-board').style.display   = 'none';
-  if (!ic) {
-    tasksTab.style.display = 'none';
-    document.getElementById('tasks-gate').style.display = 'block';
-    return;
-  }
-  try {
-    const data = await supa.get(`bb_members?ic=eq.${encodeURIComponent(ic)}&select=name,department`);
-    const member = data && data[0];
-    const dept = member && member.department;
-    if (!dept || !DEPT_CONFIG[dept]) {
-      tasksTab.style.display = 'none';
-      document.getElementById('tasks-no-dept').style.display = 'block';
-      return;
-    }
-    // Member has a department — show the tab
-    tasksTab.style.display = 'block';
-    const cfg = DEPT_CONFIG[dept];
-    document.getElementById('tasks-dept-title').textContent = cfg.label + ' Department';
-    document.getElementById('tasks-dept-sub').textContent   = 'Task Board';
-    document.getElementById('tasks-dept-badge').innerHTML   = `<span class="dept-badge ${cfg.cls}">${cfg.label}</span>`;
-    document.getElementById('tasks-board').style.display    = 'block';
-    await renderTasksBoard(dept);
-  } catch(e) { console.error(e); }
-}
-
-
-function openTaskDetail(id) {
-  const t = (window._taskMap && window._taskMap[id]) || {};
-  document.getElementById('tdm-title').textContent = t.title;
-  document.getElementById('tdm-desc').textContent  = t.description || 'No description.';
-  const prioClass = t.priority === 'high' ? 'prio-high' : t.priority === 'low' ? 'prio-low' : 'prio-medium';
-  const prioLabel = t.priority ? t.priority.charAt(0).toUpperCase() + t.priority.slice(1) : 'Medium';
-  const statusLabel = t.status === 'inprogress' ? 'In Progress' : t.status === 'done' ? 'Done' : 'To Do';
-  const statusColor = t.status === 'done' ? '#66bb6a' : t.status === 'inprogress' ? '#42a5f5' : '#8898bb';
-  const dept = DEPT_CONFIG[t.department] || {};
-  document.getElementById('tdm-meta').innerHTML =
-    `<span class="task-pill ${prioClass}">${prioLabel}</span>` +
-    `<span class="task-pill" style="background:${statusColor}22;color:${statusColor};border:1px solid ${statusColor}44;">${statusLabel}</span>` +
-    (dept.cls ? `<span class="dept-badge ${dept.cls}">${dept.label}</span>` : '');
-  document.getElementById('tdm-assignee').textContent = t.assignee_name || '—';
-  document.getElementById('tdm-due').textContent = t.due_date
-    ? new Date(t.due_date).toLocaleDateString('en-MY', { day:'numeric', month:'short', year:'numeric' })
-    : '—';
-  document.getElementById('task-detail-modal').style.display = 'block';
-}
-
-function closeTaskDetail() {
-  document.getElementById('task-detail-modal').style.display = 'none';
-}
-
 // ── Admin Tasks ────────────────────────────────────────────────────────────
-let _adminTaskFilter = 'all';
-let _allAdminTasks = [];
-
-
-function filterAdminTasks(filter) { switchDeptTab(filter); }
+var _adminTaskFilter = 'all';
+var _allAdminTasks   = [];
 
 async function loadAssigneeOptions() {
-  const dept = document.getElementById('task-dept').value;
-  const sel  = document.getElementById('task-assignee');
+  var dept = (document.getElementById('task-dept') || {}).value || '';
+  var sel  = document.getElementById('task-assignee');
+  if (!sel) return;
   sel.innerHTML = '<option value="">Unassigned</option>';
   if (!dept) return;
   try {
-    const members = await supa.get(`bb_members?department=eq.${dept}&select=ic,name&order=name`);
-    members.forEach(m => {
-      const opt = document.createElement('option');
-      opt.value = m.ic;
-      opt.textContent = m.name;
+    var members = await supa.get('bb_members?department=eq.' + dept + '&select=ic,name&order=name');
+    members.forEach(function(m) {
+      var opt = document.createElement('option');
+      opt.value = m.ic; opt.textContent = m.name;
       sel.appendChild(opt);
     });
   } catch(e) { console.error(e); }
 }
 
-
-async function renderTasksBoard(dept) {
-  const ic = localStorage.getItem('bb_current') || '';
-  const cols = { todo: [], inprogress: [], done: [] };
-  try {
-    const tasks = await supa.get(`bb_tasks?department=eq.${dept}&order=created_at.desc`);
-    tasks.forEach(t => {
-      const key = t.status === 'inprogress' ? 'inprogress' : t.status === 'done' ? 'done' : 'todo';
-      cols[key].push(t);
-    });
-  } catch(e) { console.error(e); }
-
-  const today = new Date(); today.setHours(0,0,0,0);
-  ['todo','inprogress','done'].forEach(status => {
-    const el  = document.getElementById('col-' + status);
-    const cnt = document.getElementById('count-' + status);
-    if (cnt) cnt.textContent = cols[status].length ? `(${cols[status].length})` : '';
-    if (!cols[status].length) { el.innerHTML = `<div style="color:#556;font-size:12px;text-align:center;padding:16px 0;">No tasks</div>`; return; }
-    el.innerHTML = cols[status].map(t => {
-      const prioClass = t.priority === 'high' ? 'prio-high' : t.priority === 'low' ? 'prio-low' : 'prio-medium';
-      const prioLabel = (t.priority||'medium').charAt(0).toUpperCase() + (t.priority||'medium').slice(1);
-      let dueHtml = '';
-      if (t.due_date) {
-        const due = new Date(t.due_date); due.setHours(0,0,0,0);
-        const overdue = status !== 'done' && due < today;
-        dueHtml = `<span class="task-due${overdue?' overdue':''}">📅 ${due.toLocaleDateString('en-MY',{day:'numeric',month:'short'})}</span>`;
-      }
-      const assigneeHtml = t.assignee_name ? `<span class="task-assignee">👤 ${t.assignee_name}</span>` : '';
-      window._taskMap = window._taskMap || {};
-      window._taskMap[t.id] = t;
-
-      // Status buttons for members (any dept member can update)
-      const statusBtns = `
-        <div style="display:flex;gap:4px;margin-top:10px;flex-wrap:wrap;">
-          ${['todo','inprogress','done'].map(s => {
-            const sc = s==='done'?'#66bb6a':s==='inprogress'?'#42a5f5':'#8898bb';
-            const sl = s==='inprogress'?'In Progress':s==='done'?'Done':'To Do';
-            const active = t.status === s;
-            return `<button onclick="memberUpdateTaskStatus('${t.id}','${s}','${dept}')" style="padding:3px 10px;border:1.5px solid ${active?sc:'#2a3a50'};border-radius:14px;background:${active?sc+'22':'transparent'};color:${active?sc:'#556'};font-size:10px;font-weight:700;cursor:pointer;font-family:'Oswald',sans-serif;">${sl}</button>`;
-          }).join('')}
-        </div>`;
-
-      return `<div class="task-card" onclick="openTaskDetail('${t.id}')">
-        <div class="task-card-title">${t.title}</div>
-        ${t.description ? `<div class="task-card-desc">${t.description.length>80?t.description.slice(0,80)+'…':t.description}</div>` : ''}
-        <div class="task-meta">
-          <span class="task-pill ${prioClass}">${prioLabel}</span>
-          ${assigneeHtml}
-          ${dueHtml}
-        </div>
-        ${statusBtns}
-      </div>`;
-    }).join('');
-  });
-}
-
-async function memberUpdateTaskStatus(id, status, dept) {
-  try {
-    await supa.patch(`bb_tasks?id=eq.${id}`, { status });
-    await renderTasksBoard(dept);
-  } catch(e) { alert('Failed to update.'); }
-}
-
-async function renderAdminTasks(filter) {
-  _adminTaskFilter = filter || 'all';
-  ['all','logistics','secretariat','media'].forEach(f => {
-    const btn = document.getElementById('dtab-' + f);
-    if (!btn) return;
-    const active = f === _adminTaskFilter;
-    const cfg = DEPT_CONFIG[f];
-    if (f === 'all') {
-      btn.style.background = active ? 'var(--accent)' : 'transparent';
-      btn.style.color      = active ? 'var(--navy)'   : 'var(--accent)';
-      btn.style.borderColor= active ? 'var(--accent)' : 'rgba(200,150,30,0.3)';
-    } else if (cfg) {
-      btn.style.background  = active ? cfg.color+'33' : 'transparent';
-      btn.style.fontWeight  = active ? '900' : '700';
-    }
-  });
-
-  const list = document.getElementById('admin-tasks-list');
-  list.innerHTML = '<div style="color:#888;text-align:center;padding:20px;"><span class="spinner"></span> Loading...</div>';
-  try {
-    const url = _adminTaskFilter === 'all'
-      ? 'bb_tasks?select=*&order=created_at.desc'
-      : `bb_tasks?department=eq.${_adminTaskFilter}&order=created_at.desc`;
-    _allAdminTasks = await supa.get(url);
-    if (!_allAdminTasks.length) { list.innerHTML = '<div style="color:#666;text-align:center;padding:20px;">No tasks yet.</div>'; return; }
-    const SC = { todo:'#8898bb', inprogress:'#42a5f5', done:'#66bb6a' };
-    const SL = { todo:'To Do', inprogress:'In Progress', done:'Done' };
-    list.innerHTML = _allAdminTasks.map(t => {
-      const dept = DEPT_CONFIG[t.department] || { label: t.department, cls:'' };
-      const prioClass = t.priority==='high'?'prio-high':t.priority==='low'?'prio-low':'prio-medium';
-      const sc = SC[t.status]||'#888';
-      return `<div style="background:#0a1628;border-radius:12px;padding:14px 16px;margin-bottom:10px;border:1px solid rgba(255,255,255,0.06);">
-        <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:8px;margin-bottom:8px;">
-          <div style="font-family:'Oswald',sans-serif;font-size:15px;font-weight:700;color:#fff;flex:1;">${t.title}</div>
-          <span class="dept-badge ${dept.cls}" style="font-size:10px;flex-shrink:0;">${dept.label}</span>
-        </div>
-        ${t.description ? `<div style="font-size:12px;color:#8898bb;margin-bottom:8px;line-height:1.5;">${t.description}</div>` : ''}
-        <div style="display:flex;gap:6px;flex-wrap:wrap;align-items:center;margin-bottom:10px;">
-          <span class="task-pill ${prioClass}">${t.priority||'medium'}</span>
-          ${t.assignee_name ? `<span style="font-size:11px;color:#8898bb;">👤 ${t.assignee_name}</span>` : ''}
-          ${t.due_date ? `<span style="font-size:11px;color:#8898bb;">📅 ${new Date(t.due_date).toLocaleDateString('en-MY',{day:'numeric',month:'short',year:'numeric'})}</span>` : ''}
-        </div>
-        <div style="display:flex;gap:5px;flex-wrap:wrap;align-items:center;">
-          ${['todo','inprogress','done'].map(s=>`<button onclick="updateTaskStatus('${t.id}','${s}')" style="padding:4px 10px;border:1.5px solid ${s===t.status?SC[s]:'#2a3a50'};border-radius:6px;background:${s===t.status?SC[s]+'22':'transparent'};color:${s===t.status?SC[s]:'#556'};font-size:11px;font-weight:700;cursor:pointer;font-family:'Oswald',sans-serif;">${SL[s]}</button>`).join('')}
-          <button onclick="editAdminTask('${t.id}')" style="margin-left:auto;background:#1a3a6e;border:1px solid #2a4a8e;color:#fff;padding:4px 10px;border-radius:6px;cursor:pointer;font-size:11px;font-weight:700;">✏️</button>
-          <button onclick="deleteTask('${t.id}')" style="background:#3a1a1a;border:1px solid #6a2a2a;color:#f66;padding:4px 10px;border-radius:6px;cursor:pointer;font-size:11px;font-weight:700;">🗑️</button>
-        </div>
-      </div>`;
-    }).join('');
-  } catch(e) { list.innerHTML = '<div style="color:#f66;text-align:center;padding:20px;">Failed to load tasks.</div>'; }
-}
-
-function clearTaskForm() {
-  document.getElementById('task-title').value    = '';
-  document.getElementById('task-desc').value     = '';
-  document.getElementById('task-dept').value     = '';
-  document.getElementById('task-priority').value = 'medium';
-  document.getElementById('task-due').value      = '';
-  document.getElementById('task-edit-id').value  = '';
-  document.getElementById('task-assignee').innerHTML = '<option value="">Select dept first...</option>';
-  document.getElementById('task-form-title').textContent = '➕ Add New Task';
-}
-
 async function saveTask() {
-  const title    = document.getElementById('task-title').value.trim();
-  const desc     = document.getElementById('task-desc').value.trim();
-  const dept     = document.getElementById('task-dept').value;
-  const priority = document.getElementById('task-priority').value;
-  const due      = document.getElementById('task-due').value;
-  const editId   = document.getElementById('task-edit-id').value;
-  const assigneeSel = document.getElementById('task-assignee');
-  const assigneeIc   = assigneeSel.value;
-  const assigneeName = assigneeSel.options[assigneeSel.selectedIndex]?.text || '';
-
-  if (!title) return alert('Please enter a task title.');
-  if (!dept)  return alert('Please select a department.');
-
-  const payload = {
-    title, description: desc, department: dept, priority,
-    due_date: due || null,
-    assignee_ic: assigneeIc || null,
-    assignee_name: assigneeIc ? assigneeName : null,
-    status: editId ? undefined : 'todo',
-  };
+  var title    = ((document.getElementById('task-title') || {}).value || '').trim();
+  var desc     = ((document.getElementById('task-desc') || {}).value || '').trim();
+  var dept     = (document.getElementById('task-dept') || {}).value || '';
+  var priority = (document.getElementById('task-priority') || {}).value || 'medium';
+  var due      = (document.getElementById('task-due') || {}).value || '';
+  var editId   = (document.getElementById('task-edit-id') || {}).value || '';
+  if (!title) { alert('Please enter a task title.'); return; }
+  if (!dept)  { alert('Please select a department.'); return; }
+  var assigneeSel = document.getElementById('task-assignee');
+  var selected    = assigneeSel ? Array.from(assigneeSel.selectedOptions).filter(function(o) { return o.value; }) : [];
+  var assigneeIc  = selected.map(function(o) { return o.value; }).join(',');
+  var assigneeName = selected.map(function(o) { return o.text; }).join(', ');
+  var payload = { title: title, description: desc, department: dept, priority: priority, due_date: due || null, assignee_ic: assigneeIc || null, assignee_name: assigneeName || null };
   if (!editId) payload.created_at = new Date().toISOString();
-  // Remove undefined keys
-  Object.keys(payload).forEach(k => payload[k] === undefined && delete payload[k]);
-
+  if (!editId) payload.status = 'todo';
   try {
-    if (editId) {
-      await supa.patch(`bb_tasks?id=eq.${editId}`, payload);
-      alert('✅ Task updated!');
-    } else {
-      await supa.post('bb_tasks', payload);
-      alert('✅ Task added!');
-    }
+    if (editId) { await supa.patch('bb_tasks?id=eq.' + editId, payload); alert('\u2705 Task updated!'); }
+    else        { await supa.post('bb_tasks', payload); alert('\u2705 Task added!'); }
     clearTaskForm();
+    var body = document.getElementById('task-form-body');
+    if (body && body.style.display !== 'none') toggleTaskForm();
     renderAdminTasks(_adminTaskFilter);
   } catch(e) { alert('Failed: ' + e.message); }
 }
 
-function editAdminTask(id) {
-  const t = _allAdminTasks.find(x => String(x.id) === String(id));
-  if (!t) return;
-  document.getElementById('task-form-title').textContent = '✏️ Edit Task';
-  document.getElementById('task-title').value    = t.title || '';
-  document.getElementById('task-desc').value     = t.description || '';
-  document.getElementById('task-dept').value     = t.department || '';
-  document.getElementById('task-priority').value = t.priority || 'medium';
-  document.getElementById('task-due').value      = t.due_date ? t.due_date.slice(0,10) : '';
-  document.getElementById('task-edit-id').value  = t.id;
-  loadAssigneeOptions().then(() => {
-    if (t.assignee_ic) document.getElementById('task-assignee').value = t.assignee_ic;
-  });
-  const body = document.getElementById('task-form-body');
-  if (body && body.style.display === 'none') toggleTaskForm();
-  document.getElementById('task-title').scrollIntoView({ behavior:'smooth' });
+function clearTaskForm() {
+  ['task-title','task-desc','task-due','task-edit-id'].forEach(function(id) { var el = document.getElementById(id); if (el) el.value = ''; });
+  var td = document.getElementById('task-dept');     if (td) td.value = '';
+  var tp = document.getElementById('task-priority'); if (tp) tp.value = 'medium';
+  var ta = document.getElementById('task-assignee'); if (ta) ta.innerHTML = '<option value="" disabled>Select dept first...</option>';
+  var tl = document.getElementById('task-form-toggle-label'); if (tl) tl.textContent = '\u2795 Add New Task';
+}
+
+async function renderAdminTasks(filter) {
+  _adminTaskFilter = filter || 'all';
+  var SC = { todo:'#8898bb', inprogress:'#42a5f5', done:'#66bb6a' };
+  var SL = { todo:'To Do', inprogress:'In Progress', done:'Done' };
+  var list = document.getElementById('admin-tasks-list');
+  if (!list) return;
+  list.innerHTML = '<div style="color:#888;text-align:center;padding:20px;"><span class="spinner"></span> Loading...</div>';
+  try {
+    var url = _adminTaskFilter === 'all' ? 'bb_tasks?select=*&order=created_at.desc' : 'bb_tasks?department=eq.' + _adminTaskFilter + '&order=created_at.desc';
+    _allAdminTasks = await supa.get(url);
+    if (!_allAdminTasks.length) { list.innerHTML = '<div style="color:#666;text-align:center;padding:20px;">No tasks yet.</div>'; return; }
+    var html = '';
+    _allAdminTasks.forEach(function(t) {
+      var dept = DEPT_CONFIG[t.department] || { label: t.department || '', cls: '' };
+      var pc   = t.priority === 'high' ? 'prio-high' : t.priority === 'low' ? 'prio-low' : 'prio-medium';
+      var sc   = SC[t.status] || '#888';
+      var statusBtns = Object.keys(SL).map(function(s) {
+        var a = s === t.status;
+        return '<button data-tid="' + t.id + '" data-ts="' + s + '" style="padding:4px 10px;border:1.5px solid ' + (a ? SC[s] : '#2a3a50') + ';border-radius:6px;background:' + (a ? SC[s] + '22' : 'transparent') + ';color:' + (a ? SC[s] : '#556') + ';font-size:11px;font-weight:700;cursor:pointer;font-family:\'Oswald\',sans-serif;">' + SL[s] + '</button>';
+      }).join('');
+      html += '<div style="background:#0a1628;border-radius:12px;padding:14px 16px;margin-bottom:10px;border:1px solid rgba(255,255,255,0.06);">'
+        + '<div style="display:flex;justify-content:space-between;align-items:flex-start;gap:8px;margin-bottom:8px;">'
+        + '<div style="font-family:\'Oswald\',sans-serif;font-size:15px;font-weight:700;color:#fff;flex:1;">' + t.title + '</div>'
+        + '<span class="dept-badge ' + dept.cls + '" style="font-size:10px;flex-shrink:0;">' + dept.label + '</span></div>'
+        + (t.description ? '<div style="font-size:12px;color:#8898bb;margin-bottom:8px;line-height:1.5;">' + t.description + '</div>' : '')
+        + '<div style="display:flex;gap:6px;flex-wrap:wrap;align-items:center;margin-bottom:10px;">'
+        + '<span class="task-pill ' + pc + '">' + (t.priority||'medium') + '</span>'
+        + (t.assignee_name ? '<span style="font-size:11px;color:#8898bb;">\ud83d\udc64 ' + t.assignee_name + '</span>' : '')
+        + (t.due_date ? '<span style="font-size:11px;color:#8898bb;">\ud83d\udcc5 ' + new Date(t.due_date).toLocaleDateString('en-MY', { day:'numeric', month:'short', year:'numeric' }) + '</span>' : '')
+        + '</div>'
+        + '<div style="display:flex;gap:5px;flex-wrap:wrap;align-items:center;">' + statusBtns
+        + '<button data-edit-tid="' + t.id + '" style="margin-left:auto;background:#1a3a6e;border:1px solid #2a4a8e;color:#fff;padding:4px 10px;border-radius:6px;cursor:pointer;font-size:11px;font-weight:700;">\u270f\ufe0f</button>'
+        + '<button data-del-tid="' + t.id + '" style="background:#3a1a1a;border:1px solid #6a2a2a;color:#f66;padding:4px 10px;border-radius:6px;cursor:pointer;font-size:11px;font-weight:700;">\ud83d\uddd1\ufe0f</button>'
+        + '</div></div>';
+    });
+    list.innerHTML = html;
+    list.querySelectorAll('[data-tid]').forEach(function(btn) {
+      btn.addEventListener('click', function() { updateTaskStatus(btn.getAttribute('data-tid'), btn.getAttribute('data-ts')); });
+    });
+    list.querySelectorAll('[data-edit-tid]').forEach(function(btn) {
+      btn.addEventListener('click', function() { editAdminTask(btn.getAttribute('data-edit-tid')); });
+    });
+    list.querySelectorAll('[data-del-tid]').forEach(function(btn) {
+      btn.addEventListener('click', function() { deleteTask(btn.getAttribute('data-del-tid')); });
+    });
+  } catch(e) { list.innerHTML = '<div style="color:#f66;text-align:center;padding:20px;">Failed to load tasks.</div>'; }
 }
 
 async function updateTaskStatus(id, status) {
-  try {
-    await supa.patch(`bb_tasks?id=eq.${id}`, { status });
-    renderAdminTasks(_adminTaskFilter);
-  } catch(e) { alert('Failed to update status.'); }
+  try { await supa.patch('bb_tasks?id=eq.' + id, { status: status }); renderAdminTasks(_adminTaskFilter); }
+  catch(e) { alert('Failed to update status.'); }
+}
+
+function editAdminTask(id) {
+  var t = _allAdminTasks.find(function(x) { return String(x.id) === String(id); });
+  if (!t) return;
+  var set = function(elId, val) { var el = document.getElementById(elId); if (el) el.value = val || ''; };
+  set('task-title',    t.title);
+  set('task-desc',     t.description);
+  set('task-priority', t.priority || 'medium');
+  set('task-due',      t.due_date ? t.due_date.slice(0,10) : '');
+  set('task-dept',     t.department);
+  set('task-edit-id',  t.id);
+  var tl = document.getElementById('task-form-toggle-label'); if (tl) tl.textContent = '\u270f\ufe0f Edit Task';
+  loadAssigneeOptions().then(function() {
+    if (t.assignee_ic) {
+      var sel = document.getElementById('task-assignee');
+      if (sel) {
+        var ics = t.assignee_ic.split(',');
+        Array.from(sel.options).forEach(function(o) { o.selected = ics.indexOf(o.value) !== -1; });
+      }
+    }
+  });
+  var body = document.getElementById('task-form-body');
+  if (body && body.style.display === 'none') toggleTaskForm();
+  var tt = document.getElementById('task-title'); if (tt) tt.scrollIntoView({ behavior: 'smooth' });
 }
 
 async function deleteTask(id) {
   if (!confirm('Delete this task?')) return;
-  try {
-    await supa.delete(`bb_tasks?id=eq.${id}`);
-    renderAdminTasks(_adminTaskFilter);
-  } catch(e) { alert('Failed to delete task.'); }
+  try { await supa.delete('bb_tasks?id=eq.' + id); renderAdminTasks(_adminTaskFilter); }
+  catch(e) { alert('Failed to delete task.'); }
 }
 
-// ── Forms system ──────────────────────────────────────────────────────────
-let _customForms = [];
-let _currentFormType = 'link';
-let _fbFields = [];
-let _currentFormData = null; // form being viewed by member
+function filterAdminTasks(filter) { switchDeptTab(filter); }
 
-function loadCustomForms() {
-  try { _customForms = JSON.parse(localStorage.getItem('bb_custom_forms') || '[]'); } catch(e) { _customForms = []; }
-}
-function saveCustomForms() {
-  localStorage.setItem('bb_custom_forms', JSON.stringify(_customForms));
-}
-
-function setFormType(type) {
-  _currentFormType = type;
-  ['link','builtin','uniform'].forEach(t => {
-    document.getElementById('ftype-' + t).classList.toggle('ftype-active', t === type);
-    const fields = document.getElementById('fb-' + t + '-fields');
-    if (fields) fields.style.display = t === type ? 'block' : 'none';
-  });
-}
-
-function addFormField() {
-  const id = Date.now();
-  _fbFields.push({ id, label: '', type: 'text', required: false });
-  renderFbFields();
-}
-
-function renderFbFields() {
-  const container = document.getElementById('fb-fields-list');
-  if (!container) return;
-  container.innerHTML = _fbFields.map((f, i) => `
-    <div class="fb-field-row">
-      <input type="text" value="${f.label}" oninput="_fbFields[${i}].label=this.value" placeholder="Field label e.g. Full Name" style="flex:1;background:#0a1628;color:#fff;border:2px solid #2a3a50;border-radius:8px;padding:8px 10px;font-family:'Roboto',sans-serif;font-size:13px;"/>
-      <select onchange="_fbFields[${i}].type=this.value" style="background:#0a1628;color:#fff;border:2px solid #2a3a50;border-radius:8px;padding:8px;font-size:12px;">
-        <option value="text" ${f.type==='text'?'selected':''}>Text</option>
-        <option value="textarea" ${f.type==='textarea'?'selected':''}>Long text</option>
-        <option value="number" ${f.type==='number'?'selected':''}>Number</option>
-        <option value="date" ${f.type==='date'?'selected':''}>Date</option>
-        <option value="select" ${f.type==='select'?'selected':''}>Dropdown</option>
-      </select>
-      <label style="display:flex;align-items:center;gap:4px;color:#8898bb;font-size:11px;cursor:pointer;">
-        <input type="checkbox" ${f.required?'checked':''} onchange="_fbFields[${i}].required=this.checked"/> Req
-      </label>
-      <button onclick="_fbFields.splice(${i},1);renderFbFields()" style="background:#3a1a1a;border:1px solid #6a2a2a;color:#f66;padding:5px 9px;border-radius:7px;cursor:pointer;font-size:13px;">✕</button>
-    </div>
-    ${f.type==='select' ? `<input type="text" value="${f.options||''}" oninput="_fbFields[${i}].options=this.value" placeholder="Options: e.g. Yes, No, Maybe" style="width:100%;background:#0a1628;color:#fff;border:2px solid #2a3a50;border-radius:8px;padding:8px 10px;font-family:'Roboto',sans-serif;font-size:12px;margin-bottom:8px;"/>` : ''}
-  `).join('');
-}
-
-function clearFormBuilder() {
-  document.getElementById('fb-name').value = '';
-  document.getElementById('fb-desc').value = '';
-  document.getElementById('fb-url').value  = '';
-  document.getElementById('fb-edit-id').value = '';
-  document.getElementById('fb-form-title').textContent = '➕ Add New Form';
-  _fbFields = [];
-  renderFbFields();
-  setFormType('link');
-}
-
-function saveForm() {
-  const name    = document.getElementById('fb-name').value.trim();
-  const desc    = document.getElementById('fb-desc').value.trim();
-  const editId  = document.getElementById('fb-edit-id').value;
-  const type    = _currentFormType;
-  if (!name) return alert('Please enter a form name.');
-  let formData = { id: editId || 'form_' + Date.now(), name, desc, type, active: true };
-  if (type === 'link') {
-    const url = document.getElementById('fb-url').value.trim();
-    if (!url) return alert('Please enter a URL.');
-    formData.url = url;
-  } else if (type === 'builtin') {
-    if (!_fbFields.length) return alert('Please add at least one field.');
-    formData.fields = JSON.parse(JSON.stringify(_fbFields));
-  } else if (type === 'uniform') {
-    formData.fields = [];
-  }
-  const idx = _customForms.findIndex(f => f.id === formData.id);
-  if (idx >= 0) _customForms[idx] = formData; else _customForms.push(formData);
-  saveCustomForms();
-  clearFormBuilder();
-  renderAdminForms();
-  renderFormsHub();
-  alert('✅ Form saved!');
-}
-
-function editForm(id) {
-  const f = _customForms.find(x => x.id === id);
-  if (!f) return;
-  document.getElementById('fb-form-title').textContent = '✏️ Edit: ' + f.name;
-  document.getElementById('fb-name').value  = f.name;
-  document.getElementById('fb-desc').value  = f.desc || '';
-  document.getElementById('fb-edit-id').value = f.id;
-  _fbFields = f.fields ? JSON.parse(JSON.stringify(f.fields)) : [];
-  if (f.type === 'link') { document.getElementById('fb-url').value = f.url || ''; }
-  setFormType(f.type || 'link');
-  renderFbFields();
-}
-
-function deleteForm(id) {
-  if (!confirm('Delete this form?')) return;
-  _customForms = _customForms.filter(f => f.id !== id);
-  saveCustomForms();
-  renderAdminForms();
-  renderFormsHub();
-}
-
-function renderAdminForms() {
-  loadCustomForms();
-  const container = document.getElementById('admin-forms-list');
-  if (!container) return;
-  // Pre-populate filter dropdown
-  const filter = document.getElementById('admin-order-form-filter');
-  if (filter) {
-    filter.innerHTML = '<option value="">All forms</option>' + _customForms.map(f => `<option value="${f.id}">${f.name}</option>`).join('');
-  }
-  if (!_customForms.length) { container.innerHTML = '<div style="color:#8898bb;text-align:center;padding:20px;font-size:13px;">No forms yet. Create one above.</div>'; return; }
-  const icons = { link:'🔗', builtin:'⚙️', uniform:'👔' };
-  const typeLabel = { link:'External Link', builtin:'Built-in Form', uniform:'Uniform Order' };
-  container.innerHTML = _customForms.map(f => `
-    <div style="background:#0a1628;border-radius:12px;padding:14px 16px;margin-bottom:10px;border:1px solid rgba(255,255,255,0.06);display:flex;align-items:center;gap:12px;">
-      <div style="width:42px;height:42px;border-radius:10px;background:rgba(200,150,30,0.1);display:flex;align-items:center;justify-content:center;font-size:20px;flex-shrink:0;">${icons[f.type]||'📋'}</div>
-      <div style="flex:1;">
-        <div style="font-family:'Oswald',sans-serif;font-size:15px;font-weight:600;color:#fff;">${f.name}</div>
-        <div style="font-size:11px;color:#8898bb;">${typeLabel[f.type]||''} ${f.desc ? '· '+f.desc : ''}</div>
-      </div>
-      <button onclick="editForm('${f.id}')" style="background:#1a3a6e;border:1px solid #2a4a8e;color:#fff;padding:6px 12px;border-radius:8px;cursor:pointer;font-size:12px;font-weight:600;">✏️</button>
-      <button onclick="deleteForm('${f.id}')" style="background:#3a1a1a;border:1px solid #6a2a2a;color:#f66;padding:6px 12px;border-radius:8px;cursor:pointer;font-size:12px;">🗑️</button>
-    </div>
-  `).join('');
-}
-
-// ── Forms hub (member side) ───────────────────────────────────────────────
-function renderFormsHub() {
-  loadCustomForms();
-  const hub = document.getElementById('forms-hub');
-  if (!hub) return;
-  // Always include uniform order form + leave form built-in + custom forms
-  const builtinForms = [
-    { id:'__leave__', name:'Leave Application', desc:'Submit a leave request', type:'builtin', icon:'📝',
-      fields:[
-        { id:'lf1', label:'Reason for Leave', type:'textarea', required:true },
-        { id:'lf2', label:'Start Date', type:'date', required:true },
-        { id:'lf3', label:'End Date', type:'date', required:true },
-        { id:'lf4', label:'Contact During Leave', type:'text', required:false },
-      ]
-    },
-    { id:'__uniform__', name:'Uniform Order', desc:'Order BB uniform items', type:'uniform', icon:'👔' },
-  ];
-  const allForms = [...builtinForms, ..._customForms.filter(f => f.active !== false)];
-
-  if (!allForms.length) { hub.innerHTML = '<div style="color:#8898bb;text-align:center;padding:30px;font-size:13px;">No forms available.</div>'; return; }
-
-  const typeColors = { builtin:'rgba(102,187,106,0.12)', uniform:'rgba(200,150,30,0.12)', link:'rgba(66,165,245,0.12)' };
-  const typeIcons  = { builtin:'⚙️', uniform:'👔', link:'🔗' };
-  hub.innerHTML = allForms.map(f => {
-    const icon = f.icon || typeIcons[f.type] || '📋';
-    const bg   = typeColors[f.type] || 'rgba(200,150,30,0.08)';
-    return `<div class="form-card-hub" onclick="openFormForMember('${f.id}')">
-      <div class="form-card-icon" style="background:${bg};">${icon}</div>
-      <div style="flex:1;">
-        <div class="form-card-name">${f.name}</div>
-        <div class="form-card-desc">${f.desc || ''}</div>
-      </div>
-      <div class="form-card-arrow">›</div>
-    </div>`;
-  }).join('');
-}
-
-function openFormForMember(formId) {
-  loadCustomForms();
-  const builtinLeave = { id:'__leave__', name:'Leave Application', desc:'Submit a leave request', type:'builtin', icon:'📝',
-    fields:[
-      { id:'lf1', label:'Reason for Leave', type:'textarea', required:true },
-      { id:'lf2', label:'Start Date', type:'date', required:true },
-      { id:'lf3', label:'End Date', type:'date', required:true },
-      { id:'lf4', label:'Contact During Leave', type:'text', required:false },
-    ]
-  };
-  const allForms = [builtinLeave, { id:'__uniform__', name:'Uniform Order', type:'uniform' }, ..._customForms];
-  const form = allForms.find(f => f.id === formId);
-  if (!form) return;
-
-  if (form.type === 'link') {
-    window.open(form.url, '_blank');
-    return;
-  }
-  if (form.type === 'uniform') {
-    // Show the uniform order form
-    document.getElementById('forms-hub').style.display = 'none';
-    document.getElementById('inline-form-view').style.display = 'block';
-    renderUniformOrderInline();
-    return;
-  }
-  // Built-in form
-  _currentFormData = form;
-  document.getElementById('forms-hub').style.display = 'none';
-  document.getElementById('inline-form-view').style.display = 'block';
-  renderBuiltinFormInline(form);
-}
-
-function backToFormsHub() {
-  document.getElementById('forms-hub').style.display = 'block';
-  document.getElementById('inline-form-view').style.display = 'none';
-  _currentFormData = null;
-  // Reset uniform order state
-  UNIFORM_ITEMS.forEach(i => { itemQtys[i.key] = 0; delete itemSizes[i.key]; });
-  updateTotal();
-}
-
-function renderBuiltinFormInline(form) {
-  const container = document.getElementById('inline-form-view');
-  const fieldsHtml = form.fields.map((f, i) => {
-    const inputHtml = f.type === 'textarea'
-      ? `<textarea class="form-textarea" id="bff-${i}" placeholder="Your answer..." style="margin-top:6px;"></textarea>`
-      : f.type === 'select'
-      ? `<select class="form-select" id="bff-${i}" style="margin-top:6px;"><option value="">Select...</option>${(f.options||'').split(',').map(o=>`<option>${o.trim()}</option>`).join('')}</select>`
-      : `<input class="form-input" type="${f.type||'text'}" id="bff-${i}" placeholder="Your answer..." style="margin-top:6px;"/>`;
-    return `<div class="form-group">
-      <label class="form-label">${f.label}${f.required?' <span style="color:#f66;">*</span>':''}</label>
-      ${inputHtml}
-    </div>`;
-  }).join('');
-
-  container.innerHTML = `
-    <div class="card stripe-bg">
-      <button onclick="backToFormsHub()" style="display:flex;align-items:center;gap:6px;background:none;border:none;color:#8898bb;font-family:'Oswald',sans-serif;font-size:13px;cursor:pointer;padding:0;margin-bottom:16px;">‹ Back to Forms</button>
-      <div class="page-title">${form.name}</div>
-      ${form.desc ? `<div class="page-desc">${form.desc}</div>` : ''}
-      <hr class="divider"/>
-      ${fieldsHtml}
-      <button class="submit-btn gold" onclick="submitBuiltinForm('${form.id}')">📤 Submit</button>
-      <div class="success-box" id="builtin-success" style="display:none;">
-        <div class="s-icon">✅</div>
-        <div class="s-title">Submitted!</div>
-        <div class="s-msg">Your form has been received.</div>
-      </div>
-    </div>`;
-}
-
-async function submitBuiltinForm(formId) {
-  loadCustomForms();
-  const builtinLeave = { id:'__leave__', name:'Leave Application', type:'builtin',
-    fields:[
-      { id:'lf1', label:'Reason for Leave', type:'textarea', required:true },
-      { id:'lf2', label:'Start Date', type:'date', required:true },
-      { id:'lf3', label:'End Date', type:'date', required:true },
-      { id:'lf4', label:'Contact During Leave', type:'text', required:false },
-    ]
-  };
-  const allForms = [builtinLeave, ..._customForms];
-  const form = allForms.find(f => f.id === formId);
-  if (!form) return;
-
-  const answers = {};
-  let valid = true;
-  form.fields.forEach((f, i) => {
-    const el = document.getElementById('bff-' + i);
-    const val = el ? el.value.trim() : '';
-    if (f.required && !val) { valid = false; el && (el.style.borderColor = '#f66'); return; }
-    answers[f.label] = val;
-    el && (el.style.borderColor = '');
-  });
-  if (!valid) { alert('Please fill in all required fields.'); return; }
-
-  const ic = localStorage.getItem('bb_current') || '';
-  try {
-    await supa.post('bb_orders', {
-      order_number: 'FORM-' + Date.now().toString(36).toUpperCase(),
-      ic, member_name: document.getElementById('order-member-name').textContent,
-      rank: document.getElementById('order-member-rank').textContent,
-      items: JSON.stringify({ form_name: form.name, answers }),
-      notes: form.name,
-      status: 'pending',
-      created_at: new Date().toISOString(),
-    });
-    document.getElementById('builtin-success').style.display = 'block';
-    document.getElementById('builtin-success').scrollIntoView({ behavior:'smooth' });
-  } catch(e) { alert('Failed to submit: ' + e.message); }
-}
-
-function renderUniformOrderInline() {
-  const container = document.getElementById('inline-form-view');
-  container.innerHTML = `
-    <button onclick="backToFormsHub()" style="display:flex;align-items:center;gap:6px;background:none;border:none;color:#8898bb;font-family:'Oswald',sans-serif;font-size:13px;cursor:pointer;padding:0;margin-bottom:16px;">‹ Back to Forms</button>
-    <div id="step-form">
-      <div class="card stripe-bg" style="margin-bottom:14px;">
-        <div class="page-title">Uniform</div>
-        <div class="page-subtitle">Order Form</div>
-        <div class="page-desc">Select items &amp; sizes 👔</div>
-        <div class="note-box">⚠️ Orders are confirmed by the officer in charge. You will be contacted when ready.</div>
-        <div id="uniform-items"></div>
-        <div class="form-group" style="margin-top:8px;">
-          <label class="form-label">Additional Notes (optional)</label>
-          <textarea class="form-textarea" id="order-notes" placeholder="Any special requests..."></textarea>
-        </div>
-        <div class="total-row">
-          <div class="total-label">Estimated Total</div>
-          <div class="total-val" id="order-total">RM 0.00</div>
-        </div>
-        <button class="submit-btn" style="margin-top:14px;" onclick="goToOrderReview()">👀 Review Order</button>
-      </div>
-    </div>
-    <div id="step-review" style="display:none;">
-      <div class="card stripe-bg">
-        <div class="page-title">Review</div>
-        <div class="page-subtitle">Your Order</div>
-        <div class="page-desc">Confirm before submitting 👇</div>
-        <div style="background:#fff;border-radius:14px;padding:20px;margin-bottom:18px;" id="review-content"></div>
-        <div style="display:flex;gap:10px;">
-          <button class="submit-btn danger" style="flex:1;margin-top:0;" onclick="goBackOrder()">✏️ Edit</button>
-          <button class="submit-btn" style="flex:2;margin-top:0;" onclick="submitOrder()" id="confirm-btn">✅ Confirm &amp; Submit</button>
-        </div>
-      </div>
-    </div>
-    <div class="success-box" id="order-success" style="display:none;">
-      <div class="s-icon">🎉</div>
-      <div class="s-title">Order Submitted!</div>
-      <div class="s-msg">Order <strong id="s-ordernum" style="color:var(--accent);"></strong> received! The officer will contact you when ready.</div>
-    </div>`;
-  renderOrderItems();
-}
-
-// ── Tasks: multi-assignee + member status editing ─────────────────────────
-
-// ── Badges system (fully dynamic) ─────────────────────────────────────────
-const DEFAULT_BB_BADGES = [
-  { id:'bb1',  name:'BB Enrolment',          cat:'Core' },
-  { id:'bb2',  name:"BB Founder's Award",    cat:'Core' },
-  { id:'bb3',  name:"President's Award",     cat:'Core' },
-  { id:'bb4',  name:'First Aid (Basic)',      cat:'Skills' },
-  { id:'bb5',  name:'First Aid (Advanced)',   cat:'Skills' },
-  { id:'bb6',  name:'Fire Safety',            cat:'Skills' },
-  { id:'bb7',  name:'Marching',               cat:'Drill' },
-  { id:'bb8',  name:'Best Driller',           cat:'Drill' },
-  { id:'bb9',  name:'Leadership',             cat:'Leadership' },
-  { id:'bb10', name:'Community Service',      cat:'Service' },
-  { id:'bb11', name:'Best Camper',            cat:'Outdoor' },
-  { id:'bb12', name:'Orienteering',           cat:'Outdoor' },
-  { id:'bb13', name:'Swimming (Beginner)',     cat:'Sports' },
-  { id:'bb14', name:'Swimming (Proficiency)', cat:'Sports' },
-  { id:'bb15', name:'Music & Worship',        cat:'Arts' },
-];
-
-function getBadgeDefs() {
-  try { return JSON.parse(localStorage.getItem('bb_badge_defs') || 'null') || DEFAULT_BB_BADGES; }
-  catch(e) { return DEFAULT_BB_BADGES; }
-}
-function saveBadgeDefs(defs) { localStorage.setItem('bb_badge_defs', JSON.stringify(defs)); }
-
-// ── Member: render badges ─────────────────────────────────────────────────
-function loadBadges(ic) {
-  const saved     = JSON.parse(localStorage.getItem('bb_badges_' + ic) || '{}');
-  const defs      = getBadgeDefs();
-  const container = document.getElementById('badges-list');
-  if (!container) return;
-  const cats = [...new Set(defs.map(b => b.cat))];
-  if (!cats.length) { container.innerHTML = '<div style="color:#8898bb;font-size:13px;text-align:center;padding:16px;">No badges defined yet.</div>'; return; }
-  container.innerHTML = cats.map(cat => {
-    const catBadges = defs.filter(b => b.cat === cat && b.name !== '(Add badges below)');
-    if (!catBadges.length) return '';
-    return `<div style="margin-bottom:16px;">
-      <div style="font-size:10px;font-weight:700;letter-spacing:2px;color:var(--gold);text-transform:uppercase;margin-bottom:8px;">${cat}</div>
-      ${catBadges.map(b => {
-        const entry = saved[b.id] || { earned: false, date: '' };
-        return `<div style="display:flex;align-items:center;gap:10px;padding:8px 0;border-bottom:1px solid rgba(255,255,255,0.05);">
-          <div onclick="toggleBadge('${b.id}','${ic}')" style="width:22px;height:22px;border-radius:6px;border:2px solid ${entry.earned?'var(--gold)':'#2a3a50'};background:${entry.earned?'rgba(200,150,30,0.2)':'transparent'};display:flex;align-items:center;justify-content:center;cursor:pointer;flex-shrink:0;font-size:13px;">${entry.earned?'✓':''}</div>
-          <div style="flex:1;font-size:13px;color:${entry.earned?'#fff':'#8898bb'};">${b.name}</div>
-          <input type="date" id="badge-date-${b.id}" value="${entry.date||''}" style="background:#0a1628;color:#8898bb;border:1px solid #2a3a50;border-radius:7px;padding:4px 8px;font-size:11px;width:130px;${entry.earned?'':'opacity:0.4;'}"/>
-        </div>`;
-      }).join('')}
-    </div>`;
-  }).join('');
-}
-
-function toggleBadge(badgeId, ic) {
-  const saved = JSON.parse(localStorage.getItem('bb_badges_' + ic) || '{}');
-  const curr  = saved[badgeId] || { earned: false, date: '' };
-  saved[badgeId] = { earned: !curr.earned, date: curr.date };
-  localStorage.setItem('bb_badges_' + ic, JSON.stringify(saved));
-  loadBadges(ic);
-}
-
-function saveBadges() {
-  const ic = localStorage.getItem('bb_current');
-  if (!ic) return;
-  const defs  = getBadgeDefs();
-  const saved = JSON.parse(localStorage.getItem('bb_badges_' + ic) || '{}');
-  defs.forEach(b => {
-    const el = document.getElementById('badge-date-' + b.id);
-    if (el) { if (!saved[b.id]) saved[b.id] = { earned: false, date: '' }; saved[b.id].date = el.value; }
-  });
-  localStorage.setItem('bb_badges_' + ic, JSON.stringify(saved));
-  alert('✅ Badges saved!');
-}
-
-// ── Admin: badge definition editor ───────────────────────────────────────
-function renderAdminBadges() {
-  const defs      = getBadgeDefs();
-  const cats      = [...new Set(defs.map(b => b.cat))];
-  const container = document.getElementById('admin-badges-content');
-  if (!container) return;
-  container.innerHTML = cats.map(cat => {
-    const catBadges = defs.filter(b => b.cat === cat && b.name !== '(Add badges below)');
-    const safecat   = cat.replace(/'/g, "\\'");
-    const inputKey  = 'new-badge-' + cat.replace(/\s/g,'_').replace(/[^a-zA-Z0-9_]/g,'');
-    return `<div style="background:#0a1628;border-radius:12px;padding:14px 16px;margin-bottom:12px;border:1px solid rgba(255,255,255,0.07);">
-      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;">
-        <div style="font-family:'Oswald',sans-serif;font-size:15px;font-weight:700;color:var(--gold);">${cat}</div>
-        <button onclick="deleteCategory('${safecat}')" style="background:#3a1a1a;border:1px solid #6a2a2a;color:#f66;padding:4px 12px;border-radius:7px;cursor:pointer;font-size:11px;font-weight:700;">🗑️ Delete section</button>
-      </div>
-      ${catBadges.length ? catBadges.map(b => `
-        <div style="display:flex;align-items:center;gap:8px;padding:7px 0;border-bottom:1px solid rgba(255,255,255,0.05);">
-          <div style="flex:1;font-size:13px;color:#ccc;">${b.name}</div>
-          <button onclick="deleteBadge('${b.id}')" style="background:none;border:none;color:#f66;font-size:14px;cursor:pointer;padding:2px 8px;">✕</button>
-        </div>`).join('') : '<div style="font-size:12px;color:#556;padding:6px 0;">No badges yet — add one below.</div>'}
-      <div style="display:flex;gap:8px;margin-top:10px;">
-        <input type="text" id="${inputKey}" placeholder="New badge name..." style="flex:1;background:#122040;color:#fff;border:1.5px solid #2a3a50;border-radius:8px;padding:8px 10px;font-family:'Roboto',sans-serif;font-size:13px;outline:none;"/>
-        <button onclick="addBadgeToCategory('${safecat}')" style="background:rgba(200,150,30,0.15);border:1px solid rgba(200,150,30,0.35);color:var(--gold);padding:8px 14px;border-radius:8px;cursor:pointer;font-family:'Oswald',sans-serif;font-size:13px;font-weight:700;white-space:nowrap;">+ Add</button>
-      </div>
-    </div>`;
-  }).join('');
-  container.innerHTML += `
-    <div style="background:#0a1628;border-radius:12px;padding:14px 16px;border:1px dashed rgba(200,150,30,0.3);">
-      <div style="font-family:'Oswald',sans-serif;font-size:14px;font-weight:600;color:#8898bb;margin-bottom:10px;">➕ Add New Section</div>
-      <div style="display:flex;gap:8px;">
-        <input type="text" id="new-cat-name" placeholder="Section name e.g. Leadership" style="flex:1;background:#122040;color:#fff;border:1.5px solid #2a3a50;border-radius:8px;padding:8px 10px;font-family:'Roboto',sans-serif;font-size:13px;outline:none;"/>
-        <button onclick="addCategory()" style="background:var(--accent);border:none;color:var(--navy);padding:8px 18px;border-radius:8px;cursor:pointer;font-family:'Oswald',sans-serif;font-size:14px;font-weight:700;">+ Add</button>
-      </div>
-    </div>`;
-}
-
-function addCategory() {
-  const input = document.getElementById('new-cat-name');
-  const name  = (input ? input.value.trim() : '');
-  if (!name) return alert('Please enter a section name.');
-  const defs = getBadgeDefs();
-  if (defs.some(b => b.cat === name)) return alert('Section already exists.');
-  defs.push({ id: 'b_' + Date.now(), name: '(Add badges below)', cat: name });
-  saveBadgeDefs(defs);
-  if (input) input.value = '';
-  renderAdminBadges();
-}
-
-function deleteCategory(cat) {
-  if (!confirm('Delete the "' + cat + '" section and all its badges?')) return;
-  saveBadgeDefs(getBadgeDefs().filter(b => b.cat !== cat));
-  renderAdminBadges();
-}
-
-function addBadgeToCategory(cat) {
-  const key   = 'new-badge-' + cat.replace(/\s/g,'_').replace(/[^a-zA-Z0-9_]/g,'');
-  const input = document.getElementById(key);
-  const name  = input ? input.value.trim() : '';
-  if (!name) return alert('Please enter a badge name.');
-  const defs = getBadgeDefs().filter(b => !(b.cat === cat && b.name === '(Add badges below)'));
-  defs.push({ id: 'b_' + Date.now(), name, cat });
-  saveBadgeDefs(defs);
-  if (input) input.value = '';
-  renderAdminBadges();
-}
-
-function deleteBadge(id) {
-  const badge = getBadgeDefs().find(b => b.id === id);
-  if (!badge || !confirm('Delete badge "' + badge.name + '"?')) return;
-  saveBadgeDefs(getBadgeDefs().filter(b => b.id !== id));
-  renderAdminBadges();
-}
-
-// ── Init ──────────────────────────────────────────────────────────────────
-window.addEventListener('load', () => {
+// ── Init ───────────────────────────────────────────────────────────────────
+window.addEventListener('load', function() {
   loadPrices();
   loadGallery();
   loadAnnouncements();
   loadCustomForms();
   renderOrderItems();
-  const ic = localStorage.getItem('bb_current');
-  if (ic) { renderDashboard(); checkTasksAccess(); }  if (window.location.hash === '#admin') openAdmin();
-});
-window.addEventListener('hashchange', () => {
+  var ic = localStorage.getItem('bb_current');
+  if (ic) { renderDashboard(); checkTasksAccess(); }
   if (window.location.hash === '#admin') openAdmin();
 });
-
-// Drag-drop gallery
-document.addEventListener('DOMContentLoaded', () => {
-  const drop = document.getElementById('gallery-drop');
+window.addEventListener('hashchange', function() {
+  if (window.location.hash === '#admin') openAdmin();
+});
+document.addEventListener('DOMContentLoaded', function() {
+  var drop = document.getElementById('gallery-drop');
   if (!drop) return;
-  drop.addEventListener('dragover', e => { e.preventDefault(); drop.classList.add('dragover'); });
-  drop.addEventListener('dragleave', () => drop.classList.remove('dragover'));
-  drop.addEventListener('drop', e => {
+  drop.addEventListener('dragover', function(e) { e.preventDefault(); drop.classList.add('dragover'); });
+  drop.addEventListener('dragleave', function() { drop.classList.remove('dragover'); });
+  drop.addEventListener('drop', function(e) {
     e.preventDefault(); drop.classList.remove('dragover');
-    const files = Array.from(e.dataTransfer.files).filter(f => f.type.startsWith('image/'));
-    files.forEach(f => { const r = new FileReader(); r.onload = ev => { galleryImages.push(ev.target.result); localStorage.setItem('bb_gallery', JSON.stringify(galleryImages)); renderGallery(); }; r.readAsDataURL(f); });
+    Array.from(e.dataTransfer.files).filter(function(f) { return f.type.startsWith('image/'); }).forEach(function(f) {
+      var r = new FileReader();
+      r.onload = function(ev) { galleryImages.push(ev.target.result); localStorage.setItem('bb_gallery', JSON.stringify(galleryImages)); renderGallery(); };
+      r.readAsDataURL(f);
+    });
   });
 });
+
 </script>
-</body>
-</html>
