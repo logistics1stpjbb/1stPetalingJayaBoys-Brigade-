@@ -143,6 +143,29 @@
   .admin-count-btn { width: 28px; height: 28px; border-radius: 7px; border: none; font-size: 16px; font-weight: 700; cursor: pointer; display: flex; align-items: center; justify-content: center; }
   .admin-count-display { font-family: 'Oswald', sans-serif; font-size: 20px; font-weight: 700; color: var(--accent); min-width: 28px; text-align: center; }
 
+
+  /* ── Tasks ── */
+  .task-col { background: var(--navy2); border-radius: 14px; padding: 14px; flex: 1; min-width: 0; border: 1px solid rgba(255,255,255,0.06); }
+  .task-col-title { font-family: 'Oswald', sans-serif; font-size: 14px; font-weight: 600; letter-spacing: 2px; text-transform: uppercase; margin-bottom: 12px; display: flex; align-items: center; gap: 8px; }
+  .task-card { background: var(--navy); border-radius: 10px; padding: 12px 14px; margin-bottom: 8px; border: 1px solid rgba(255,255,255,0.08); cursor: pointer; transition: border-color 0.2s; }
+  .task-card:hover { border-color: rgba(200,150,30,0.4); }
+  .task-card-title { font-family: 'Oswald', sans-serif; font-size: 15px; font-weight: 600; color: #fff; margin-bottom: 4px; line-height: 1.3; }
+  .task-card-desc { font-size: 11px; color: #8898bb; line-height: 1.5; margin-bottom: 8px; }
+  .task-meta { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
+  .task-pill { font-size: 10px; font-weight: 700; padding: 2px 8px; border-radius: 20px; letter-spacing: 0.5px; text-transform: uppercase; }
+  .prio-high   { background: rgba(220,60,60,0.2);   color: #ff7070; border: 1px solid rgba(220,60,60,0.3);   }
+  .prio-medium { background: rgba(200,150,30,0.2);  color: #e8b830; border: 1px solid rgba(200,150,30,0.3);  }
+  .prio-low    { background: rgba(70,160,100,0.2);  color: #66bb6a; border: 1px solid rgba(70,160,100,0.3);  }
+  .task-due { font-size: 10px; color: #556; margin-left: auto; white-space: nowrap; }
+  .task-due.overdue { color: #ff7070; }
+  .task-assignee { font-size: 10px; color: #8898bb; display: flex; align-items: center; gap: 3px; }
+  .dept-badge { display: inline-block; font-family: 'Oswald', sans-serif; font-size: 11px; font-weight: 600; padding: 3px 10px; border-radius: 20px; letter-spacing: 1px; text-transform: uppercase; }
+  .dept-logistics   { background: rgba(66,165,245,0.15); color: #42a5f5; border: 1px solid rgba(66,165,245,0.3); }
+  .dept-secretariat { background: rgba(171,71,188,0.15); color: #ce93d8; border: 1px solid rgba(171,71,188,0.3); }
+  .dept-media       { background: rgba(255,167,38,0.15);  color: #ffb74d; border: 1px solid rgba(255,167,38,0.3);  }
+  .task-modal-bg { display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.85); z-index: 8888; overflow-y: auto; padding: 30px 16px; }
+  .task-modal { max-width: 480px; margin: 0 auto; background: #122040; border-radius: 16px; padding: 24px; border: 1px solid rgba(200,150,30,0.3); }
+
   /* Admin tabs */
   .adm-tab { flex:1; padding:10px 6px; border:none; border-radius:8px; background:transparent; color:#6a7a99; font-family:'Oswald',sans-serif; font-size:13px; font-weight:600; cursor:pointer; letter-spacing:0.5px; transition:all 0.2s; white-space:nowrap; }
   .adm-tab:hover { color:#fff; }
@@ -203,6 +226,7 @@
     <button class="tab-btn active" id="tab-home" onclick="switchTab('home',this)">🏠 Home</button>
     <button class="tab-btn" id="tab-order" onclick="switchTab('order',this)">👔 Order</button>
     <button class="tab-btn" id="tab-member" onclick="switchTab('member',this)">🪪 Member</button>
+    <button class="tab-btn" id="tab-tasks" onclick="switchTab('tasks',this)">✅ Tasks</button>
   </div>
 </nav>
 
@@ -491,6 +515,89 @@
   </div>
 </div>
 
+<!-- TASKS PAGE -->
+<div class="page" id="page-tasks">
+  <div style="width:100%;">
+
+    <!-- Not logged in gate -->
+    <div class="dark-card" id="tasks-gate" style="display:none;text-align:center;padding:40px 20px;">
+      <div style="font-size:48px;margin-bottom:14px;">🔒</div>
+      <div class="page-title" style="text-align:center;">Members Only</div>
+      <div class="page-subtitle" style="text-align:center;margin-bottom:10px;">Login to View Tasks</div>
+      <div style="font-size:13px;color:var(--muted);margin-bottom:24px;">You need to be logged in to see your department tasks.</div>
+      <button class="submit-btn gold" onclick="goToMemberTab()">🪪 Login / Register</button>
+    </div>
+
+    <!-- No department assigned -->
+    <div class="dark-card" id="tasks-no-dept" style="display:none;text-align:center;padding:40px 20px;">
+      <div style="font-size:48px;margin-bottom:14px;">📋</div>
+      <div style="font-family:'Oswald',sans-serif;font-size:24px;font-weight:700;color:#fff;margin-bottom:8px;">No Department Yet</div>
+      <div style="font-size:13px;color:#8898bb;line-height:1.6;">You haven't been assigned to a department.<br>Contact your officer to get assigned.</div>
+    </div>
+
+    <!-- Tasks board -->
+    <div id="tasks-board" style="display:none;width:100%;">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px;">
+        <div>
+          <div style="font-family:'Oswald',sans-serif;font-size:28px;font-weight:700;color:#fff;" id="tasks-dept-title">Department</div>
+          <div style="font-size:12px;color:#8898bb;letter-spacing:2px;text-transform:uppercase;" id="tasks-dept-sub">Task Board</div>
+        </div>
+        <div id="tasks-dept-badge"></div>
+      </div>
+
+      <!-- Kanban columns -->
+      <div style="display:flex;gap:10px;align-items:flex-start;" id="tasks-columns">
+        <!-- Todo -->
+        <div class="task-col">
+          <div class="task-col-title" style="color:#8898bb;">
+            <span style="width:8px;height:8px;border-radius:50%;background:#8898bb;display:inline-block;"></span>
+            To Do <span id="count-todo" style="font-size:11px;color:#556;font-weight:400;"></span>
+          </div>
+          <div id="col-todo"></div>
+        </div>
+        <!-- In Progress -->
+        <div class="task-col">
+          <div class="task-col-title" style="color:#42a5f5;">
+            <span style="width:8px;height:8px;border-radius:50%;background:#42a5f5;display:inline-block;"></span>
+            In Progress <span id="count-inprogress" style="font-size:11px;color:#556;font-weight:400;"></span>
+          </div>
+          <div id="col-inprogress"></div>
+        </div>
+        <!-- Done -->
+        <div class="task-col">
+          <div class="task-col-title" style="color:#66bb6a;">
+            <span style="width:8px;height:8px;border-radius:50%;background:#66bb6a;display:inline-block;"></span>
+            Done <span id="count-done" style="font-size:11px;color:#556;font-weight:400;"></span>
+          </div>
+          <div id="col-done"></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Task detail modal -->
+    <div class="task-modal-bg" id="task-detail-modal">
+      <div class="task-modal">
+        <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:16px;">
+          <div style="font-family:'Oswald',sans-serif;font-size:20px;font-weight:700;color:#fff;flex:1;line-height:1.3;" id="tdm-title"></div>
+          <button onclick="closeTaskDetail()" style="background:#1a2a40;border:1px solid #2a3a50;color:#fff;padding:5px 12px;border-radius:8px;cursor:pointer;margin-left:12px;flex-shrink:0;">✕</button>
+        </div>
+        <div id="tdm-meta" style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:14px;"></div>
+        <div style="font-size:13px;color:#8898bb;line-height:1.7;margin-bottom:16px;" id="tdm-desc"></div>
+        <div style="background:#0a1628;border-radius:10px;padding:12px 14px;">
+          <div style="display:flex;justify-content:space-between;font-size:11px;color:#556;text-transform:uppercase;letter-spacing:1px;margin-bottom:8px;">
+            <span>Assigned To</span><span>Due Date</span>
+          </div>
+          <div style="display:flex;justify-content:space-between;align-items:center;">
+            <div style="font-family:'Oswald',sans-serif;font-size:15px;color:#fff;" id="tdm-assignee">—</div>
+            <div style="font-family:'Oswald',sans-serif;font-size:15px;color:#fff;" id="tdm-due">—</div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+  </div>
+</div>
+
 <!-- ADMIN OVERLAY -->
 <div id="admin-overlay" style="display:none;position:fixed;inset:0;background:rgba(5,10,20,0.97);z-index:999;overflow-y:auto;padding:0;">
   <div style="max-width:640px;margin:0 auto;padding:24px 16px 60px;">
@@ -522,6 +629,7 @@
         <button id="adm-tab-members"  onclick="switchAdminTab('members')"  class="adm-tab active-tab">👥 Members</button>
         <button id="adm-tab-orders"   onclick="switchAdminTab('orders')"   class="adm-tab">📦 Orders</button>
         <button id="adm-tab-products" onclick="switchAdminTab('products')" class="adm-tab">🛒 Products</button>
+        <button id="adm-tab-tasks"    onclick="switchAdminTab('tasks')"    class="adm-tab">✅ Tasks</button>
         <button id="adm-tab-home"     onclick="switchAdminTab('home')"     class="adm-tab">🏠 Home</button>
       </div>
 
@@ -560,6 +668,15 @@
               </div>
             </div>
             <div class="form-group"><label class="form-label" style="color:#8898bb;">Password (leave blank to keep current)</label><input class="form-input" id="em-pass" type="text" placeholder="••••••" style="background:#0a1628;color:#fff;border-color:#2a3a50;"/></div>
+            <div class="form-group">
+              <label class="form-label" style="color:#8898bb;">Department</label>
+              <select class="form-select" id="em-dept" style="background:#0a1628;color:#fff;border-color:#2a3a50;">
+                <option value="">None</option>
+                <option value="logistics">Logistics</option>
+                <option value="secretariat">Secretariat</option>
+                <option value="media">Media</option>
+              </select>
+            </div>
             <input type="hidden" id="em-original-ic"/>
             <div style="display:flex;gap:8px;margin-top:4px;">
               <button class="submit-btn gold" onclick="saveEditMember()" style="margin-top:0;flex:1;">💾 Save</button>
@@ -612,6 +729,68 @@
         </div>
         <!-- Products list -->
         <div id="admin-products-list"></div>
+      </div>
+
+      <!-- ── TASKS TAB ── -->
+      <div id="adm-tasks-panel" style="display:none;">
+
+        <!-- Add/Edit task form -->
+        <div style="background:#0a1628;border-radius:14px;padding:18px;margin-bottom:16px;border:1px solid rgba(200,150,30,0.2);">
+          <div style="font-family:'Oswald',sans-serif;font-size:17px;font-weight:600;color:var(--gold);margin-bottom:14px;" id="task-form-title">➕ Add New Task</div>
+          <div class="form-group">
+            <label class="form-label" style="color:#8898bb;">Task Title</label>
+            <input class="form-input" id="task-title" type="text" placeholder="e.g. Prepare logistics report" style="background:#122040;color:#fff;border-color:#2a3a50;"/>
+          </div>
+          <div class="form-group">
+            <label class="form-label" style="color:#8898bb;">Description</label>
+            <textarea class="form-textarea" id="task-desc" placeholder="Details about this task..." style="background:#122040;color:#fff;border-color:#2a3a50;min-height:70px;"></textarea>
+          </div>
+          <div class="form-row">
+            <div class="form-group">
+              <label class="form-label" style="color:#8898bb;">Department</label>
+              <select class="form-select" id="task-dept" style="background:#122040;color:#fff;border-color:#2a3a50;" onchange="loadAssigneeOptions()">
+                <option value="">Select dept...</option>
+                <option value="logistics">Logistics</option>
+                <option value="secretariat">Secretariat</option>
+                <option value="media">Media</option>
+              </select>
+            </div>
+            <div class="form-group">
+              <label class="form-label" style="color:#8898bb;">Priority</label>
+              <select class="form-select" id="task-priority" style="background:#122040;color:#fff;border-color:#2a3a50;">
+                <option value="medium">Medium</option>
+                <option value="high">High</option>
+                <option value="low">Low</option>
+              </select>
+            </div>
+          </div>
+          <div class="form-row">
+            <div class="form-group">
+              <label class="form-label" style="color:#8898bb;">Assign To</label>
+              <select class="form-select" id="task-assignee" style="background:#122040;color:#fff;border-color:#2a3a50;">
+                <option value="">Select dept first...</option>
+              </select>
+            </div>
+            <div class="form-group">
+              <label class="form-label" style="color:#8898bb;">Due Date</label>
+              <input class="form-input" id="task-due" type="date" style="background:#122040;color:#fff;border-color:#2a3a50;"/>
+            </div>
+          </div>
+          <input type="hidden" id="task-edit-id"/>
+          <div style="display:flex;gap:8px;">
+            <button class="submit-btn gold" onclick="saveTask()" style="margin-top:4px;flex:1;">💾 Save Task</button>
+            <button class="submit-btn danger" onclick="clearTaskForm()" style="margin-top:4px;width:auto;padding:15px 18px;">✕</button>
+          </div>
+        </div>
+
+        <!-- Filter by dept -->
+        <div style="display:flex;gap:6px;margin-bottom:12px;flex-wrap:wrap;">
+          <button onclick="filterAdminTasks('all')" id="tf-all" style="padding:6px 14px;border-radius:20px;border:1px solid var(--accent);background:var(--accent);color:var(--navy);font-family:'Oswald',sans-serif;font-size:12px;font-weight:700;cursor:pointer;">All</button>
+          <button onclick="filterAdminTasks('logistics')" id="tf-logistics" style="padding:6px 14px;border-radius:20px;border:1px solid rgba(66,165,245,0.4);background:transparent;color:#42a5f5;font-family:'Oswald',sans-serif;font-size:12px;font-weight:700;cursor:pointer;">Logistics</button>
+          <button onclick="filterAdminTasks('secretariat')" id="tf-secretariat" style="padding:6px 14px;border-radius:20px;border:1px solid rgba(171,71,188,0.4);background:transparent;color:#ce93d8;font-family:'Oswald',sans-serif;font-size:12px;font-weight:700;cursor:pointer;">Secretariat</button>
+          <button onclick="filterAdminTasks('media')" id="tf-media" style="padding:6px 14px;border-radius:20px;border:1px solid rgba(255,167,38,0.4);background:transparent;color:#ffb74d;font-family:'Oswald',sans-serif;font-size:12px;font-weight:700;cursor:pointer;">Media</button>
+        </div>
+        <div id="admin-tasks-list"></div>
       </div>
 
       <!-- ── HOME TAB ── -->
@@ -731,6 +910,7 @@ function switchTab(tab, btn) {
   document.getElementById('page-' + tab).classList.add('active');
   btn.classList.add('active');
   if (tab === 'order') checkOrderAccess();
+  if (tab === 'tasks') checkTasksAccess();
 }
 
 function goToMemberTab() {
@@ -1158,7 +1338,7 @@ function adminLogin() {
 }
 
 function switchAdminTab(tab) {
-  const tabs = ['members','orders','products','home'];
+  const tabs = ['members','orders','products','tasks','home'];
   tabs.forEach(t => {
     const panel = document.getElementById('adm-' + t + '-panel');
     const btn   = document.getElementById('adm-tab-' + t);
@@ -1168,6 +1348,7 @@ function switchAdminTab(tab) {
   if (tab === 'members')  renderAdminList();
   if (tab === 'orders')   renderAdminOrders();
   if (tab === 'products') renderAdminProducts();
+  if (tab === 'tasks')    renderAdminTasks('all');
   if (tab === 'home')     renderAdminAnnList();
 }
 
@@ -1219,6 +1400,7 @@ function openEditMember(ic) {
   document.getElementById('em-ic').readOnly = true;
   document.getElementById('em-rank').value  = m.rank  || '';
   document.getElementById('em-squad').value = m.squad || '';
+  document.getElementById('em-dept').value  = m.department || '';
   document.getElementById('em-pass').value  = '';
   document.getElementById('em-original-ic').value = m.ic || '';
   document.getElementById('em-delete-btn').style.display = 'inline-block';
@@ -1235,6 +1417,8 @@ async function saveEditMember() {
   const name  = document.getElementById('em-name').value.trim();
   const rank  = document.getElementById('em-rank').value;
   const squad = document.getElementById('em-squad').value;
+  const dept  = document.getElementById('em-dept').value;
+  const department = dept;
   const pass  = document.getElementById('em-pass').value;
   if (!name) return alert('Name cannot be empty.');
   if (!ic)   return alert('IC number cannot be empty.');
@@ -1244,11 +1428,11 @@ async function saveEditMember() {
       if (pass.length < 6) return alert('Password must be at least 6 characters.');
       const existing = await supa.get(`bb_members?ic=eq.${encodeURIComponent(ic)}&select=ic`);
       if (existing && existing.length) return alert('A member with this IC already exists.');
-      await supa.post('bb_members', { ic, name, rank, squad, password: btoa(pass), joined_at: new Date().toISOString() });
+      await supa.post('bb_members', { ic, name, rank, squad, department, password: btoa(pass), joined_at: new Date().toISOString() });
       alert('✅ Member added!');
     } else {
       // Editing existing
-      const updates = { name, rank, squad };
+      const updates = { name, rank, squad, department };
       if (pass) updates.password = btoa(pass);
       await supa.patch(`bb_members?ic=eq.${encodeURIComponent(originalIc)}`, updates);
       alert('✅ Member updated!');
@@ -1430,6 +1614,253 @@ function renderAdminAnnList() {
         <button onclick="deleteAnnouncement(${i})" style="background:none;border:none;color:#f66;font-size:16px;cursor:pointer;flex-shrink:0;">🗑️</button>
       </div>`;
     }).join('');
+}
+
+// ── Tasks ──────────────────────────────────────────────────────────────────
+const DEPT_CONFIG = {
+  logistics:   { label: 'Logistics',   color: '#42a5f5', cls: 'dept-logistics'   },
+  secretariat: { label: 'Secretariat', color: '#ce93d8', cls: 'dept-secretariat' },
+  media:       { label: 'Media',       color: '#ffb74d', cls: 'dept-media'       },
+};
+
+async function checkTasksAccess() {
+  const ic = localStorage.getItem('bb_current');
+  document.getElementById('tasks-gate').style.display    = 'none';
+  document.getElementById('tasks-no-dept').style.display = 'none';
+  document.getElementById('tasks-board').style.display   = 'none';
+  if (!ic) { document.getElementById('tasks-gate').style.display = 'block'; return; }
+  try {
+    const data = await supa.get(`bb_members?ic=eq.${encodeURIComponent(ic)}&select=name,department`);
+    const member = data && data[0];
+    const dept = member && member.department;
+    if (!dept || !DEPT_CONFIG[dept]) { document.getElementById('tasks-no-dept').style.display = 'block'; return; }
+    const cfg = DEPT_CONFIG[dept];
+    document.getElementById('tasks-dept-title').textContent = cfg.label + ' Department';
+    document.getElementById('tasks-dept-sub').textContent   = 'Task Board';
+    document.getElementById('tasks-dept-badge').innerHTML   = `<span class="dept-badge ${cfg.cls}">${cfg.label}</span>`;
+    document.getElementById('tasks-board').style.display    = 'block';
+    await renderTasksBoard(dept);
+  } catch(e) { console.error(e); }
+}
+
+async function renderTasksBoard(dept) {
+  const cols = { todo: [], inprogress: [], done: [] };
+  try {
+    const tasks = await supa.get(`bb_tasks?department=eq.${dept}&order=created_at.desc`);
+    tasks.forEach(t => {
+      const key = t.status === 'inprogress' ? 'inprogress' : t.status === 'done' ? 'done' : 'todo';
+      cols[key].push(t);
+    });
+  } catch(e) { console.error(e); }
+
+  const today = new Date(); today.setHours(0,0,0,0);
+  ['todo','inprogress','done'].forEach(status => {
+    const el = document.getElementById('col-' + status);
+    const cnt = document.getElementById('count-' + status);
+    if (cnt) cnt.textContent = cols[status].length ? `(${cols[status].length})` : '';
+    if (!cols[status].length) { el.innerHTML = `<div style="color:#556;font-size:12px;text-align:center;padding:16px 0;">No tasks</div>`; return; }
+    el.innerHTML = cols[status].map(t => {
+      const prioClass = t.priority === 'high' ? 'prio-high' : t.priority === 'low' ? 'prio-low' : 'prio-medium';
+      const prioLabel = t.priority ? t.priority.charAt(0).toUpperCase() + t.priority.slice(1) : 'Medium';
+      let dueHtml = '';
+      if (t.due_date) {
+        const due = new Date(t.due_date); due.setHours(0,0,0,0);
+        const overdue = status !== 'done' && due < today;
+        const fmt = due.toLocaleDateString('en-MY', { day:'numeric', month:'short' });
+        dueHtml = `<span class="task-due${overdue ? ' overdue' : ''}">📅 ${fmt}</span>`;
+      }
+      const assigneeHtml = t.assignee_name ? `<span class="task-assignee">👤 ${t.assignee_name}</span>` : '';
+      window._taskMap = window._taskMap || {};
+      window._taskMap[t.id] = t;
+      return `<div class="task-card" onclick="openTaskDetail('${t.id}')">
+        <div class="task-card-title">${t.title}</div>
+        ${t.description ? `<div class="task-card-desc">${t.description.length > 80 ? t.description.slice(0,80)+'…' : t.description}</div>` : ''}
+        <div class="task-meta">
+          <span class="task-pill ${prioClass}">${prioLabel}</span>
+          ${assigneeHtml}
+          ${dueHtml}
+        </div>
+      </div>`;
+    }).join('');
+  });
+}
+
+function openTaskDetail(id) {
+  const t = (window._taskMap && window._taskMap[id]) || {};
+  document.getElementById('tdm-title').textContent = t.title;
+  document.getElementById('tdm-desc').textContent  = t.description || 'No description.';
+  const prioClass = t.priority === 'high' ? 'prio-high' : t.priority === 'low' ? 'prio-low' : 'prio-medium';
+  const prioLabel = t.priority ? t.priority.charAt(0).toUpperCase() + t.priority.slice(1) : 'Medium';
+  const statusLabel = t.status === 'inprogress' ? 'In Progress' : t.status === 'done' ? 'Done' : 'To Do';
+  const statusColor = t.status === 'done' ? '#66bb6a' : t.status === 'inprogress' ? '#42a5f5' : '#8898bb';
+  const dept = DEPT_CONFIG[t.department] || {};
+  document.getElementById('tdm-meta').innerHTML =
+    `<span class="task-pill ${prioClass}">${prioLabel}</span>` +
+    `<span class="task-pill" style="background:${statusColor}22;color:${statusColor};border:1px solid ${statusColor}44;">${statusLabel}</span>` +
+    (dept.cls ? `<span class="dept-badge ${dept.cls}">${dept.label}</span>` : '');
+  document.getElementById('tdm-assignee').textContent = t.assignee_name || '—';
+  document.getElementById('tdm-due').textContent = t.due_date
+    ? new Date(t.due_date).toLocaleDateString('en-MY', { day:'numeric', month:'short', year:'numeric' })
+    : '—';
+  document.getElementById('task-detail-modal').style.display = 'block';
+}
+
+function closeTaskDetail() {
+  document.getElementById('task-detail-modal').style.display = 'none';
+}
+
+// ── Admin Tasks ────────────────────────────────────────────────────────────
+let _adminTaskFilter = 'all';
+let _allAdminTasks = [];
+
+async function renderAdminTasks(filter) {
+  _adminTaskFilter = filter || 'all';
+  // Update filter button styles
+  ['all','logistics','secretariat','media'].forEach(f => {
+    const btn = document.getElementById('tf-' + f);
+    if (!btn) return;
+    const active = f === _adminTaskFilter;
+    const cfg = DEPT_CONFIG[f];
+    if (f === 'all') {
+      btn.style.background = active ? 'var(--accent)' : 'transparent';
+      btn.style.color = active ? 'var(--navy)' : 'var(--accent)';
+    } else {
+      btn.style.background = active ? (cfg.color + '33') : 'transparent';
+      btn.style.fontWeight = active ? '900' : '700';
+    }
+  });
+
+  const list = document.getElementById('admin-tasks-list');
+  list.innerHTML = '<div style="color:#888;text-align:center;padding:20px;"><span class="spinner"></span> Loading...</div>';
+  try {
+    const url = _adminTaskFilter === 'all'
+      ? 'bb_tasks?select=*&order=created_at.desc'
+      : `bb_tasks?department=eq.${_adminTaskFilter}&order=created_at.desc`;
+    _allAdminTasks = await supa.get(url);
+    if (!_allAdminTasks.length) { list.innerHTML = '<div style="color:#666;text-align:center;padding:20px;">No tasks yet.</div>'; return; }
+    const STATUS_COLORS = { todo:'#8898bb', inprogress:'#42a5f5', done:'#66bb6a', cancelled:'#ef5350' };
+    const STATUS_LABELS = { todo:'To Do', inprogress:'In Progress', done:'Done', cancelled:'Cancelled' };
+    list.innerHTML = _allAdminTasks.map(t => {
+      const dept = DEPT_CONFIG[t.department] || { label: t.department, cls: '' };
+      const prioClass = t.priority === 'high' ? 'prio-high' : t.priority === 'low' ? 'prio-low' : 'prio-medium';
+      const sc = STATUS_COLORS[t.status] || '#888';
+      return `<div style="background:#0a1628;border-radius:12px;padding:14px 16px;margin-bottom:10px;border:1px solid rgba(255,255,255,0.06);">
+        <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:8px;margin-bottom:8px;">
+          <div style="font-family:'Oswald',sans-serif;font-size:15px;font-weight:700;color:#fff;flex:1;">${t.title}</div>
+          <span class="dept-badge ${dept.cls}" style="font-size:10px;flex-shrink:0;">${dept.label}</span>
+        </div>
+        ${t.description ? `<div style="font-size:12px;color:#8898bb;margin-bottom:8px;line-height:1.5;">${t.description}</div>` : ''}
+        <div style="display:flex;gap:6px;flex-wrap:wrap;align-items:center;margin-bottom:10px;">
+          <span class="task-pill ${prioClass}">${t.priority||'medium'}</span>
+          ${t.assignee_name ? `<span style="font-size:11px;color:#8898bb;">👤 ${t.assignee_name}</span>` : ''}
+          ${t.due_date ? `<span style="font-size:11px;color:#8898bb;">📅 ${new Date(t.due_date).toLocaleDateString('en-MY',{day:'numeric',month:'short',year:'numeric'})}</span>` : ''}
+        </div>
+        <div style="display:flex;gap:5px;flex-wrap:wrap;align-items:center;">
+          ${['todo','inprogress','done'].map(s => `<button onclick="updateTaskStatus('${t.id}','${s}')" style="padding:4px 10px;border:1.5px solid ${s===t.status?STATUS_COLORS[s]:'#2a3a50'};border-radius:6px;background:${s===t.status?STATUS_COLORS[s]+'22':'transparent'};color:${s===t.status?STATUS_COLORS[s]:'#556'};font-size:11px;font-weight:700;cursor:pointer;font-family:'Oswald',sans-serif;">${STATUS_LABELS[s]}</button>`).join('')}
+          <button onclick="editAdminTask('${t.id}')" style="margin-left:auto;background:#1a3a6e;border:1px solid #2a4a8e;color:#fff;padding:4px 10px;border-radius:6px;cursor:pointer;font-size:11px;font-weight:700;">✏️ Edit</button>
+          <button onclick="deleteTask('${t.id}')" style="background:#3a1a1a;border:1px solid #6a2a2a;color:#ff6666;padding:4px 10px;border-radius:6px;cursor:pointer;font-size:11px;font-weight:700;">🗑️</button>
+        </div>
+      </div>`;
+    }).join('');
+  } catch(e) { list.innerHTML = '<div style="color:#f66;text-align:center;padding:20px;">Failed to load tasks.</div>'; }
+}
+
+function filterAdminTasks(filter) { renderAdminTasks(filter); }
+
+async function loadAssigneeOptions() {
+  const dept = document.getElementById('task-dept').value;
+  const sel  = document.getElementById('task-assignee');
+  sel.innerHTML = '<option value="">Unassigned</option>';
+  if (!dept) return;
+  try {
+    const members = await supa.get(`bb_members?department=eq.${dept}&select=ic,name&order=name`);
+    members.forEach(m => {
+      const opt = document.createElement('option');
+      opt.value = m.ic;
+      opt.textContent = m.name;
+      sel.appendChild(opt);
+    });
+  } catch(e) { console.error(e); }
+}
+
+function clearTaskForm() {
+  document.getElementById('task-title').value    = '';
+  document.getElementById('task-desc').value     = '';
+  document.getElementById('task-dept').value     = '';
+  document.getElementById('task-priority').value = 'medium';
+  document.getElementById('task-due').value      = '';
+  document.getElementById('task-edit-id').value  = '';
+  document.getElementById('task-assignee').innerHTML = '<option value="">Select dept first...</option>';
+  document.getElementById('task-form-title').textContent = '➕ Add New Task';
+}
+
+async function saveTask() {
+  const title    = document.getElementById('task-title').value.trim();
+  const desc     = document.getElementById('task-desc').value.trim();
+  const dept     = document.getElementById('task-dept').value;
+  const priority = document.getElementById('task-priority').value;
+  const due      = document.getElementById('task-due').value;
+  const editId   = document.getElementById('task-edit-id').value;
+  const assigneeSel = document.getElementById('task-assignee');
+  const assigneeIc   = assigneeSel.value;
+  const assigneeName = assigneeSel.options[assigneeSel.selectedIndex]?.text || '';
+
+  if (!title) return alert('Please enter a task title.');
+  if (!dept)  return alert('Please select a department.');
+
+  const payload = {
+    title, description: desc, department: dept, priority,
+    due_date: due || null,
+    assignee_ic: assigneeIc || null,
+    assignee_name: assigneeIc ? assigneeName : null,
+    status: editId ? undefined : 'todo',
+  };
+  if (!editId) payload.created_at = new Date().toISOString();
+  // Remove undefined keys
+  Object.keys(payload).forEach(k => payload[k] === undefined && delete payload[k]);
+
+  try {
+    if (editId) {
+      await supa.patch(`bb_tasks?id=eq.${editId}`, payload);
+      alert('✅ Task updated!');
+    } else {
+      await supa.post('bb_tasks', payload);
+      alert('✅ Task added!');
+    }
+    clearTaskForm();
+    renderAdminTasks(_adminTaskFilter);
+  } catch(e) { alert('Failed: ' + e.message); }
+}
+
+function editAdminTask(id) {
+  const t = _allAdminTasks.find(x => String(x.id) === String(id));
+  if (!t) return;
+  document.getElementById('task-form-title').textContent = '✏️ Edit Task';
+  document.getElementById('task-title').value    = t.title || '';
+  document.getElementById('task-desc').value     = t.description || '';
+  document.getElementById('task-dept').value     = t.department || '';
+  document.getElementById('task-priority').value = t.priority || 'medium';
+  document.getElementById('task-due').value      = t.due_date ? t.due_date.slice(0,10) : '';
+  document.getElementById('task-edit-id').value  = t.id;
+  loadAssigneeOptions().then(() => {
+    if (t.assignee_ic) document.getElementById('task-assignee').value = t.assignee_ic;
+  });
+  document.getElementById('task-title').scrollIntoView({ behavior:'smooth' });
+}
+
+async function updateTaskStatus(id, status) {
+  try {
+    await supa.patch(`bb_tasks?id=eq.${id}`, { status });
+    renderAdminTasks(_adminTaskFilter);
+  } catch(e) { alert('Failed to update status.'); }
+}
+
+async function deleteTask(id) {
+  if (!confirm('Delete this task?')) return;
+  try {
+    await supa.delete(`bb_tasks?id=eq.${id}`);
+    renderAdminTasks(_adminTaskFilter);
+  } catch(e) { alert('Failed to delete task.'); }
 }
 
 // ── Init ──────────────────────────────────────────────────────────────────
