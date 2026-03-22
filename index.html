@@ -322,7 +322,7 @@
         </div>
         <div style="flex:1;">
           <div style="font-family:'Oswald',sans-serif;font-size:13px;font-weight:600;color:#fff;">Submitting as <span id="order-member-name" style="color:var(--gold);"></span></div>
-          <div style="font-size:11px;color:#8898bb;" id="order-member-rank"></div>
+          <div style="font-size:11px;color:#8898bb;"><span id="order-member-squad-inline"></span> <span id="order-member-rank"></span></div>
         </div>
         <div id="order-member-squad" style="font-family:'Oswald',sans-serif;font-size:11px;font-weight:600;color:var(--navy);padding:3px 10px;border-radius:6px;background:var(--gold);"></div>
       </div>
@@ -483,12 +483,12 @@
 
         <div class="mic-details-row">
           <div class="mic-detail-chip">
-            <div class="chip-label">Rank</div>
-            <div class="chip-value" id="m-rank-val">—</div>
-          </div>
-          <div class="mic-detail-chip">
             <div class="chip-label">Squad</div>
             <div class="chip-value" id="m-squad-val">—</div>
+          </div>
+          <div class="mic-detail-chip">
+            <div class="chip-label">Rank</div>
+            <div class="chip-value" id="m-rank-val">—</div>
           </div>
           <div class="mic-detail-chip">
             <div class="chip-label">Member Since</div>
@@ -500,6 +500,18 @@
       </div>
 
 
+
+      <!-- Badges section -->
+      <div class="dark-card" style="margin-bottom:14px;">
+        <div style="display:flex;align-items:center;gap:10px;margin-bottom:6px;">
+          <div style="font-family:'Oswald',sans-serif;font-size:20px;font-weight:700;color:#fff;">🏅 My Badges</div>
+        </div>
+        <div style="background:rgba(200,150,30,0.08);border:1px solid rgba(200,150,30,0.2);border-radius:10px;padding:10px 14px;margin-bottom:14px;">
+          <div style="font-size:11px;color:#c8a870;line-height:1.6;">📝 <strong>Self-reported:</strong> Tick the badges you have earned and enter the date achieved. This section is for your own record — it is not automatically verified.</div>
+        </div>
+        <div id="badges-list"></div>
+        <button class="submit-btn gold" onclick="saveBadges()" style="margin-top:8px;">💾 Save Badges</button>
+      </div>
 
       <button class="submit-btn danger" style="margin-bottom:0;" onclick="logoutMember()">🚪 Logout</button>
     </div>
@@ -669,6 +681,18 @@
           <div class="adm-sec-arrow">›</div>
         </div>
 
+        <!-- Section: Badges -->
+        <div class="adm-section-btn" id="sec-btn-badges" onclick="switchAdminSection('badges')">
+          <div style="display:flex;align-items:center;gap:12px;">
+            <div class="adm-sec-icon" style="background:rgba(200,150,30,0.15);color:var(--gold);">🏅</div>
+            <div>
+              <div class="adm-sec-title">Badges</div>
+              <div class="adm-sec-sub">Manage badge sections &amp; individual badges</div>
+            </div>
+          </div>
+          <div class="adm-sec-arrow">›</div>
+        </div>
+
         <!-- Section: Gallery -->
         <div class="adm-section-btn" id="sec-btn-gallery" onclick="switchAdminSection('gallery')">
           <div style="display:flex;align-items:center;gap:12px;">
@@ -744,7 +768,7 @@
                 <option value="media">Media</option>
               </select>
             </div>
-            <div class="form-group"><label class="form-label" style="color:#8898bb;">Password (leave blank to keep)</label><input class="form-input" id="em-pass" type="text" placeholder="••••••" style="background:#0a1628;color:#fff;border-color:#2a3a50;"/></div>
+            <div class="form-group"><label class="form-label" style="color:#8898bb;">Member Since</label><input class="form-input" id="em-joined" type="date" style="background:#0a1628;color:#fff;border-color:#2a3a50;"/></div>
             <input type="hidden" id="em-original-ic"/>
             <div style="display:flex;gap:8px;margin-top:4px;">
               <button class="submit-btn gold" onclick="saveEditMember()" style="margin-top:0;flex:1;">💾 Save</button>
@@ -941,6 +965,18 @@
         <div id="admin-ann-list"></div>
       </div>
 
+      <!-- ── BADGES SECTION ─────────────────────────── -->
+      <div id="adm-section-badges" style="display:none;">
+        <div class="adm-section-header">
+          <div class="adm-sec-icon" style="background:rgba(200,150,30,0.15);color:var(--gold);">🏅</div>
+          <div>
+            <div class="adm-section-title">Badges</div>
+            <div class="adm-section-desc">Add sections and badges — visible to all members on their profile</div>
+          </div>
+        </div>
+        <div id="admin-badges-content"></div>
+      </div>
+
       <!-- ── GALLERY SECTION ────────────────────────── -->
       <div id="adm-section-gallery" style="display:none;">
         <div class="adm-section-header">
@@ -1115,7 +1151,9 @@ async function populateOrderBar(ic) {
     if (!data || !data.length) return;
     const m = data[0];
     document.getElementById('order-member-name').textContent = m.name;
-    document.getElementById('order-member-rank').textContent = m.rank || 'No rank set';
+    document.getElementById('order-member-rank').textContent = m.rank || '';
+    const squadEl = document.getElementById('order-member-squad-inline');
+    if (squadEl) squadEl.textContent = m.squad ? m.squad + ' Squad ·' : '';
     document.getElementById('order-member-squad').textContent = m.squad ? m.squad + ' Squad' : '—';
     const pfp = localStorage.getItem('bb_pfp_' + ic);
     if (pfp) { document.getElementById('order-pfp-img').src = pfp; document.getElementById('order-pfp-img').style.display = 'block'; document.getElementById('order-pfp-ph').style.display = 'none'; }
@@ -1297,8 +1335,9 @@ async function renderDashboard() {
     document.getElementById('m-display-ic').textContent   = 'IC: ' + m.ic;
     document.getElementById('m-rank-val').textContent     = m.rank || '—';
     document.getElementById('m-squad-val').textContent    = m.squad ? m.squad + ' Squad' : '—';
-    const joined = m.joined_at ? new Date(m.joined_at).getFullYear() : '—';
+    const joined = m.joined_at ? new Date(m.joined_at).toLocaleDateString('en-MY', { day:'numeric', month:'short', year:'numeric' }) : '—';
     document.getElementById('m-since-val').textContent = joined;
+    loadBadges(ic);
     // pfp
     const pfp = localStorage.getItem('bb_pfp_' + ic);
     if (pfp) { document.getElementById('m-pfp-img').src = pfp; document.getElementById('m-pfp-img').style.display = 'block'; document.getElementById('m-pfp-ph').style.display = 'none'; }
@@ -1482,7 +1521,7 @@ function adminLogin() {
   renderGallery(); renderAnnouncements();
 }
 
-const ADMIN_SECTIONS = ['members','orders','tasks','announcements','gallery'];
+const ADMIN_SECTIONS = ['members','orders','tasks','announcements','badges','gallery'];
 
 function backToAdminHome() {
   // Show section nav, hide back bar, hide all panels
@@ -1513,6 +1552,7 @@ function switchAdminSection(section) {
   if (section === 'orders')        { switchOrderSubtab('products'); }
   if (section === 'tasks')         { switchDeptTab('all'); }
   if (section === 'announcements') renderAdminAnnList();
+  if (section === 'badges')        renderAdminBadges();
   if (section === 'gallery')       renderGallery();
 }
 
@@ -1574,7 +1614,7 @@ async function renderAdminList() {
       <div class="admin-row" style="cursor:pointer;" onclick="openEditMember('${m.ic.replace(/'/g,"\\'")}')">
         <div style="flex:1;">
           <div class="admin-name">${m.name}</div>
-          <div class="admin-sub">IC: ${m.ic} · ${m.rank||'No rank'} · ${m.squad ? m.squad+' Squad' : 'No squad'}</div>
+          <div class="admin-sub">IC: ${m.ic} · ${m.squad ? m.squad+' Squad' : 'No squad'} · ${m.rank||'No rank'}</div>
         </div>
         <div class="admin-rank-badge">${m.rank||'—'}</div>
         <div style="color:#8898bb;font-size:18px;margin-left:8px;">›</div>
@@ -1585,12 +1625,13 @@ async function renderAdminList() {
 
 function openAddMember() {
   document.getElementById('em-modal-title').textContent = '➕ Add New Member';
-  document.getElementById('em-name').value = '';
-  document.getElementById('em-ic').value   = '';
-  document.getElementById('em-ic').readOnly = false;
-  document.getElementById('em-rank').value  = '';
-  document.getElementById('em-squad').value = '';
-  document.getElementById('em-pass').value  = '';
+  document.getElementById('em-name').value   = '';
+  document.getElementById('em-ic').value     = '';
+  document.getElementById('em-ic').readOnly  = false;
+  document.getElementById('em-rank').value   = '';
+  document.getElementById('em-squad').value  = '';
+  document.getElementById('em-dept').value   = '';
+  document.getElementById('em-joined').value = '';
   document.getElementById('em-original-ic').value = '';
   document.getElementById('em-delete-btn').style.display = 'none';
   document.getElementById('edit-member-modal').style.display = 'block';
@@ -1599,13 +1640,13 @@ function openAddMember() {
 function openEditMember(ic) {
   const m = (window._adminMembers && window._adminMembers[ic]) || { ic };
   document.getElementById('em-modal-title').textContent = '✏️ Edit Member';
-  document.getElementById('em-name').value  = m.name  || '';
-  document.getElementById('em-ic').value    = m.ic    || '';
-  document.getElementById('em-ic').readOnly = true;
-  document.getElementById('em-rank').value  = m.rank  || '';
-  document.getElementById('em-squad').value = m.squad || '';
-  document.getElementById('em-dept').value  = m.department || '';
-  document.getElementById('em-pass').value  = '';
+  document.getElementById('em-name').value   = m.name  || '';
+  document.getElementById('em-ic').value     = m.ic    || '';
+  document.getElementById('em-ic').readOnly  = true;
+  document.getElementById('em-rank').value   = m.rank  || '';
+  document.getElementById('em-squad').value  = m.squad || '';
+  document.getElementById('em-dept').value   = m.department || '';
+  document.getElementById('em-joined').value = m.joined_at ? m.joined_at.slice(0,10) : '';
   document.getElementById('em-original-ic').value = m.ic || '';
   document.getElementById('em-delete-btn').style.display = 'inline-block';
   document.getElementById('edit-member-modal').style.display = 'block';
@@ -1617,27 +1658,30 @@ function closeEditMember() {
 
 async function saveEditMember() {
   const originalIc = document.getElementById('em-original-ic').value;
-  const ic    = document.getElementById('em-ic').value.trim().replace(/\s/g,'');
-  const name  = document.getElementById('em-name').value.trim();
-  const rank  = document.getElementById('em-rank').value;
-  const squad = document.getElementById('em-squad').value;
-  const dept  = document.getElementById('em-dept').value;
-  const department = dept;
-  const pass  = document.getElementById('em-pass').value;
+  const ic         = document.getElementById('em-ic').value.trim().replace(/\s/g,'');
+  const name       = document.getElementById('em-name').value.trim();
+  const rank       = document.getElementById('em-rank').value;
+  const squad      = document.getElementById('em-squad').value;
+  const department = document.getElementById('em-dept').value;
+  const joinedRaw  = document.getElementById('em-joined').value;
+  const joined_at  = joinedRaw ? new Date(joinedRaw).toISOString() : null;
   if (!name) return alert('Name cannot be empty.');
   if (!ic)   return alert('IC number cannot be empty.');
   try {
     if (!originalIc) {
-      // Adding new member
-      if (pass.length < 6) return alert('Password must be at least 6 characters.');
+      // Adding new member — generate a temporary password = IC number (member can't change it)
       const existing = await supa.get(`bb_members?ic=eq.${encodeURIComponent(ic)}&select=ic`);
       if (existing && existing.length) return alert('A member with this IC already exists.');
-      await supa.post('bb_members', { ic, name, rank, squad, department, password: btoa(pass), joined_at: new Date().toISOString() });
-      alert('✅ Member added!');
+      const defaultPass = btoa(ic); // default password = IC number
+      await supa.post('bb_members', {
+        ic, name, rank, squad, department,
+        password: defaultPass,
+        joined_at: joined_at || new Date().toISOString(),
+      });
+      alert(`✅ Member added!\n\nDefault password is their IC number: ${ic}\nThey can reset it using the Forgot Password option.`);
     } else {
-      // Editing existing
       const updates = { name, rank, squad, department };
-      if (pass) updates.password = btoa(pass);
+      if (joined_at) updates.joined_at = joined_at;
       await supa.patch(`bb_members?ic=eq.${encodeURIComponent(originalIc)}`, updates);
       alert('✅ Member updated!');
     }
@@ -1660,14 +1704,69 @@ async function deleteEditMember() {
 
 // ── Orders ────────────────────────────────────────────────────────────────
 async function renderAdminOrders() {
-  const search = (document.getElementById('admin-order-search')?.value || '').toLowerCase();
-  const list = document.getElementById('admin-orders-list');
-  list.innerHTML = '<div style="color:#888;text-align:center;padding:20px;"><span class="spinner"></span> Loading...</div>';
+  const search     = (document.getElementById('admin-order-search')?.value || '').toLowerCase();
+  const formFilter = document.getElementById('admin-order-form-filter')?.value || '';
+  const list       = document.getElementById('admin-orders-list');
+  list.innerHTML   = '<div style="color:#888;text-align:center;padding:20px;"><span class="spinner"></span> Loading...</div>';
   try {
     const orders = await supa.get('bb_orders?select=*&order=created_at.desc');
-    const filtered = orders.filter(o =>
-      o.order_number.toLowerCase().includes(search) || (o.member_name||'').toLowerCase().includes(search)
+    let filtered = orders.filter(o =>
+      (o.order_number||'').toLowerCase().includes(search) ||
+      (o.member_name||'').toLowerCase().includes(search)
     );
+    if (formFilter) filtered = filtered.filter(o => (o.notes||'').includes(formFilter) || (o.form_id||'') === formFilter);
+    if (!filtered.length) { list.innerHTML = '<div style="color:#666;text-align:center;padding:20px;">No submissions found.</div>'; return; }
+    const STATUS_COLORS = { pending:'#e8b830', processing:'#42a5f5', ready:'#66bb6a', collected:'#888', cancelled:'#ef5350' };
+    const STATUS_OPTIONS = ['pending','processing','ready','collected','cancelled'];
+    list.innerHTML = filtered.map(o => {
+      let itemsDisplay = '';
+      try {
+        const items = JSON.parse(o.items||'{}');
+        if (items.form_name) {
+          // Built-in form submission
+          itemsDisplay = `<div style="font-size:12px;color:#42a5f5;margin-bottom:6px;">📋 ${items.form_name}</div>`;
+          if (items.answers) {
+            itemsDisplay += Object.entries(items.answers).map(([k,v]) =>
+              `<div style="font-size:11px;color:#8898bb;">${k}: <span style="color:#ccc;">${v}</span></div>`
+            ).join('');
+          }
+        } else {
+          // Uniform order
+          itemsDisplay = Object.entries(items).map(([k,v]) => {
+            const prod = UNIFORM_ITEMS.find(i=>i.key===k);
+            return `<div style="font-size:12px;color:#8898bb;">${prod?.name||k} ×${v.qty}${v.size?' ('+v.size+')':''}</div>`;
+          }).join('');
+        }
+      } catch(e) {}
+      const status = o.status || 'pending';
+      const sc = STATUS_COLORS[status] || '#888';
+      const created = o.created_at ? new Date(o.created_at).toLocaleDateString('en-MY',{day:'numeric',month:'short',year:'numeric'}) : '';
+      return `<div style="background:#0a1628;border-radius:12px;padding:14px 16px;margin-bottom:10px;border:1px solid rgba(255,255,255,0.06);">
+        <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:8px;">
+          <div>
+            <div style="font-family:'Oswald',sans-serif;font-size:15px;font-weight:700;color:#fff;">${o.order_number}</div>
+            <div style="font-size:11px;color:#8898bb;">${o.member_name||o.ic} · ${o.rank||''} · ${created}</div>
+          </div>
+          <div style="font-size:11px;font-weight:600;padding:3px 10px;border-radius:20px;background:${sc}22;color:${sc};border:1px solid ${sc}44;font-family:'Oswald',sans-serif;">${status.toUpperCase()}</div>
+        </div>
+        <div style="margin-bottom:10px;">${itemsDisplay}</div>
+        ${o.notes && !JSON.parse(o.items||'{}').form_name ? `<div style="font-size:12px;color:#8898bb;margin-bottom:8px;">📝 ${o.notes}</div>` : ''}
+        <div style="display:flex;gap:5px;flex-wrap:wrap;">
+          ${STATUS_OPTIONS.map(s=>`<button onclick="updateOrderStatus('${o.order_number}','${s}')" style="padding:3px 10px;border:1.5px solid ${s===status?STATUS_COLORS[s]:'#2a3a50'};border-radius:6px;background:${s===status?STATUS_COLORS[s]+'22':'transparent'};color:${s===status?STATUS_COLORS[s]:'#556'};font-size:11px;font-weight:700;cursor:pointer;font-family:'Oswald',sans-serif;">${s}</button>`).join('')}
+          <button onclick="deleteSubmission('${o.order_number}')" style="margin-left:auto;background:#3a1a1a;border:1px solid #6a2a2a;color:#f66;padding:3px 10px;border-radius:6px;cursor:pointer;font-size:11px;font-weight:700;">🗑️</button>
+        </div>
+      </div>`;
+    }).join('');
+  } catch(e) { list.innerHTML = '<div style="color:#f66;text-align:center;padding:20px;">Failed to load.</div>'; }
+}
+
+async function deleteSubmission(orderNum) {
+  if (!confirm('Delete this submission?')) return;
+  try {
+    await supa.delete(`bb_orders?order_number=eq.${encodeURIComponent(orderNum)}`);
+    renderAdminOrders();
+  } catch(e) { alert('Failed: ' + e.message); }
+}
     if (!filtered.length) { list.innerHTML = '<div style="color:#666;text-align:center;padding:20px;">No orders yet.</div>'; return; }
     const STATUS_OPTIONS = ['pending','processing','ready','collected','cancelled'];
     const STATUS_COLORS  = { pending:'#e8b830', processing:'#42a5f5', ready:'#66bb6a', collected:'#888', cancelled:'#ef5350' };
@@ -1683,20 +1782,6 @@ async function renderAdminOrders() {
       return `<div style="background:#0a1628;border-radius:12px;padding:14px 16px;margin-bottom:10px;border:1px solid rgba(255,255,255,0.06);">
         <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:8px;">
           <div>
-            <div style="font-family:'Oswald',sans-serif;font-size:16px;font-weight:700;color:#fff;">${o.order_number}</div>
-            <div style="font-size:11px;color:#8898bb;margin-top:2px;">👤 ${o.member_name||o.ic} · ${o.rank||''} · ${o.squad||''} · ${created}</div>
-          </div>
-          <div style="font-family:'Oswald',sans-serif;font-size:11px;font-weight:600;padding:3px 10px;border-radius:20px;background:${STATUS_COLORS[status]}22;color:${STATUS_COLORS[status]};border:1px solid ${STATUS_COLORS[status]}44;">${status.toUpperCase()}</div>
-        </div>
-        <div style="font-size:12px;color:#6a7a99;margin-bottom:10px;">${itemLines||'No items'}</div>
-        ${o.notes ? `<div style="font-size:12px;color:#8898bb;margin-bottom:10px;">📝 ${o.notes}</div>` : ''}
-        <div style="display:flex;gap:5px;flex-wrap:wrap;">
-          ${STATUS_OPTIONS.map(s=>`<button onclick="updateOrderStatus('${o.order_number}','${s}')" style="padding:4px 10px;border:1.5px solid ${s===status?STATUS_COLORS[s]:'#2a3a50'};border-radius:6px;background:${s===status?STATUS_COLORS[s]+'22':'transparent'};color:${s===status?STATUS_COLORS[s]:'#556'};font-size:11px;font-weight:700;cursor:pointer;font-family:'Oswald',sans-serif;">${s.toUpperCase()}</button>`).join('')}
-        </div>
-      </div>`;
-    }).join('');
-  } catch(e) { list.innerHTML = '<div style="color:#f66;text-align:center;padding:20px;">Failed to load orders.</div>'; }
-}
 
 async function updateOrderStatus(orderNum, status) {
   try {
@@ -2429,6 +2514,150 @@ function renderUniformOrderInline() {
 
 // ── Tasks: multi-assignee + member status editing ─────────────────────────
 
+// ── Badges system (fully dynamic) ─────────────────────────────────────────
+const DEFAULT_BB_BADGES = [
+  { id:'bb1',  name:'BB Enrolment',          cat:'Core' },
+  { id:'bb2',  name:"BB Founder's Award",    cat:'Core' },
+  { id:'bb3',  name:"President's Award",     cat:'Core' },
+  { id:'bb4',  name:'First Aid (Basic)',      cat:'Skills' },
+  { id:'bb5',  name:'First Aid (Advanced)',   cat:'Skills' },
+  { id:'bb6',  name:'Fire Safety',            cat:'Skills' },
+  { id:'bb7',  name:'Marching',               cat:'Drill' },
+  { id:'bb8',  name:'Best Driller',           cat:'Drill' },
+  { id:'bb9',  name:'Leadership',             cat:'Leadership' },
+  { id:'bb10', name:'Community Service',      cat:'Service' },
+  { id:'bb11', name:'Best Camper',            cat:'Outdoor' },
+  { id:'bb12', name:'Orienteering',           cat:'Outdoor' },
+  { id:'bb13', name:'Swimming (Beginner)',     cat:'Sports' },
+  { id:'bb14', name:'Swimming (Proficiency)', cat:'Sports' },
+  { id:'bb15', name:'Music & Worship',        cat:'Arts' },
+];
+
+function getBadgeDefs() {
+  try { return JSON.parse(localStorage.getItem('bb_badge_defs') || 'null') || DEFAULT_BB_BADGES; }
+  catch(e) { return DEFAULT_BB_BADGES; }
+}
+function saveBadgeDefs(defs) { localStorage.setItem('bb_badge_defs', JSON.stringify(defs)); }
+
+// ── Member: render badges ─────────────────────────────────────────────────
+function loadBadges(ic) {
+  const saved     = JSON.parse(localStorage.getItem('bb_badges_' + ic) || '{}');
+  const defs      = getBadgeDefs();
+  const container = document.getElementById('badges-list');
+  if (!container) return;
+  const cats = [...new Set(defs.map(b => b.cat))];
+  if (!cats.length) { container.innerHTML = '<div style="color:#8898bb;font-size:13px;text-align:center;padding:16px;">No badges defined yet.</div>'; return; }
+  container.innerHTML = cats.map(cat => {
+    const catBadges = defs.filter(b => b.cat === cat && b.name !== '(Add badges below)');
+    if (!catBadges.length) return '';
+    return `<div style="margin-bottom:16px;">
+      <div style="font-size:10px;font-weight:700;letter-spacing:2px;color:var(--gold);text-transform:uppercase;margin-bottom:8px;">${cat}</div>
+      ${catBadges.map(b => {
+        const entry = saved[b.id] || { earned: false, date: '' };
+        return `<div style="display:flex;align-items:center;gap:10px;padding:8px 0;border-bottom:1px solid rgba(255,255,255,0.05);">
+          <div onclick="toggleBadge('${b.id}','${ic}')" style="width:22px;height:22px;border-radius:6px;border:2px solid ${entry.earned?'var(--gold)':'#2a3a50'};background:${entry.earned?'rgba(200,150,30,0.2)':'transparent'};display:flex;align-items:center;justify-content:center;cursor:pointer;flex-shrink:0;font-size:13px;">${entry.earned?'✓':''}</div>
+          <div style="flex:1;font-size:13px;color:${entry.earned?'#fff':'#8898bb'};">${b.name}</div>
+          <input type="date" id="badge-date-${b.id}" value="${entry.date||''}" style="background:#0a1628;color:#8898bb;border:1px solid #2a3a50;border-radius:7px;padding:4px 8px;font-size:11px;width:130px;${entry.earned?'':'opacity:0.4;'}"/>
+        </div>`;
+      }).join('')}
+    </div>`;
+  }).join('');
+}
+
+function toggleBadge(badgeId, ic) {
+  const saved = JSON.parse(localStorage.getItem('bb_badges_' + ic) || '{}');
+  const curr  = saved[badgeId] || { earned: false, date: '' };
+  saved[badgeId] = { earned: !curr.earned, date: curr.date };
+  localStorage.setItem('bb_badges_' + ic, JSON.stringify(saved));
+  loadBadges(ic);
+}
+
+function saveBadges() {
+  const ic = localStorage.getItem('bb_current');
+  if (!ic) return;
+  const defs  = getBadgeDefs();
+  const saved = JSON.parse(localStorage.getItem('bb_badges_' + ic) || '{}');
+  defs.forEach(b => {
+    const el = document.getElementById('badge-date-' + b.id);
+    if (el) { if (!saved[b.id]) saved[b.id] = { earned: false, date: '' }; saved[b.id].date = el.value; }
+  });
+  localStorage.setItem('bb_badges_' + ic, JSON.stringify(saved));
+  alert('✅ Badges saved!');
+}
+
+// ── Admin: badge definition editor ───────────────────────────────────────
+function renderAdminBadges() {
+  const defs      = getBadgeDefs();
+  const cats      = [...new Set(defs.map(b => b.cat))];
+  const container = document.getElementById('admin-badges-content');
+  if (!container) return;
+  container.innerHTML = cats.map(cat => {
+    const catBadges = defs.filter(b => b.cat === cat && b.name !== '(Add badges below)');
+    const safecat   = cat.replace(/'/g, "\\'");
+    const inputKey  = 'new-badge-' + cat.replace(/\s/g,'_').replace(/[^a-zA-Z0-9_]/g,'');
+    return `<div style="background:#0a1628;border-radius:12px;padding:14px 16px;margin-bottom:12px;border:1px solid rgba(255,255,255,0.07);">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;">
+        <div style="font-family:'Oswald',sans-serif;font-size:15px;font-weight:700;color:var(--gold);">${cat}</div>
+        <button onclick="deleteCategory('${safecat}')" style="background:#3a1a1a;border:1px solid #6a2a2a;color:#f66;padding:4px 12px;border-radius:7px;cursor:pointer;font-size:11px;font-weight:700;">🗑️ Delete section</button>
+      </div>
+      ${catBadges.length ? catBadges.map(b => `
+        <div style="display:flex;align-items:center;gap:8px;padding:7px 0;border-bottom:1px solid rgba(255,255,255,0.05);">
+          <div style="flex:1;font-size:13px;color:#ccc;">${b.name}</div>
+          <button onclick="deleteBadge('${b.id}')" style="background:none;border:none;color:#f66;font-size:14px;cursor:pointer;padding:2px 8px;">✕</button>
+        </div>`).join('') : '<div style="font-size:12px;color:#556;padding:6px 0;">No badges yet — add one below.</div>'}
+      <div style="display:flex;gap:8px;margin-top:10px;">
+        <input type="text" id="${inputKey}" placeholder="New badge name..." style="flex:1;background:#122040;color:#fff;border:1.5px solid #2a3a50;border-radius:8px;padding:8px 10px;font-family:'Roboto',sans-serif;font-size:13px;outline:none;"/>
+        <button onclick="addBadgeToCategory('${safecat}')" style="background:rgba(200,150,30,0.15);border:1px solid rgba(200,150,30,0.35);color:var(--gold);padding:8px 14px;border-radius:8px;cursor:pointer;font-family:'Oswald',sans-serif;font-size:13px;font-weight:700;white-space:nowrap;">+ Add</button>
+      </div>
+    </div>`;
+  }).join('');
+  container.innerHTML += `
+    <div style="background:#0a1628;border-radius:12px;padding:14px 16px;border:1px dashed rgba(200,150,30,0.3);">
+      <div style="font-family:'Oswald',sans-serif;font-size:14px;font-weight:600;color:#8898bb;margin-bottom:10px;">➕ Add New Section</div>
+      <div style="display:flex;gap:8px;">
+        <input type="text" id="new-cat-name" placeholder="Section name e.g. Leadership" style="flex:1;background:#122040;color:#fff;border:1.5px solid #2a3a50;border-radius:8px;padding:8px 10px;font-family:'Roboto',sans-serif;font-size:13px;outline:none;"/>
+        <button onclick="addCategory()" style="background:var(--accent);border:none;color:var(--navy);padding:8px 18px;border-radius:8px;cursor:pointer;font-family:'Oswald',sans-serif;font-size:14px;font-weight:700;">+ Add</button>
+      </div>
+    </div>`;
+}
+
+function addCategory() {
+  const input = document.getElementById('new-cat-name');
+  const name  = (input ? input.value.trim() : '');
+  if (!name) return alert('Please enter a section name.');
+  const defs = getBadgeDefs();
+  if (defs.some(b => b.cat === name)) return alert('Section already exists.');
+  defs.push({ id: 'b_' + Date.now(), name: '(Add badges below)', cat: name });
+  saveBadgeDefs(defs);
+  if (input) input.value = '';
+  renderAdminBadges();
+}
+
+function deleteCategory(cat) {
+  if (!confirm('Delete the "' + cat + '" section and all its badges?')) return;
+  saveBadgeDefs(getBadgeDefs().filter(b => b.cat !== cat));
+  renderAdminBadges();
+}
+
+function addBadgeToCategory(cat) {
+  const key   = 'new-badge-' + cat.replace(/\s/g,'_').replace(/[^a-zA-Z0-9_]/g,'');
+  const input = document.getElementById(key);
+  const name  = input ? input.value.trim() : '';
+  if (!name) return alert('Please enter a badge name.');
+  const defs = getBadgeDefs().filter(b => !(b.cat === cat && b.name === '(Add badges below)'));
+  defs.push({ id: 'b_' + Date.now(), name, cat });
+  saveBadgeDefs(defs);
+  if (input) input.value = '';
+  renderAdminBadges();
+}
+
+function deleteBadge(id) {
+  const badge = getBadgeDefs().find(b => b.id === id);
+  if (!badge || !confirm('Delete badge "' + badge.name + '"?')) return;
+  saveBadgeDefs(getBadgeDefs().filter(b => b.id !== id));
+  renderAdminBadges();
+}
+
 // ── Init ──────────────────────────────────────────────────────────────────
 window.addEventListener('load', () => {
   loadPrices();
@@ -2437,8 +2666,7 @@ window.addEventListener('load', () => {
   loadCustomForms();
   renderOrderItems();
   const ic = localStorage.getItem('bb_current');
-  if (ic) { renderDashboard(); checkTasksAccess(); }
-  if (window.location.hash === '#admin') openAdmin();
+  if (ic) { renderDashboard(); checkTasksAccess(); }  if (window.location.hash === '#admin') openAdmin();
 });
 window.addEventListener('hashchange', () => {
   if (window.location.hash === '#admin') openAdmin();
