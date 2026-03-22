@@ -166,6 +166,25 @@
   .task-modal-bg { display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.85); z-index: 8888; overflow-y: auto; padding: 30px 16px; }
   .task-modal { max-width: 480px; margin: 0 auto; background: #122040; border-radius: 16px; padding: 24px; border: 1px solid rgba(200,150,30,0.3); }
 
+  /* Admin section navigation */
+  .adm-section-btn { display:flex; align-items:center; justify-content:space-between; background:#0a1628; border:1px solid rgba(255,255,255,0.07); border-radius:14px; padding:14px 16px; cursor:pointer; transition:all 0.2s; }
+  .adm-section-btn:hover { border-color:rgba(200,150,30,0.4); background:#0f1e38; }
+  .adm-section-btn.active-section { border-color:rgba(200,150,30,0.5); background:#0f1e38; }
+  .adm-sec-icon { width:40px; height:40px; border-radius:10px; display:flex; align-items:center; justify-content:center; font-size:18px; flex-shrink:0; }
+  .adm-sec-title { font-family:'Oswald',sans-serif; font-size:16px; font-weight:600; color:#fff; line-height:1.2; }
+  .adm-sec-sub { font-size:11px; color:#556; margin-top:2px; }
+  .adm-sec-arrow { font-size:22px; color:#2a3a50; transition:transform 0.2s; }
+  .adm-section-btn:hover .adm-sec-arrow { color:var(--gold); transform:translateX(3px); }
+  .adm-section-header { display:flex; align-items:center; gap:14px; margin-bottom:20px; padding-bottom:16px; border-bottom:1px solid rgba(255,255,255,0.06); }
+  .adm-section-title { font-family:'Oswald',sans-serif; font-size:20px; font-weight:700; color:#fff; }
+  .adm-section-desc { font-size:12px; color:#556; margin-top:2px; }
+  /* Sub-tabs */
+  .adm-subtab { flex:1; padding:9px 6px; border:none; border-radius:8px; background:transparent; color:#6a7a99; font-family:'Oswald',sans-serif; font-size:13px; font-weight:600; cursor:pointer; transition:all 0.2s; }
+  .adm-subtab.active-subtab { background:rgba(255,255,255,0.08); color:#fff; }
+  /* Dept tabs */
+  .adm-dept-tab { padding:6px 14px; border-radius:20px; border:1px solid rgba(255,255,255,0.1); background:transparent; color:#6a7a99; font-family:'Oswald',sans-serif; font-size:12px; font-weight:700; cursor:pointer; transition:all 0.2s; }
+  .adm-dept-tab.active-dept-tab { background:var(--accent); color:var(--navy); border-color:var(--accent); }
+
   /* Admin tabs */
   .adm-tab { flex:1; padding:10px 6px; border:none; border-radius:8px; background:transparent; color:#6a7a99; font-family:'Oswald',sans-serif; font-size:13px; font-weight:600; cursor:pointer; letter-spacing:0.5px; transition:all 0.2s; white-space:nowrap; }
   .adm-tab:hover { color:#fff; }
@@ -624,17 +643,93 @@
     <!-- Admin panel (shown after login) -->
     <div id="admin-panel" style="display:none;">
 
-      <!-- Tab bar -->
-      <div style="display:flex;gap:6px;margin-bottom:20px;background:#0a1628;border-radius:12px;padding:6px;border:1px solid rgba(255,255,255,0.06);">
-        <button id="adm-tab-members"  onclick="switchAdminTab('members')"  class="adm-tab active-tab">👥 Members</button>
-        <button id="adm-tab-orders"   onclick="switchAdminTab('orders')"   class="adm-tab">📦 Orders</button>
-        <button id="adm-tab-products" onclick="switchAdminTab('products')" class="adm-tab">🛒 Products</button>
-        <button id="adm-tab-tasks"    onclick="switchAdminTab('tasks')"    class="adm-tab">✅ Tasks</button>
-        <button id="adm-tab-home"     onclick="switchAdminTab('home')"     class="adm-tab">🏠 Home</button>
+      <!-- ══════════════════════════════════════════════
+           SECTION NAV
+      ══════════════════════════════════════════════ -->
+      <div style="display:flex;flex-direction:column;gap:6px;margin-bottom:24px;">
+
+        <!-- Section: Members -->
+        <div class="adm-section-btn" id="sec-btn-members" onclick="switchAdminSection('members')">
+          <div style="display:flex;align-items:center;gap:12px;">
+            <div class="adm-sec-icon" style="background:rgba(200,150,30,0.15);color:var(--gold);">👥</div>
+            <div>
+              <div class="adm-sec-title">Members</div>
+              <div class="adm-sec-sub">Register, edit &amp; assign members</div>
+            </div>
+          </div>
+          <div class="adm-sec-arrow">›</div>
+        </div>
+
+        <!-- Section: Orders & Products -->
+        <div class="adm-section-btn" id="sec-btn-orders" onclick="switchAdminSection('orders')">
+          <div style="display:flex;align-items:center;gap:12px;">
+            <div class="adm-sec-icon" style="background:rgba(66,165,245,0.15);color:#42a5f5;">📦</div>
+            <div>
+              <div class="adm-sec-title">Orders &amp; Products</div>
+              <div class="adm-sec-sub">Manage uniform items &amp; member orders</div>
+            </div>
+          </div>
+          <div class="adm-sec-arrow">›</div>
+        </div>
+
+        <!-- Section: Departments & Tasks -->
+        <div class="adm-section-btn" id="sec-btn-tasks" onclick="switchAdminSection('tasks')">
+          <div style="display:flex;align-items:center;gap:12px;">
+            <div class="adm-sec-icon" style="background:rgba(102,187,106,0.15);color:#66bb6a;">✅</div>
+            <div>
+              <div class="adm-sec-title">Departments &amp; Tasks</div>
+              <div class="adm-sec-sub">Create &amp; manage department task boards</div>
+            </div>
+          </div>
+          <div class="adm-sec-arrow">›</div>
+        </div>
+
+        <!-- Section: Announcements -->
+        <div class="adm-section-btn" id="sec-btn-announcements" onclick="switchAdminSection('announcements')">
+          <div style="display:flex;align-items:center;gap:12px;">
+            <div class="adm-sec-icon" style="background:rgba(206,147,216,0.15);color:#ce93d8;">📢</div>
+            <div>
+              <div class="adm-sec-title">Announcements</div>
+              <div class="adm-sec-sub">Post &amp; manage company notices</div>
+            </div>
+          </div>
+          <div class="adm-sec-arrow">›</div>
+        </div>
+
+        <!-- Section: Gallery -->
+        <div class="adm-section-btn" id="sec-btn-gallery" onclick="switchAdminSection('gallery')">
+          <div style="display:flex;align-items:center;gap:12px;">
+            <div class="adm-sec-icon" style="background:rgba(255,167,38,0.15);color:#ffb74d;">📸</div>
+            <div>
+              <div class="adm-sec-title">Photo Gallery</div>
+              <div class="adm-sec-sub">Upload &amp; remove homepage photos</div>
+            </div>
+          </div>
+          <div class="adm-sec-arrow">›</div>
+        </div>
+
+      </div><!-- end section nav -->
+
+      <!-- ══════════════════════════════════════════════
+           SECTION PANELS
+      ══════════════════════════════════════════════ -->
+
+      <!-- Back button (shown inside a section) -->
+      <div id="adm-back-bar" style="display:none;margin-bottom:16px;">
+        <button onclick="backToAdminHome()" style="display:flex;align-items:center;gap:8px;background:#1a2a40;border:1px solid #2a3a50;color:#8898bb;padding:8px 14px;border-radius:10px;cursor:pointer;font-family:'Oswald',sans-serif;font-size:14px;font-weight:600;">
+          ‹ Back
+        </button>
       </div>
 
-      <!-- ── MEMBERS TAB ── -->
-      <div id="adm-members-panel">
+      <!-- ── MEMBERS SECTION ─────────────────────────── -->
+      <div id="adm-section-members" style="display:none;">
+        <div class="adm-section-header">
+          <div class="adm-sec-icon" style="background:rgba(200,150,30,0.15);color:var(--gold);">👥</div>
+          <div>
+            <div class="adm-section-title">Members</div>
+            <div class="adm-section-desc">Add, edit, assign rank, squad and department</div>
+          </div>
+        </div>
         <div style="display:flex;gap:8px;margin-bottom:14px;">
           <input class="form-input" id="admin-search" type="text" placeholder="Search by name or IC..." oninput="renderAdminList()" style="background:#0a1628;color:#fff;border-color:#2a3a50;flex:1;"/>
           <button class="submit-btn gold" onclick="openAddMember()" style="width:auto;padding:12px 16px;margin-top:0;font-size:14px;white-space:nowrap;">➕ Add</button>
@@ -649,7 +744,7 @@
               <button onclick="closeEditMember()" style="background:#1a2a40;border:1px solid #2a3a50;color:#fff;padding:6px 14px;border-radius:8px;cursor:pointer;">✕</button>
             </div>
             <div class="form-group"><label class="form-label" style="color:#8898bb;">Full Name</label><input class="form-input" id="em-name" type="text" style="background:#0a1628;color:#fff;border-color:#2a3a50;"/></div>
-            <div class="form-group"><label class="form-label" style="color:#8898bb;">IC Number (MyKad)</label><input class="form-input" id="em-ic" type="text" style="background:#0a1628;color:#fff;border-color:#2a3a50;"/></div>
+            <div class="form-group"><label class="form-label" style="color:#8898bb;">IC Number</label><input class="form-input" id="em-ic" type="text" style="background:#0a1628;color:#fff;border-color:#2a3a50;"/></div>
             <div class="form-row">
               <div class="form-group">
                 <label class="form-label" style="color:#8898bb;">Rank</label>
@@ -667,7 +762,6 @@
                 </select>
               </div>
             </div>
-            <div class="form-group"><label class="form-label" style="color:#8898bb;">Password (leave blank to keep current)</label><input class="form-input" id="em-pass" type="text" placeholder="••••••" style="background:#0a1628;color:#fff;border-color:#2a3a50;"/></div>
             <div class="form-group">
               <label class="form-label" style="color:#8898bb;">Department</label>
               <select class="form-select" id="em-dept" style="background:#0a1628;color:#fff;border-color:#2a3a50;">
@@ -677,6 +771,7 @@
                 <option value="media">Media</option>
               </select>
             </div>
+            <div class="form-group"><label class="form-label" style="color:#8898bb;">Password (leave blank to keep)</label><input class="form-input" id="em-pass" type="text" placeholder="••••••" style="background:#0a1628;color:#fff;border-color:#2a3a50;"/></div>
             <input type="hidden" id="em-original-ic"/>
             <div style="display:flex;gap:8px;margin-top:4px;">
               <button class="submit-btn gold" onclick="saveEditMember()" style="margin-top:0;flex:1;">💾 Save</button>
@@ -686,138 +781,161 @@
         </div>
       </div>
 
-      <!-- ── ORDERS TAB ── -->
-      <div id="adm-orders-panel" style="display:none;">
-        <input class="form-input" id="admin-order-search" type="text" placeholder="Search by order no or member name..." oninput="renderAdminOrders()" style="background:#0a1628;color:#fff;border-color:#2a3a50;margin-bottom:14px;"/>
-        <div id="admin-orders-list"></div>
+      <!-- ── ORDERS & PRODUCTS SECTION ──────────────── -->
+      <div id="adm-section-orders" style="display:none;">
+        <div class="adm-section-header">
+          <div class="adm-sec-icon" style="background:rgba(66,165,245,0.15);color:#42a5f5;">📦</div>
+          <div>
+            <div class="adm-section-title">Orders &amp; Products</div>
+            <div class="adm-section-desc">Manage what members can order and track their requests</div>
+          </div>
+        </div>
+
+        <!-- Sub-tabs -->
+        <div style="display:flex;gap:6px;margin-bottom:18px;background:#0a1628;border-radius:10px;padding:5px;border:1px solid rgba(255,255,255,0.06);">
+          <button class="adm-subtab active-subtab" id="subtab-products" onclick="switchOrderSubtab('products')">🛒 Products</button>
+          <button class="adm-subtab" id="subtab-orders"   onclick="switchOrderSubtab('orders')">📋 Orders</button>
+        </div>
+
+        <!-- Products sub-panel -->
+        <div id="subpanel-products">
+          <div style="background:#0a1628;border-radius:14px;padding:18px;margin-bottom:14px;border:1px solid rgba(255,255,255,0.08);">
+            <div style="font-family:'Oswald',sans-serif;font-size:16px;font-weight:600;color:var(--gold);margin-bottom:14px;" id="prod-form-title">➕ Add New Product</div>
+            <div class="form-group"><label class="form-label" style="color:#8898bb;">Product Name</label><input class="form-input" id="prod-name" type="text" placeholder="e.g. BB Uniform Shirt" style="background:#122040;color:#fff;border-color:#2a3a50;"/></div>
+            <div class="form-row">
+              <div class="form-group"><label class="form-label" style="color:#8898bb;">Price (RM)</label><input class="form-input" id="prod-price" type="number" step="0.50" min="0" placeholder="0.00" style="background:#122040;color:#fff;border-color:#2a3a50;"/></div>
+              <div class="form-group"><label class="form-label" style="color:#8898bb;">Size Options</label><input class="form-input" id="prod-sizes" type="text" placeholder="S, M, L, XL or 28, 30, 32" style="background:#122040;color:#fff;border-color:#2a3a50;"/></div>
+            </div>
+            <div style="font-size:11px;color:#556;margin-top:-10px;margin-bottom:12px;">Separate sizes with commas. Leave blank if no size needed.</div>
+            <div class="form-group">
+              <label class="form-label" style="color:#8898bb;">Product Image</label>
+              <div style="border:2px dashed rgba(200,150,30,0.3);border-radius:10px;padding:16px;text-align:center;position:relative;cursor:pointer;background:#122040;" id="prod-img-drop">
+                <input type="file" id="prod-img-file" accept="image/*" style="position:absolute;inset:0;opacity:0;cursor:pointer;width:100%;height:100%;" onchange="previewProductImg(this)"/>
+                <div id="prod-img-preview" style="display:none;"><img id="prod-img-prev-img" style="max-height:90px;max-width:100%;border-radius:8px;display:block;margin:0 auto;" alt="preview"/></div>
+                <div id="prod-img-placeholder" style="color:#8898bb;font-size:13px;">📷 Click to upload image</div>
+              </div>
+              <input type="hidden" id="prod-img-data"/>
+            </div>
+            <input type="hidden" id="prod-edit-key"/>
+            <div style="display:flex;gap:8px;">
+              <button class="submit-btn gold" onclick="saveProduct()" style="margin-top:4px;flex:1;">💾 Save Product</button>
+              <button class="submit-btn danger" onclick="clearProductForm()" style="margin-top:4px;width:auto;padding:15px 18px;">✕</button>
+            </div>
+          </div>
+          <div id="admin-products-list"></div>
+        </div>
+
+        <!-- Orders sub-panel -->
+        <div id="subpanel-orders" style="display:none;">
+          <input class="form-input" id="admin-order-search" type="text" placeholder="Search by order no or member name..." oninput="renderAdminOrders()" style="background:#0a1628;color:#fff;border-color:#2a3a50;margin-bottom:14px;"/>
+          <div id="admin-orders-list"></div>
+        </div>
       </div>
 
-      <!-- ── PRODUCTS TAB ── -->
-      <div id="adm-products-panel" style="display:none;">
-        <!-- Add/Edit form -->
-        <div style="background:#0a1628;border-radius:14px;padding:18px;margin-bottom:16px;border:1px solid rgba(200,150,30,0.2);">
-          <div style="font-family:'Oswald',sans-serif;font-size:17px;font-weight:600;color:var(--gold);margin-bottom:14px;" id="prod-form-title">➕ Add New Product</div>
-          <div class="form-group">
-            <label class="form-label" style="color:#8898bb;">Product Name</label>
-            <input class="form-input" id="prod-name" type="text" placeholder="e.g. BB Uniform Shirt" style="background:#122040;color:#fff;border-color:#2a3a50;"/>
-          </div>
-          <div class="form-row">
-            <div class="form-group">
-              <label class="form-label" style="color:#8898bb;">Price (RM)</label>
-              <input class="form-input" id="prod-price" type="number" step="0.50" min="0" placeholder="0.00" style="background:#122040;color:#fff;border-color:#2a3a50;"/>
-            </div>
-            <div class="form-group">
-              <label class="form-label" style="color:#8898bb;">Size Options</label>
-              <input class="form-input" id="prod-sizes" type="text" placeholder="e.g. S, M, L, XL or 28, 30, 32" style="background:#122040;color:#fff;border-color:#2a3a50;"/>
-            </div>
-          </div>
-          <div style="font-size:11px;color:#556;margin-top:-10px;margin-bottom:12px;">Leave size blank if no size needed. Separate options with commas.</div>
-          <div class="form-group">
-            <label class="form-label" style="color:#8898bb;">Product Image</label>
-            <div style="border:2px dashed rgba(200,150,30,0.3);border-radius:10px;padding:16px;text-align:center;position:relative;cursor:pointer;background:#122040;" id="prod-img-drop">
-              <input type="file" id="prod-img-file" accept="image/*" style="position:absolute;inset:0;opacity:0;cursor:pointer;width:100%;height:100%;" onchange="previewProductImg(this)"/>
-              <div id="prod-img-preview" style="display:none;"><img id="prod-img-prev-img" style="max-height:90px;max-width:100%;border-radius:8px;display:block;margin:0 auto;" alt="preview"/></div>
-              <div id="prod-img-placeholder" style="color:#8898bb;font-size:13px;">📷 Click to upload image</div>
-            </div>
-            <input type="hidden" id="prod-img-data"/>
-          </div>
-          <input type="hidden" id="prod-edit-key"/>
-          <div style="display:flex;gap:8px;">
-            <button class="submit-btn gold" onclick="saveProduct()" style="margin-top:4px;flex:1;">💾 Save Product</button>
-            <button class="submit-btn danger" onclick="clearProductForm()" style="margin-top:4px;width:auto;padding:15px 18px;">✕</button>
-          </div>
-        </div>
-        <!-- Products list -->
-        <div id="admin-products-list"></div>
-      </div>
-
-      <!-- ── TASKS TAB ── -->
-      <div id="adm-tasks-panel" style="display:none;">
-
-        <!-- Add/Edit task form -->
-        <div style="background:#0a1628;border-radius:14px;padding:18px;margin-bottom:16px;border:1px solid rgba(200,150,30,0.2);">
-          <div style="font-family:'Oswald',sans-serif;font-size:17px;font-weight:600;color:var(--gold);margin-bottom:14px;" id="task-form-title">➕ Add New Task</div>
-          <div class="form-group">
-            <label class="form-label" style="color:#8898bb;">Task Title</label>
-            <input class="form-input" id="task-title" type="text" placeholder="e.g. Prepare logistics report" style="background:#122040;color:#fff;border-color:#2a3a50;"/>
-          </div>
-          <div class="form-group">
-            <label class="form-label" style="color:#8898bb;">Description</label>
-            <textarea class="form-textarea" id="task-desc" placeholder="Details about this task..." style="background:#122040;color:#fff;border-color:#2a3a50;min-height:70px;"></textarea>
-          </div>
-          <div class="form-row">
-            <div class="form-group">
-              <label class="form-label" style="color:#8898bb;">Department</label>
-              <select class="form-select" id="task-dept" style="background:#122040;color:#fff;border-color:#2a3a50;" onchange="loadAssigneeOptions()">
-                <option value="">Select dept...</option>
-                <option value="logistics">Logistics</option>
-                <option value="secretariat">Secretariat</option>
-                <option value="media">Media</option>
-              </select>
-            </div>
-            <div class="form-group">
-              <label class="form-label" style="color:#8898bb;">Priority</label>
-              <select class="form-select" id="task-priority" style="background:#122040;color:#fff;border-color:#2a3a50;">
-                <option value="medium">Medium</option>
-                <option value="high">High</option>
-                <option value="low">Low</option>
-              </select>
-            </div>
-          </div>
-          <div class="form-row">
-            <div class="form-group">
-              <label class="form-label" style="color:#8898bb;">Assign To</label>
-              <select class="form-select" id="task-assignee" style="background:#122040;color:#fff;border-color:#2a3a50;">
-                <option value="">Select dept first...</option>
-              </select>
-            </div>
-            <div class="form-group">
-              <label class="form-label" style="color:#8898bb;">Due Date</label>
-              <input class="form-input" id="task-due" type="date" style="background:#122040;color:#fff;border-color:#2a3a50;"/>
-            </div>
-          </div>
-          <input type="hidden" id="task-edit-id"/>
-          <div style="display:flex;gap:8px;">
-            <button class="submit-btn gold" onclick="saveTask()" style="margin-top:4px;flex:1;">💾 Save Task</button>
-            <button class="submit-btn danger" onclick="clearTaskForm()" style="margin-top:4px;width:auto;padding:15px 18px;">✕</button>
+      <!-- ── DEPARTMENTS & TASKS SECTION ────────────── -->
+      <div id="adm-section-tasks" style="display:none;">
+        <div class="adm-section-header">
+          <div class="adm-sec-icon" style="background:rgba(102,187,106,0.15);color:#66bb6a;">✅</div>
+          <div>
+            <div class="adm-section-title">Departments &amp; Tasks</div>
+            <div class="adm-section-desc">Assign tasks to each department</div>
           </div>
         </div>
 
-        <!-- Filter by dept -->
-        <div style="display:flex;gap:6px;margin-bottom:12px;flex-wrap:wrap;">
-          <button onclick="filterAdminTasks('all')" id="tf-all" style="padding:6px 14px;border-radius:20px;border:1px solid var(--accent);background:var(--accent);color:var(--navy);font-family:'Oswald',sans-serif;font-size:12px;font-weight:700;cursor:pointer;">All</button>
-          <button onclick="filterAdminTasks('logistics')" id="tf-logistics" style="padding:6px 14px;border-radius:20px;border:1px solid rgba(66,165,245,0.4);background:transparent;color:#42a5f5;font-family:'Oswald',sans-serif;font-size:12px;font-weight:700;cursor:pointer;">Logistics</button>
-          <button onclick="filterAdminTasks('secretariat')" id="tf-secretariat" style="padding:6px 14px;border-radius:20px;border:1px solid rgba(171,71,188,0.4);background:transparent;color:#ce93d8;font-family:'Oswald',sans-serif;font-size:12px;font-weight:700;cursor:pointer;">Secretariat</button>
-          <button onclick="filterAdminTasks('media')" id="tf-media" style="padding:6px 14px;border-radius:20px;border:1px solid rgba(255,167,38,0.4);background:transparent;color:#ffb74d;font-family:'Oswald',sans-serif;font-size:12px;font-weight:700;cursor:pointer;">Media</button>
+        <!-- Dept sub-tabs -->
+        <div style="display:flex;gap:6px;margin-bottom:18px;flex-wrap:wrap;">
+          <button class="adm-dept-tab active-dept-tab" id="dtab-all"          onclick="switchDeptTab('all')">All</button>
+          <button class="adm-dept-tab" id="dtab-logistics"    style="color:#42a5f5;border-color:rgba(66,165,245,0.3);"   onclick="switchDeptTab('logistics')">🔵 Logistics</button>
+          <button class="adm-dept-tab" id="dtab-secretariat"  style="color:#ce93d8;border-color:rgba(171,71,188,0.3);"   onclick="switchDeptTab('secretariat')">🟣 Secretariat</button>
+          <button class="adm-dept-tab" id="dtab-media"        style="color:#ffb74d;border-color:rgba(255,167,38,0.3);"   onclick="switchDeptTab('media')">🟡 Media</button>
         </div>
+
+        <!-- Add/edit task form (collapsible) -->
+        <div style="margin-bottom:14px;">
+          <button onclick="toggleTaskForm()" id="task-form-toggle" style="width:100%;display:flex;align-items:center;justify-content:space-between;padding:12px 16px;background:#0a1628;border:1px solid rgba(200,150,30,0.2);border-radius:12px;cursor:pointer;color:var(--gold);font-family:'Oswald',sans-serif;font-size:15px;font-weight:600;">
+            <span id="task-form-toggle-label">➕ Add New Task</span>
+            <span id="task-form-chevron" style="font-size:18px;transition:transform 0.2s;">›</span>
+          </button>
+          <div id="task-form-body" style="display:none;background:#0a1628;border:1px solid rgba(200,150,30,0.2);border-top:none;border-radius:0 0 12px 12px;padding:18px;">
+            <div class="form-group"><label class="form-label" style="color:#8898bb;">Task Title</label><input class="form-input" id="task-title" type="text" placeholder="e.g. Prepare logistics report" style="background:#122040;color:#fff;border-color:#2a3a50;"/></div>
+            <div class="form-group"><label class="form-label" style="color:#8898bb;">Description</label><textarea class="form-textarea" id="task-desc" placeholder="Details..." style="background:#122040;color:#fff;border-color:#2a3a50;min-height:70px;"></textarea></div>
+            <div class="form-row">
+              <div class="form-group">
+                <label class="form-label" style="color:#8898bb;">Department</label>
+                <select class="form-select" id="task-dept" style="background:#122040;color:#fff;border-color:#2a3a50;" onchange="loadAssigneeOptions()">
+                  <option value="">Select...</option>
+                  <option value="logistics">Logistics</option>
+                  <option value="secretariat">Secretariat</option>
+                  <option value="media">Media</option>
+                </select>
+              </div>
+              <div class="form-group">
+                <label class="form-label" style="color:#8898bb;">Priority</label>
+                <select class="form-select" id="task-priority" style="background:#122040;color:#fff;border-color:#2a3a50;">
+                  <option value="medium">Medium</option>
+                  <option value="high">High</option>
+                  <option value="low">Low</option>
+                </select>
+              </div>
+            </div>
+            <div class="form-row">
+              <div class="form-group">
+                <label class="form-label" style="color:#8898bb;">Assign To</label>
+                <select class="form-select" id="task-assignee" style="background:#122040;color:#fff;border-color:#2a3a50;">
+                  <option value="">Select dept first...</option>
+                </select>
+              </div>
+              <div class="form-group">
+                <label class="form-label" style="color:#8898bb;">Due Date</label>
+                <input class="form-input" id="task-due" type="date" style="background:#122040;color:#fff;border-color:#2a3a50;"/>
+              </div>
+            </div>
+            <input type="hidden" id="task-edit-id"/>
+            <div style="display:flex;gap:8px;">
+              <button class="submit-btn gold" onclick="saveTask()" style="margin-top:4px;flex:1;">💾 Save Task</button>
+              <button class="submit-btn danger" onclick="clearTaskForm()" style="margin-top:4px;width:auto;padding:15px 18px;">✕</button>
+            </div>
+          </div>
+        </div>
+
         <div id="admin-tasks-list"></div>
       </div>
 
-      <!-- ── HOME TAB ── -->
-      <div id="adm-home-panel" style="display:none;">
-
-        <!-- Announcements -->
-        <div style="background:#0a1628;border-radius:14px;padding:18px;margin-bottom:16px;border:1px solid rgba(200,150,30,0.2);">
-          <div style="font-family:'Oswald',sans-serif;font-size:17px;font-weight:600;color:var(--gold);margin-bottom:14px;">📢 Post Announcement</div>
+      <!-- ── ANNOUNCEMENTS SECTION ───────────────────── -->
+      <div id="adm-section-announcements" style="display:none;">
+        <div class="adm-section-header">
+          <div class="adm-sec-icon" style="background:rgba(206,147,216,0.15);color:#ce93d8;">📢</div>
+          <div>
+            <div class="adm-section-title">Announcements</div>
+            <div class="adm-section-desc">Post notices visible on the home page</div>
+          </div>
+        </div>
+        <div style="background:#0a1628;border-radius:14px;padding:18px;margin-bottom:14px;border:1px solid rgba(255,255,255,0.08);">
           <div class="form-group"><label class="form-label" style="color:#8898bb;">Title</label><input class="form-input" id="ann-title-input" type="text" placeholder="e.g. Uniform Collection — Sat 10 May" style="background:#122040;color:#fff;border-color:#2a3a50;"/></div>
           <div class="form-group"><label class="form-label" style="color:#8898bb;">Message</label><textarea class="form-textarea" id="ann-body-input" placeholder="Details..." style="background:#122040;color:#fff;border-color:#2a3a50;"></textarea></div>
-          <button class="submit-btn gold" onclick="addAnnouncement()">📢 Post</button>
-          <div id="admin-ann-list" style="margin-top:14px;"></div>
+          <button class="submit-btn gold" onclick="addAnnouncement()">📢 Post Announcement</button>
         </div>
-
-        <!-- Gallery -->
-        <div style="background:#0a1628;border-radius:14px;padding:18px;border:1px solid rgba(200,150,30,0.2);">
-          <div style="font-family:'Oswald',sans-serif;font-size:17px;font-weight:600;color:var(--gold);margin-bottom:14px;">📸 Photo Gallery</div>
-          <div style="border:2px dashed rgba(200,150,30,0.3);border-radius:10px;padding:16px;text-align:center;position:relative;cursor:pointer;background:#122040;" id="gallery-drop">
-            <input type="file" id="gallery-file" accept="image/*" multiple style="position:absolute;inset:0;opacity:0;cursor:pointer;width:100%;height:100%;" onchange="handleGalleryUpload(this)"/>
-            <div style="font-size:26px;margin-bottom:6px;">📷</div>
-            <div style="font-size:13px;font-weight:600;color:#8898bb;">Click or drag photos here</div>
-            <div style="font-size:11px;color:#556;margin-top:3px;">Multiple files supported</div>
-          </div>
-          <div id="admin-gallery-grid" class="gallery-grid" style="margin-top:14px;"></div>
-        </div>
-
+        <div id="admin-ann-list"></div>
       </div>
+
+      <!-- ── GALLERY SECTION ────────────────────────── -->
+      <div id="adm-section-gallery" style="display:none;">
+        <div class="adm-section-header">
+          <div class="adm-sec-icon" style="background:rgba(255,167,38,0.15);color:#ffb74d;">📸</div>
+          <div>
+            <div class="adm-section-title">Photo Gallery</div>
+            <div class="adm-section-desc">Photos shown on the home page</div>
+          </div>
+        </div>
+        <div style="border:2px dashed rgba(200,150,30,0.3);border-radius:12px;padding:20px;text-align:center;position:relative;cursor:pointer;background:#0a1628;margin-bottom:14px;" id="gallery-drop">
+          <input type="file" id="gallery-file" accept="image/*" multiple style="position:absolute;inset:0;opacity:0;cursor:pointer;width:100%;height:100%;" onchange="handleGalleryUpload(this)"/>
+          <div style="font-size:32px;margin-bottom:6px;">📷</div>
+          <div style="font-size:13px;font-weight:600;color:#8898bb;">Click or drag photos here</div>
+          <div style="font-size:11px;color:#556;margin-top:3px;">Multiple files supported</div>
+        </div>
+        <div id="admin-gallery-grid" class="gallery-grid"></div>
+      </div>
+
     </div><!-- end admin-panel -->
   </div>
 </div>
@@ -1318,7 +1436,7 @@ function openAdmin() {
   if (localStorage.getItem('bb_admin') === '1') {
     document.getElementById('admin-login-box').style.display = 'none';
     document.getElementById('admin-panel').style.display = 'block';
-    switchAdminTab('members');
+    backToAdminHome();
   } else {
     document.getElementById('admin-login-box').style.display = 'block';
     document.getElementById('admin-panel').style.display = 'none';
@@ -1336,23 +1454,79 @@ function adminLogin() {
   localStorage.setItem('bb_admin', '1');
   document.getElementById('admin-login-box').style.display = 'none';
   document.getElementById('admin-panel').style.display = 'block';
-  switchAdminTab('members');
+  backToAdminHome();
   renderGallery(); renderAnnouncements();
 }
 
-function switchAdminTab(tab) {
-  const tabs = ['members','orders','products','tasks','home'];
-  tabs.forEach(t => {
-    const panel = document.getElementById('adm-' + t + '-panel');
-    const btn   = document.getElementById('adm-tab-' + t);
-    if (panel) panel.style.display = t === tab ? 'block' : 'none';
-    if (btn)   { btn.classList.toggle('active-tab', t === tab); }
+const ADMIN_SECTIONS = ['members','orders','tasks','announcements','gallery'];
+
+function backToAdminHome() {
+  // Show section nav, hide back bar, hide all panels
+  document.getElementById('adm-back-bar').style.display = 'none';
+  ADMIN_SECTIONS.forEach(s => {
+    const el = document.getElementById('adm-section-' + s);
+    if (el) el.style.display = 'none';
+    const btn = document.getElementById('sec-btn-' + s);
+    if (btn) btn.classList.remove('active-section');
   });
-  if (tab === 'members')  renderAdminList();
-  if (tab === 'orders')   renderAdminOrders();
-  if (tab === 'products') renderAdminProducts();
-  if (tab === 'tasks')    renderAdminTasks('all');
-  if (tab === 'home')     renderAdminAnnList();
+  // Show the section buttons
+  document.querySelectorAll('.adm-section-btn').forEach(b => b.style.display = 'flex');
+}
+
+function switchAdminSection(section) {
+  // Hide all section buttons, show back bar
+  document.querySelectorAll('.adm-section-btn').forEach(b => b.style.display = 'none');
+  document.getElementById('adm-back-bar').style.display = 'block';
+  // Hide all panels then show target
+  ADMIN_SECTIONS.forEach(s => {
+    const el = document.getElementById('adm-section-' + s);
+    if (el) el.style.display = 'none';
+  });
+  const target = document.getElementById('adm-section-' + section);
+  if (target) target.style.display = 'block';
+  // Trigger data loads
+  if (section === 'members')       renderAdminList();
+  if (section === 'orders')        { switchOrderSubtab('products'); }
+  if (section === 'tasks')         { switchDeptTab('all'); }
+  if (section === 'announcements') renderAdminAnnList();
+  if (section === 'gallery')       renderGallery();
+}
+
+function switchAdminTab(tab) { switchAdminSection(tab); }  // legacy compat
+
+function switchOrderSubtab(sub) {
+  ['products','orders'].forEach(s => {
+    document.getElementById('subpanel-' + s).style.display = s === sub ? 'block' : 'none';
+    document.getElementById('subtab-' + s).classList.toggle('active-subtab', s === sub);
+  });
+  if (sub === 'products') renderAdminProducts();
+  if (sub === 'orders')   renderAdminOrders();
+}
+
+function switchDeptTab(dept) {
+  ['all','logistics','secretariat','media'].forEach(d => {
+    const btn = document.getElementById('dtab-' + d);
+    if (!btn) return;
+    const isActive = d === dept;
+    btn.classList.toggle('active-dept-tab', isActive);
+    if (isActive && d !== 'all') {
+      const cfg = { logistics:'#42a5f5', secretariat:'#ce93d8', media:'#ffb74d' };
+      btn.style.background = cfg[d] + '22';
+    } else if (!isActive) {
+      btn.style.background = 'transparent';
+    }
+  });
+  renderAdminTasks(dept);
+}
+
+function toggleTaskForm() {
+  const body    = document.getElementById('task-form-body');
+  const chevron = document.getElementById('task-form-chevron');
+  const label   = document.getElementById('task-form-toggle-label');
+  const open    = body.style.display === 'none';
+  body.style.display    = open ? 'block' : 'none';
+  chevron.style.transform = open ? 'rotate(90deg)' : 'rotate(0deg)';
+  label.textContent = open ? '✕ Close Form' : '➕ Add New Task';
 }
 
 // ── Members ───────────────────────────────────────────────────────────────
@@ -1779,7 +1953,7 @@ async function renderAdminTasks(filter) {
   } catch(e) { list.innerHTML = '<div style="color:#f66;text-align:center;padding:20px;">Failed to load tasks.</div>'; }
 }
 
-function filterAdminTasks(filter) { renderAdminTasks(filter); }
+function filterAdminTasks(filter) { switchDeptTab(filter); }
 
 async function loadAssigneeOptions() {
   const dept = document.getElementById('task-dept').value;
@@ -1859,6 +2033,8 @@ function editAdminTask(id) {
   loadAssigneeOptions().then(() => {
     if (t.assignee_ic) document.getElementById('task-assignee').value = t.assignee_ic;
   });
+  const body = document.getElementById('task-form-body');
+  if (body && body.style.display === 'none') toggleTaskForm();
   document.getElementById('task-title').scrollIntoView({ behavior:'smooth' });
 }
 
