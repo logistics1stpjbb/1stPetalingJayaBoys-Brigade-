@@ -612,7 +612,10 @@
         <div style="font-family:'Oswald',sans-serif;font-size:26px;font-weight:700;color:var(--gold);">⚙️ Admin Panel</div>
         <div style="font-size:11px;color:#8898bb;letter-spacing:2px;text-transform:uppercase;margin-top:2px;">1st Petaling Jaya Boys Brigade</div>
       </div>
-      <button onclick="closeAdmin()" style="background:#1a2a40;border:1px solid #2a3a50;color:#fff;padding:10px 18px;border-radius:10px;cursor:pointer;font-family:'Oswald',sans-serif;font-weight:600;font-size:14px;">✕ Close</button>
+      <div style="display:flex;gap:8px;">
+        <button onclick="logoutAdmin()" style="background:transparent;border:1px solid #2a3a50;color:#8898bb;padding:10px 14px;border-radius:10px;cursor:pointer;font-family:'Oswald',sans-serif;font-weight:600;font-size:13px;">🔒 Lock</button>
+        <button onclick="closeAdmin()" style="background:#1a2a40;border:1px solid #2a3a50;color:#fff;padding:10px 18px;border-radius:10px;cursor:pointer;font-family:'Oswald',sans-serif;font-weight:600;font-size:14px;">✕ Close</button>
+      </div>
     </div>
 
     <!-- Login box -->
@@ -791,6 +794,7 @@
         <!-- Sub-tabs -->
         <div style="display:flex;gap:6px;margin-bottom:18px;background:#0a1628;border-radius:10px;padding:5px;border:1px solid rgba(255,255,255,0.06);">
           <button class="adm-subtab active-subtab" id="subtab-formbuilder" onclick="switchOrderSubtab('formbuilder')">📝 Forms</button>
+          <button class="adm-subtab" id="subtab-uniform"     onclick="switchOrderSubtab('uniform')">👔 Uniform</button>
           <button class="adm-subtab" id="subtab-products"    onclick="switchOrderSubtab('products')">🛒 Products</button>
           <button class="adm-subtab" id="subtab-orders"      onclick="switchOrderSubtab('orders')">📦 Submissions</button>
         </div>
@@ -806,9 +810,8 @@
             <div class="form-group">
               <label class="form-label" style="color:#8898bb;">Form Type</label>
               <div style="display:flex;gap:8px;">
-                <button id="ftype-link" onclick="setFormType('link')" class="ftype-btn ftype-active" style="flex:1;">🔗 External Link<br><span style="font-size:10px;font-weight:400;opacity:0.7;">Google Form / URL</span></button>
-                <button id="ftype-builtin" onclick="setFormType('builtin')" class="ftype-btn" style="flex:1;">⚙️ Built-in Form<br><span style="font-size:10px;font-weight:400;opacity:0.7;">Created here</span></button>
-                <button id="ftype-uniform" onclick="setFormType('uniform')" class="ftype-btn" style="flex:1;">👔 Uniform Order<br><span style="font-size:10px;font-weight:400;opacity:0.7;">Product selector</span></button>
+                <button id="ftype-link"    onclick="setFormType('link')"    class="ftype-btn ftype-active" style="flex:1;">🔗 External Link<br><span style="font-size:10px;font-weight:400;opacity:0.7;">Google Form / URL</span></button>
+                <button id="ftype-builtin" onclick="setFormType('builtin')" class="ftype-btn"              style="flex:1;">⚙️ Built-in Form<br><span style="font-size:10px;font-weight:400;opacity:0.7;">Created here</span></button>
               </div>
             </div>
 
@@ -824,11 +827,6 @@
               <button onclick="addFormField()" style="width:100%;padding:10px;background:rgba(200,150,30,0.1);border:1px dashed rgba(200,150,30,0.3);border-radius:10px;color:var(--gold);font-family:'Oswald',sans-serif;font-size:14px;font-weight:600;cursor:pointer;margin-bottom:12px;">➕ Add Field</button>
             </div>
 
-            <!-- Uniform type: no extra config needed -->
-            <div id="fb-uniform-fields" style="display:none;">
-              <div class="note-box" style="background:rgba(200,150,30,0.08);border-color:rgba(200,150,30,0.3);color:#c8a870;">👔 This will use your current product list. Members select items and sizes when ordering.</div>
-            </div>
-
             <input type="hidden" id="fb-edit-id"/>
             <div style="display:flex;gap:8px;">
               <button class="submit-btn gold" onclick="saveForm()" style="margin-top:4px;flex:1;">💾 Save Form</button>
@@ -837,6 +835,22 @@
           </div>
           <!-- Forms list -->
           <div id="admin-forms-list"></div>
+        </div>
+
+        <!-- Uniform sub-panel -->
+        <div id="subpanel-uniform" style="display:none;">
+          <div style="background:#0a1628;border-radius:14px;padding:18px;margin-bottom:14px;border:1px solid rgba(200,150,30,0.15);">
+            <div style="font-family:'Oswald',sans-serif;font-size:16px;font-weight:600;color:var(--gold);margin-bottom:8px;">👔 Uniform Order Submissions</div>
+            <div style="font-size:12px;color:#8898bb;line-height:1.6;margin-bottom:16px;">Uniform orders submitted by members appear in <strong style="color:#ccc;">Submissions</strong>. Use <strong style="color:#ccc;">Products</strong> to manage what items are available and their prices.</div>
+            <div style="display:flex;gap:10px;">
+              <button onclick="switchOrderSubtab('products')" class="submit-btn" style="flex:1;margin-top:0;font-size:14px;">🛒 Manage Products</button>
+              <button onclick="switchOrderSubtab('orders')" class="submit-btn gold" style="flex:1;margin-top:0;font-size:14px;">📦 View Submissions</button>
+            </div>
+          </div>
+          <div style="background:#0a1628;border-radius:14px;padding:18px;border:1px solid rgba(255,255,255,0.06);">
+            <div style="font-family:'Oswald',sans-serif;font-size:14px;font-weight:600;color:#8898bb;margin-bottom:12px;letter-spacing:1px;text-transform:uppercase;">Current Products</div>
+            <div id="uniform-products-preview"></div>
+          </div>
         </div>
 
         <!-- Products sub-panel -->
@@ -1121,7 +1135,7 @@ async function populateOrderBar(ic) {
     if (nameEl)  nameEl.textContent  = m.name;
     if (rankEl)  rankEl.textContent  = m.rank || '';
     if (squadIl) squadIl.textContent = m.squad ? m.squad + ' Squad \xb7' : '';
-    if (squadEl) squadEl.textContent = m.squad ? m.squad + ' Squad' : '\u2014';
+    if (squadEl) squadEl.textContent = m.squad ? 'Squad ' + m.squad : '\u2014';
     var pfp = localStorage.getItem('bb_pfp_' + ic);
     if (pfp) {
       var img = document.getElementById('order-pfp-img');
@@ -1257,12 +1271,34 @@ function saveCustomForms() { localStorage.setItem('bb_custom_forms', JSON.string
 
 function setFormType(type) {
   _currentFormType = type;
-  ['link','builtin','uniform'].forEach(function(t) {
-    var btn = document.getElementById('ftype-' + t);
+  ['link','builtin'].forEach(function(t) {
+    var btn    = document.getElementById('ftype-' + t);
     var fields = document.getElementById('fb-' + t + '-fields');
-    if (btn) btn.classList.toggle('ftype-active', t === type);
+    if (btn)    btn.classList.toggle('ftype-active', t === type);
     if (fields) fields.style.display = t === type ? 'block' : 'none';
   });
+}
+
+function renderUniformProductsPreview() {
+  var container = document.getElementById('uniform-products-preview');
+  if (!container) return;
+  if (!UNIFORM_ITEMS.length) {
+    container.innerHTML = '<div style="color:#8898bb;font-size:13px;text-align:center;padding:16px;">No products yet. Go to Products tab to add items.</div>';
+    return;
+  }
+  var html = '';
+  UNIFORM_ITEMS.forEach(function(item) {
+    var imgHtml = item.image
+      ? '<img src="' + item.image + '" style="width:40px;height:40px;object-fit:cover;border-radius:8px;flex-shrink:0;" alt="' + item.name + '"/>'
+      : '<div style="width:40px;height:40px;border-radius:8px;background:#1a2a40;display:flex;align-items:center;justify-content:center;font-size:18px;flex-shrink:0;">\ud83d\udc54</div>';
+    html += '<div style="display:flex;align-items:center;gap:10px;padding:8px 0;border-bottom:1px solid rgba(255,255,255,0.05);">'
+      + imgHtml
+      + '<div style="flex:1;">'
+      + '<div style="font-size:13px;color:#fff;font-weight:600;">' + item.name + '</div>'
+      + '<div style="font-size:11px;color:#8898bb;">RM ' + (item.price ? parseFloat(item.price).toFixed(2) : 'TBA') + (item.sizes && item.sizes.length ? ' \xb7 ' + item.sizes.join(', ') : '') + '</div>'
+      + '</div></div>';
+  });
+  container.innerHTML = html;
 }
 
 function addFormField() {
@@ -1610,7 +1646,7 @@ async function renderDashboard() {
     set('m-display-name', m.name);
     set('m-display-ic',   'IC: ' + m.ic);
     set('m-rank-val',     m.rank  || '\u2014');
-    set('m-squad-val',    m.squad ? m.squad + ' Squad' : '\u2014');
+    set('m-squad-val',    m.squad ? 'Squad ' + m.squad : '\u2014');
     set('m-since-val',    m.joined_at ? new Date(m.joined_at).toLocaleDateString('en-MY', { day:'numeric', month:'short', year:'numeric' }) : '\u2014');
     var pfp = localStorage.getItem('bb_pfp_' + ic);
     if (pfp) {
@@ -2067,19 +2103,25 @@ var ADMIN_SECTIONS = ['members','orders','tasks','announcements','badges','galle
 function openAdmin() {
   document.getElementById('admin-overlay').style.display = 'block';
   document.body.style.overflow = 'hidden';
-  if (localStorage.getItem('bb_admin') === '1') {
-    document.getElementById('admin-login-box').style.display = 'none';
-    document.getElementById('admin-panel').style.display     = 'block';
-    backToAdminHome();
-  } else {
-    document.getElementById('admin-login-box').style.display = 'block';
-    document.getElementById('admin-panel').style.display     = 'none';
-  }
+  // Always require password — clear saved session each time
+  localStorage.removeItem('bb_admin');
+  document.getElementById('admin-login-box').style.display = 'block';
+  document.getElementById('admin-panel').style.display     = 'none';
+  var passEl = document.getElementById('admin-pass');
+  if (passEl) { passEl.value = ''; passEl.focus(); }
 }
 
 function closeAdmin() {
   document.getElementById('admin-overlay').style.display = 'none';
   document.body.style.overflow = '';
+}
+
+function logoutAdmin() {
+  localStorage.removeItem('bb_admin');
+  document.getElementById('admin-panel').style.display     = 'none';
+  document.getElementById('admin-login-box').style.display = 'block';
+  var passEl = document.getElementById('admin-pass');
+  if (passEl) { passEl.value = ''; passEl.focus(); }
 }
 
 function adminLogin() {
@@ -2120,13 +2162,14 @@ function switchAdminSection(section) {
 function switchAdminTab(tab) { switchAdminSection(tab); }
 
 function switchOrderSubtab(sub) {
-  ['formbuilder','products','orders'].forEach(function(s) {
+  ['formbuilder','uniform','products','orders'].forEach(function(s) {
     var p = document.getElementById('subpanel-' + s);
     var b = document.getElementById('subtab-' + s);
     if (p) p.style.display = s === sub ? 'block' : 'none';
     if (b) b.classList.toggle('active-subtab', s === sub);
   });
   if (sub === 'formbuilder') renderAdminForms();
+  if (sub === 'uniform')     renderUniformProductsPreview();
   if (sub === 'products')    renderAdminProducts();
   if (sub === 'orders')      renderAdminOrders();
 }
@@ -2173,7 +2216,7 @@ async function renderAdminList() {
     filtered.forEach(function(m) {
       html += '<div class="admin-row" data-edit-ic="' + m.ic + '" style="cursor:pointer;">'
         + '<div style="flex:1;"><div class="admin-name">' + m.name + '</div>'
-        + '<div class="admin-sub">IC: ' + m.ic + ' \xb7 ' + (m.squad ? m.squad + ' Squad' : 'No squad') + ' \xb7 ' + (m.rank||'No rank') + '</div></div>'
+        + '<div class="admin-sub">IC: ' + m.ic + ' \xb7 ' + (m.squad ? 'Squad ' + m.squad : 'No squad') + ' \xb7 ' + (m.rank||'No rank') + '</div></div>'
         + '<div class="admin-rank-badge">' + (m.rank||'\u2014') + '</div>'
         + '<div style="color:#8898bb;font-size:18px;margin-left:8px;">\u203a</div></div>';
     });
