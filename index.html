@@ -3304,7 +3304,7 @@ async function renderAdminBadges() {
     });
   });
   var addCatBtn = document.getElementById('btn-add-cat');
-  if (addCatBtn) addCatBtn.addEventListener('click', async function() {
+  addCatBtn.addEventListener('click', async function() {
     var input = document.getElementById('new-cat-name');
     var name  = input ? input.value.trim() : '';
     if (!name) { alert('Please enter a section name.'); return; }
