@@ -529,10 +529,22 @@
     <div id="badges-logged-in" style="display:none;">
       <div class="page-title">My Badges</div>
       <div class="page-subtitle">Achievement Tracker</div>
-      <div style="background:rgba(200,150,30,0.08);border:1px solid rgba(200,150,30,0.2);border-radius:10px;padding:10px 14px;margin:12px 0 18px;">
+
+      <!-- President's Award tracker -->
+      <div id="presidents-tracker" style="margin-bottom:18px;"></div>
+
+      <!-- Search -->
+      <div style="position:relative;margin-bottom:16px;">
+        <input type="text" id="badge-search" placeholder="🔍 Search badges..." oninput="filterBadges(this.value)"
+          style="width:100%;background:#122040;color:#fff;border:2px solid #2a3a50;border-radius:12px;padding:12px 16px;font-family:'Roboto',sans-serif;font-size:14px;outline:none;box-sizing:border-box;"/>
+      </div>
+
+      <div style="background:rgba(200,150,30,0.08);border:1px solid rgba(200,150,30,0.2);border-radius:10px;padding:10px 14px;margin-bottom:16px;">
         <div style="font-size:11px;color:#c8a870;line-height:1.6;">📝 <strong>Self-reported:</strong> Tick the badges you have earned and enter the date achieved. This is for your own record — it is not automatically verified.</div>
       </div>
+
       <div id="badges-list"></div>
+      <div id="badge-no-results" style="display:none;color:#8898bb;text-align:center;padding:20px;font-size:13px;">No badges match your search.</div>
       <button class="submit-btn gold" onclick="saveBadges()" style="margin-top:8px;">💾 Save Badges</button>
     </div>
   </div>
@@ -1023,10 +1035,46 @@
           <div class="adm-sec-icon" style="background:rgba(200,150,30,0.15);color:var(--gold);">🏅</div>
           <div>
             <div class="adm-section-title">Badges</div>
-            <div class="adm-section-desc">Add sections and badges — visible to all members on their profile</div>
+            <div class="adm-section-desc">Manage badge sections and President's Award requirements</div>
           </div>
         </div>
-        <div id="admin-badges-content"></div>
+
+        <!-- Sub-tabs -->
+        <div style="display:flex;gap:6px;margin-bottom:18px;background:#0a1628;border-radius:10px;padding:5px;border:1px solid rgba(255,255,255,0.06);">
+          <button class="adm-subtab active-subtab" id="subtab-badgedefs"  onclick="switchBadgeSubtab('badgedefs')">🏅 Badges</button>
+          <button class="adm-subtab"               id="subtab-presidentsreqs" onclick="switchBadgeSubtab('presidentsreqs')">🎖️ President's Award</button>
+        </div>
+
+        <!-- Badge defs panel -->
+        <div id="subpanel-badgedefs">
+          <div id="admin-badges-content"></div>
+        </div>
+
+        <!-- President's Award requirements panel -->
+        <div id="subpanel-presidentsreqs" style="display:none;">
+          <div style="background:rgba(200,150,30,0.08);border:1px solid rgba(200,150,30,0.2);border-radius:10px;padding:10px 14px;margin-bottom:16px;">
+            <div style="font-size:12px;color:#c8a870;line-height:1.6;">🎖️ Set which badges are required to earn the <strong>President's Award</strong>. Members see a live progress tracker on their Badges tab.</div>
+          </div>
+          <div id="admin-presidents-reqs-list"></div>
+          <!-- Add new requirement -->
+          <div style="background:#0a1628;border-radius:12px;padding:14px 16px;margin-top:4px;border:1px dashed rgba(200,150,30,0.3);">
+            <div style="font-family:'Oswald',sans-serif;font-size:14px;font-weight:600;color:#8898bb;margin-bottom:12px;">➕ Add Requirement</div>
+            <div class="form-group">
+              <label class="form-label" style="color:#8898bb;">Badge</label>
+              <select id="req-badge-select" style="width:100%;background:#122040;color:#fff;border:1.5px solid #2a3a50;border-radius:8px;padding:10px 12px;font-family:'Roboto',sans-serif;font-size:13px;"></select>
+            </div>
+            <div class="form-group">
+              <label class="form-label" style="color:#8898bb;">Required Level</label>
+              <div style="display:flex;gap:8px;">
+                <button class="ftype-btn ftype-active" id="req-tier-any"      onclick="setReqTier('any')"      style="flex:1;">Any Level</button>
+                <button class="ftype-btn"              id="req-tier-basic"    onclick="setReqTier('basic')"    style="flex:1;">Basic</button>
+                <button class="ftype-btn"              id="req-tier-advanced" onclick="setReqTier('advanced')" style="flex:1;">Advanced</button>
+              </div>
+            </div>
+            <input type="hidden" id="req-tier-val" value="any"/>
+            <button class="submit-btn gold" onclick="addPresidentsReq()" style="margin-top:4px;">+ Add Requirement</button>
+          </div>
+        </div>
       </div>
 
       <!-- ── GALLERY SECTION ────────────────────────── -->
@@ -1152,16 +1200,221 @@ function switchTab(tab, btn) {
 
 function checkBadgesAccess() {
   var ic = localStorage.getItem('bb_current');
-  var gate  = document.getElementById('badges-gate');
+  var gate     = document.getElementById('badges-gate');
   var loggedIn = document.getElementById('badges-logged-in');
   if (!ic) {
-    if (gate) gate.style.display = 'block';
+    if (gate)     gate.style.display = 'block';
     if (loggedIn) loggedIn.style.display = 'none';
   } else {
-    if (gate) gate.style.display = 'none';
+    if (gate)     gate.style.display = 'none';
     if (loggedIn) loggedIn.style.display = 'block';
     loadBadges(ic);
+    renderPresidentsTracker(ic);
   }
+}
+
+// ── President's Award requirements ───────────────────────────────────────
+// Each requirement: { label, badgeIds (any match), tier ('basic'|'advanced'|'any') }
+var DEFAULT_PRESIDENTS_REQS = [
+  { label: 'First Aid (Advanced)',     badgeMatch: 'First Aid',         tier: 'advanced' },
+  { label: 'Leadership (Advanced)',    badgeMatch: 'Leadership',        tier: 'advanced' },
+  { label: 'Best Camper (Advanced)',   badgeMatch: 'Best Camper',       tier: 'advanced' },
+  { label: 'Swimming (any level)',     badgeMatch: 'Swimming',          tier: 'any'      },
+  { label: 'Marching (any level)',     badgeMatch: 'Marching',          tier: 'any'      },
+  { label: 'Community Service',        badgeMatch: 'Community Service', tier: 'any'      },
+  { label: 'Fire Safety',              badgeMatch: 'Fire Safety',       tier: 'any'      },
+];
+
+function getPresidentsReqs() {
+  try { return JSON.parse(localStorage.getItem('bb_presidents_reqs') || 'null') || DEFAULT_PRESIDENTS_REQS; }
+  catch(e) { return DEFAULT_PRESIDENTS_REQS; }
+}
+function savePresidentsReqs(reqs) { localStorage.setItem('bb_presidents_reqs', JSON.stringify(reqs)); }
+
+// Use dynamic reqs everywhere
+var PRESIDENTS_REQS = getPresidentsReqs(); // kept for compatibility, refreshed before use
+
+function switchBadgeSubtab(sub) {
+  ['badgedefs','presidentsreqs'].forEach(function(s) {
+    var p = document.getElementById('subpanel-' + s);
+    var b = document.getElementById('subtab-' + s);
+    if (p) p.style.display = s === sub ? 'block' : 'none';
+    if (b) b.classList.toggle('active-subtab', s === sub);
+  });
+  if (sub === 'badgedefs')     renderAdminBadges();
+  if (sub === 'presidentsreqs') renderAdminPresidentsReqs();
+}
+
+function setReqTier(tier) {
+  var el = document.getElementById('req-tier-val');
+  if (el) el.value = tier;
+  ['any','basic','advanced'].forEach(function(t) {
+    var btn = document.getElementById('req-tier-' + t);
+    if (btn) btn.classList.toggle('ftype-active', t === tier);
+  });
+}
+
+function renderAdminPresidentsReqs() {
+  var reqs      = getPresidentsReqs();
+  var defs      = getBadgeDefs();
+  var container = document.getElementById('admin-presidents-reqs-list');
+  if (!container) return;
+
+  // Populate badge select
+  var sel = document.getElementById('req-badge-select');
+  if (sel) {
+    var opts = '<option value="">-- Select a badge --</option>';
+    var allBadges = defs.filter(function(b) { return b.name !== '(Add badges below)'; });
+    allBadges.forEach(function(b) { opts += '<option value="' + b.name + '">' + b.name + ' (' + b.cat + ')</option>'; });
+    sel.innerHTML = opts;
+  }
+
+  if (!reqs.length) {
+    container.innerHTML = '<div style="color:#8898bb;font-size:13px;text-align:center;padding:20px;">No requirements set. Add one below.</div>';
+    return;
+  }
+
+  var tierColour = { any: '#66bb6a', basic: '#e8b830', advanced: '#ef5350' };
+  var tierLabel  = { any: 'Any Level', basic: 'Basic', advanced: 'Advanced' };
+
+  var html = '';
+  reqs.forEach(function(req, i) {
+    var tc = tierColour[req.tier] || '#888';
+    var tl = tierLabel[req.tier]  || req.tier;
+    html += '<div style="background:#0a1628;border-radius:12px;padding:12px 16px;margin-bottom:8px;border:1px solid rgba(255,255,255,0.06);display:flex;align-items:center;gap:12px;">'
+      + '<div style="width:28px;height:28px;border-radius:50%;background:rgba(200,150,30,0.15);display:flex;align-items:center;justify-content:center;font-family:\'Oswald\',sans-serif;font-size:13px;font-weight:700;color:var(--gold);flex-shrink:0;">' + (i+1) + '</div>'
+      + '<div style="flex:1;">'
+        + '<div style="font-size:13px;color:#fff;font-weight:600;">' + req.badgeMatch + '</div>'
+        + '<span style="font-size:10px;font-weight:700;background:' + tc + '22;color:' + tc + ';border:1px solid ' + tc + '44;padding:2px 8px;border-radius:20px;letter-spacing:1px;text-transform:uppercase;">' + tl + '</span>'
+      + '</div>'
+      + '<button data-del-req="' + i + '" style="background:#3a1a1a;border:1px solid #6a2a2a;color:#f66;padding:5px 12px;border-radius:8px;cursor:pointer;font-size:12px;font-weight:700;">Remove</button>'
+      + '</div>';
+  });
+  container.innerHTML = html;
+
+  container.querySelectorAll('[data-del-req]').forEach(function(btn) {
+    btn.addEventListener('click', function() {
+      var idx  = parseInt(btn.getAttribute('data-del-req'));
+      var reqs = getPresidentsReqs();
+      var name = reqs[idx] ? reqs[idx].badgeMatch : '';
+      if (!confirm('Remove "' + name + '" from requirements?')) return;
+      reqs.splice(idx, 1);
+      savePresidentsReqs(reqs);
+      renderAdminPresidentsReqs();
+    });
+  });
+}
+
+function addPresidentsReq() {
+  var sel  = document.getElementById('req-badge-select');
+  var tier = (document.getElementById('req-tier-val') || {}).value || 'any';
+  var name = sel ? sel.value.trim() : '';
+  if (!name) { alert('Please select a badge.'); return; }
+  var tierLabel = { any: '(any level)', basic: '(Basic)', advanced: '(Advanced)' };
+  var label = name + ' ' + (tierLabel[tier] || '');
+  var reqs  = getPresidentsReqs();
+  if (reqs.some(function(r) { return r.badgeMatch === name && r.tier === tier; })) {
+    alert('This badge and level combination is already a requirement.'); return;
+  }
+  reqs.push({ label: label, badgeMatch: name, tier: tier });
+  savePresidentsReqs(reqs);
+  renderAdminPresidentsReqs();
+  if (sel) sel.value = '';
+  setReqTier('any');
+}
+
+function renderPresidentsTracker(ic) {
+  var container = document.getElementById('presidents-tracker');
+  if (!container) return;
+  var saved = JSON.parse(localStorage.getItem('bb_badges_' + ic) || '{}');
+  var defs  = getBadgeDefs();
+
+  function migrateE(r) {
+    if (!r) return { basic:false, basicDate:'', advanced:false, advancedDate:'' };
+    if (typeof r.earned !== 'undefined') return { basic:r.earned, basicDate:r.date||'', advanced:false, advancedDate:'' };
+    return { basic:r.basic||false, basicDate:r.basicDate||'', advanced:r.advanced||false, advancedDate:r.advancedDate||'' };
+  }
+
+  var results = getPresidentsReqs().map(function(req) {
+    var badge = defs.find(function(b) {
+      return b.name.toLowerCase().indexOf(req.badgeMatch.toLowerCase()) !== -1;
+    });
+    if (!badge) return { label: req.label, done: false };
+    var entry = migrateE(saved[badge.id]);
+    var done = req.tier === 'advanced' ? entry.advanced
+             : req.tier === 'basic'    ? entry.basic
+             : (entry.basic || entry.advanced);
+    return { label: req.label, done: done };
+  });
+
+  var earned   = results.filter(function(r) { return r.done; }).length;
+  var total    = results.length;
+  var pct      = Math.round((earned / total) * 100);
+  var allDone  = earned === total;
+
+  var html = '<div style="background:linear-gradient(135deg,#1a2a40,#0d1e36);border:1.5px solid ' + (allDone ? 'var(--gold)' : 'rgba(200,150,30,0.25)') + ';border-radius:14px;padding:16px 18px;margin-bottom:4px;">';
+
+  // Header
+  html += '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;">';
+  html += '<div style="display:flex;align-items:center;gap:10px;">';
+  html += '<div style="font-size:28px;">' + (allDone ? '🏆' : '🎖️') + '</div>';
+  html += '<div>';
+  html += '<div style="font-family:\'Oswald\',sans-serif;font-size:16px;font-weight:700;color:var(--gold);">President\'s Award</div>';
+  html += '<div style="font-size:11px;color:#8898bb;margin-top:1px;">' + earned + ' of ' + total + ' requirements met</div>';
+  html += '</div></div>';
+  html += '<div style="font-family:\'Oswald\',sans-serif;font-size:22px;font-weight:700;color:' + (allDone ? 'var(--gold)' : '#fff') + ';">' + pct + '%</div>';
+  html += '</div>';
+
+  // Progress bar
+  html += '<div style="background:#0a1628;border-radius:20px;height:10px;overflow:hidden;margin-bottom:14px;">';
+  html += '<div style="height:100%;width:' + pct + '%;border-radius:20px;background:linear-gradient(90deg,var(--accent),var(--gold));transition:width 0.5s ease;"></div>';
+  html += '</div>';
+
+  // Requirements list
+  html += '<div style="display:flex;flex-direction:column;gap:6px;">';
+  results.forEach(function(r) {
+    html += '<div style="display:flex;align-items:center;gap:10px;">';
+    html += '<div style="width:20px;height:20px;border-radius:50%;flex-shrink:0;display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:700;'
+      + (r.done ? 'background:var(--gold);color:var(--navy);' : 'background:#1a2a40;border:2px solid #2a3a50;color:#556;') + '">'
+      + (r.done ? '✓' : '') + '</div>';
+    html += '<div style="font-size:12px;color:' + (r.done ? '#fff' : '#8898bb') + ';' + (r.done ? '' : 'text-decoration:none;') + '">' + r.label + '</div>';
+    if (r.done) html += '<div style="margin-left:auto;font-size:10px;color:var(--gold);font-weight:700;">✓ Done</div>';
+    html += '</div>';
+  });
+  html += '</div>';
+
+  // Completion banner
+  if (allDone) {
+    html += '<div style="background:linear-gradient(135deg,rgba(200,150,30,0.2),rgba(232,184,48,0.1));border:1px solid var(--gold);border-radius:10px;padding:12px 14px;margin-top:14px;text-align:center;">';
+    html += '<div style="font-size:20px;margin-bottom:4px;">🏆</div>';
+    html += '<div style="font-family:\'Oswald\',sans-serif;font-size:16px;font-weight:700;color:var(--gold);">All Requirements Met!</div>';
+    html += '<div style="font-size:12px;color:#c8a870;margin-top:4px;">You are eligible for the President\'s Award. See your officer to confirm.</div>';
+    html += '</div>';
+  }
+
+  html += '</div>';
+  container.innerHTML = html;
+}
+
+function filterBadges(query) {
+  var q = query.toLowerCase().trim();
+  var cats = document.querySelectorAll('#badges-list > div');
+  var anyVisible = false;
+  cats.forEach(function(catDiv) {
+    var badges = catDiv.querySelectorAll('[data-badge-card]');
+    var catLabel = catDiv.querySelector('[data-cat-label]');
+    var catVisible = false;
+    badges.forEach(function(card) {
+      var name = (card.getAttribute('data-badge-name') || '').toLowerCase();
+      var show = !q || name.indexOf(q) !== -1;
+      card.style.display = show ? 'block' : 'none';
+      if (show) { catVisible = true; anyVisible = true; }
+    });
+    if (catLabel) catLabel.style.display = catVisible ? 'block' : 'none';
+    catDiv.style.display = catVisible ? 'block' : 'none';
+  });
+  var noRes = document.getElementById('badge-no-results');
+  if (noRes) noRes.style.display = anyVisible ? 'none' : 'block';
 }
 
 function goToMemberTab() {
@@ -2223,7 +2476,7 @@ function loadBadges(ic) {
     var catBadges = defs.filter(function(b) { return b.cat === cat && b.name !== '(Add badges below)'; });
     if (!catBadges.length) return;
     html += '<div style="margin-bottom:20px;">';
-    html += '<div style="font-size:10px;font-weight:700;letter-spacing:2px;color:var(--gold);text-transform:uppercase;margin-bottom:10px;">' + cat + '</div>';
+    html += '<div data-cat-label="1" style="font-size:10px;font-weight:700;letter-spacing:2px;color:var(--gold);text-transform:uppercase;margin-bottom:10px;">' + cat + '</div>';
 
     catBadges.forEach(function(b) {
       var entry = migrateEntry(saved[b.id]);
@@ -2235,8 +2488,15 @@ function loadBadges(ic) {
       var aBord = entry.advanced ? '#ef5350'               : '#2a3a50';
       var aTxt  = entry.advanced ? '#ef5350'               : '#556';
 
-      html += '<div style="background:#0d1e36;border-radius:10px;padding:12px 14px;margin-bottom:8px;">';
-      html += '<div style="font-size:13px;font-weight:600;color:#fff;margin-bottom:10px;">' + b.name + '</div>';
+      var imgHtml = b.image
+        ? '<img src="' + b.image + '" style="width:36px;height:36px;object-fit:cover;border-radius:8px;flex-shrink:0;border:1px solid rgba(200,150,30,0.3);"/>'
+        : '';
+
+      html += '<div data-badge-card="1" data-badge-name="' + b.name.toLowerCase() + '" style="background:#0d1e36;border-radius:10px;padding:12px 14px;margin-bottom:8px;">';
+      html += '<div style="display:flex;align-items:center;gap:10px;margin-bottom:10px;">'
+        + imgHtml
+        + '<div style="font-size:13px;font-weight:600;color:#fff;">' + b.name + '</div>'
+        + '</div>';
 
       // Basic row
       html += '<div style="display:flex;align-items:center;gap:10px;margin-bottom:' + (b.hasAdvanced ? '6px' : '0') + ';">';
@@ -2285,6 +2545,7 @@ function toggleBadge(badgeId, ic, tier) {
   saved[badgeId] = entry;
   localStorage.setItem('bb_badges_' + ic, JSON.stringify(saved));
   loadBadges(ic);
+  renderPresidentsTracker(ic);
 }
 
 function saveBadges() {
@@ -2301,6 +2562,7 @@ function saveBadges() {
     saved[b.id] = entry;
   });
   localStorage.setItem('bb_badges_' + ic, JSON.stringify(saved));
+  renderPresidentsTracker(ic);
   alert('\u2705 Badges saved!');
 }
 
@@ -2319,11 +2581,19 @@ function renderAdminBadges() {
           var advLabel = b.hasAdvanced
             ? '<span style="font-size:9px;font-weight:700;background:rgba(239,83,80,0.15);color:#ef5350;border:1px solid rgba(239,83,80,0.3);padding:2px 7px;border-radius:20px;margin-left:6px;">Basic + Advanced</span>'
             : '<span style="font-size:9px;color:#556;margin-left:6px;">Basic only</span>';
+          var imgThumb = b.image
+            ? '<img src="' + b.image + '" style="width:32px;height:32px;object-fit:cover;border-radius:6px;border:1px solid rgba(200,150,30,0.3);flex-shrink:0;"/>'
+            : '<div style="width:32px;height:32px;border-radius:6px;background:#122040;border:1px dashed #2a3a50;display:flex;align-items:center;justify-content:center;font-size:14px;flex-shrink:0;">&#127885;</div>';
           return '<div style="display:flex;align-items:center;gap:8px;padding:9px 0;border-bottom:1px solid rgba(255,255,255,0.05);">'
+            + imgThumb
             + '<div style="flex:1;"><span style="font-size:13px;color:#ccc;">' + b.name + '</span>' + advLabel + '</div>'
+            + '<label title="Upload badge image" style="cursor:pointer;background:#1a2a40;border:1px solid #2a3a50;border-radius:7px;padding:5px 8px;font-size:11px;color:#8898bb;white-space:nowrap;position:relative;">'
+              + '&#128247;<input type="file" accept="image/*" data-img-badge="' + b.id + '" style="position:absolute;inset:0;opacity:0;cursor:pointer;width:100%;height:100%;"/>'
+            + '</label>'
+            + (b.image ? '<button data-clear-img="' + b.id + '" title="Remove image" style="background:none;border:none;color:#f66;font-size:12px;cursor:pointer;padding:2px 6px;">&#10005;</button>' : '')
             + '<label style="display:flex;align-items:center;gap:5px;cursor:pointer;font-size:11px;color:#8898bb;white-space:nowrap;">'
-              + '<input type="checkbox" data-toggle-adv="' + b.id + '" ' + (b.hasAdvanced ? 'checked' : '') + ' style="accent-color:#ef5350;cursor:pointer;"/> Has Advanced</label>'
-            + '<button data-del-badge="' + b.id + '" style="background:none;border:none;color:#f66;font-size:14px;cursor:pointer;padding:2px 8px;">\u00d7</button>'
+              + '<input type="checkbox" data-toggle-adv="' + b.id + '" ' + (b.hasAdvanced ? 'checked' : '') + ' style="accent-color:#ef5350;cursor:pointer;"/> Adv</label>'
+            + '<button data-del-badge="' + b.id + '" style="background:none;border:none;color:#f66;font-size:14px;cursor:pointer;padding:2px 6px;">\u00d7</button>'
             + '</div>';
         }).join('')
       : '<div style="font-size:12px;color:#556;padding:6px 0;">No badges yet \u2014 add one below.</div>';
@@ -2348,6 +2618,28 @@ function renderAdminBadges() {
 
   container.innerHTML = html;
 
+  container.querySelectorAll('[data-img-badge]').forEach(function(input) {
+    input.addEventListener('change', function() {
+      var id   = input.getAttribute('data-img-badge');
+      var file = input.files[0];
+      if (!file) return;
+      var reader = new FileReader();
+      reader.onload = function(e) {
+        var defs  = getBadgeDefs();
+        var badge = defs.find(function(b) { return b.id === id; });
+        if (badge) { badge.image = e.target.result; saveBadgeDefs(defs); renderAdminBadges(); }
+      };
+      reader.readAsDataURL(file);
+    });
+  });
+  container.querySelectorAll('[data-clear-img]').forEach(function(btn) {
+    btn.addEventListener('click', function() {
+      var id    = btn.getAttribute('data-clear-img');
+      var defs  = getBadgeDefs();
+      var badge = defs.find(function(b) { return b.id === id; });
+      if (badge) { delete badge.image; saveBadgeDefs(defs); renderAdminBadges(); }
+    });
+  });
   container.querySelectorAll('[data-toggle-adv]').forEach(function(chk) {
     chk.addEventListener('change', function() {
       var id    = chk.getAttribute('data-toggle-adv');
@@ -2460,7 +2752,7 @@ function switchAdminSection(section) {
   if (section === 'uniform')       switchUniformSubtab('products');
   if (section === 'tasks')         switchDeptTab('all');
   if (section === 'announcements') renderAdminAnnList();
-  if (section === 'badges')        renderAdminBadges();
+  if (section === 'badges')        switchBadgeSubtab('badgedefs');
   if (section === 'gallery')       renderGallery();
 }
 
