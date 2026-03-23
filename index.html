@@ -192,6 +192,55 @@
 
   /* Rich editor placeholder */
   [contenteditable][data-placeholder]:empty:before { content:attr(data-placeholder); color:#3a4a62; pointer-events:none; display:block; }
+
+  /* Admin section nav icons/labels */
+  .adm-sec-icon  { width:40px; height:40px; border-radius:10px; display:flex; align-items:center; justify-content:center; font-size:20px; flex-shrink:0; }
+  .adm-sec-title { font-family:'Oswald',sans-serif; font-size:16px; font-weight:700; color:#fff; letter-spacing:0.5px; }
+  .adm-sec-sub   { font-size:12px; color:#5a6a82; margin-top:2px; }
+  .adm-sec-arrow { font-size:22px; color:#3a4a62; transition:all 0.2s; }
+  .adm-section-btn:hover .adm-sec-arrow { color:var(--gold); transform:translateX(3px); }
+
+  /* Uniform order quantity controls */
+  .qty-ctrl    { display:flex; align-items:center; gap:8px; margin-top:6px; }
+  .qty-btn     { width:32px; height:32px; border-radius:8px; border:1.5px solid #2a3a50; background:#0d1a2e; color:#e0e8ff; font-size:18px; font-weight:700; cursor:pointer; display:flex; align-items:center; justify-content:center; transition:all 0.2s; }
+  .qty-btn:hover { border-color:var(--accent); color:var(--gold); }
+  .qty-display { font-family:'Oswald',sans-serif; font-size:22px; font-weight:700; color:var(--gold); min-width:32px; text-align:center; }
+
+  /* Order total */
+  .total-row   { display:flex; justify-content:space-between; align-items:center; padding:10px 0; border-top:1.5px solid rgba(200,150,30,0.25); margin-top:8px; }
+  .total-label { font-family:'Oswald',sans-serif; font-size:16px; font-weight:700; color:#8898bb; text-transform:uppercase; letter-spacing:1px; }
+  .total-val   { font-family:'Oswald',sans-serif; font-size:26px; font-weight:700; color:var(--gold); }
+
+  /* ── TASKS (generated) ───────────────────────────────────────────── */
+  .task-meta     { display:flex; align-items:center; gap:6px; flex-wrap:wrap; margin-top:6px; }
+  .task-pill     { font-size:10px; font-weight:700; padding:2px 8px; border-radius:20px; text-transform:uppercase; letter-spacing:0.5px; }
+  .task-pill.high   { background:rgba(239,83,80,0.15); color:#ef5350; border:1px solid rgba(239,83,80,0.3); }
+  .task-pill.medium { background:rgba(232,184,48,0.15); color:#e8b830; border:1px solid rgba(232,184,48,0.3); }
+  .task-pill.low    { background:rgba(102,187,106,0.15); color:#66bb6a; border:1px solid rgba(102,187,106,0.3); }
+  .task-due      { font-size:11px; color:#8898bb; }
+  .task-due.overdue { color:#ef5350; font-weight:700; }
+  .task-assignee { font-size:11px; color:#6a7a99; }
+  .task-modal    { position:fixed; inset:0; z-index:998; display:flex; align-items:flex-end; justify-content:center; }
+  .task-modal-bg { position:absolute; inset:0; background:rgba(5,10,20,0.8); }
+  .adm-dept-tab    { background:transparent; border:1px solid #2a3a50; color:#5a6a82; font-family:'Oswald',sans-serif; font-size:12px; font-weight:700; padding:6px 14px; border-radius:8px; cursor:pointer; letter-spacing:1px; text-transform:uppercase; transition:all 0.2s; }
+  .adm-dept-tab:hover { color:var(--gold); border-color:var(--accent); }
+  .active-dept-tab { background:rgba(200,150,30,0.1) !important; border-color:var(--accent) !important; color:var(--gold) !important; }
+
+  /* ── FORMS HUB (generated) ───────────────────────────────────────── */
+  .form-card-hub  { background:var(--navy2); border:1px solid rgba(255,255,255,0.07); border-radius:14px; padding:16px; margin-bottom:10px; display:flex; align-items:center; gap:14px; cursor:pointer; transition:all 0.2s; }
+  .form-card-hub:hover { border-color:rgba(200,150,30,0.35); transform:translateY(-1px); box-shadow:0 4px 14px rgba(0,0,0,0.3); }
+  .form-card-icon { width:44px; height:44px; border-radius:12px; display:flex; align-items:center; justify-content:center; font-size:22px; flex-shrink:0; }
+  .form-card-name { font-family:'Oswald',sans-serif; font-size:16px; font-weight:700; color:#fff; margin-bottom:2px; }
+  .form-card-desc { font-size:12px; color:#5a6a82; line-height:1.5; }
+  .form-card-arrow { font-size:22px; color:#3a4a62; margin-left:auto; flex-shrink:0; }
+
+  /* ── UNIFORM ORDER ITEMS (generated) ────────────────────────────── */
+  .uniform-item   { background:var(--navy2); border:1px solid rgba(255,255,255,0.07); border-radius:14px; padding:16px; margin-bottom:10px; transition:border-color 0.2s; }
+  .uniform-item:hover { border-color:rgba(200,150,30,0.25); }
+  .uniform-item-header { display:flex; align-items:center; gap:12px; margin-bottom:12px; }
+  .uniform-icon   { width:52px; height:52px; border-radius:10px; object-fit:cover; background:#1a2a40; flex-shrink:0; display:flex; align-items:center; justify-content:center; font-size:24px; }
+  .uniform-name   { font-family:'Oswald',sans-serif; font-size:17px; font-weight:700; color:#fff; line-height:1.2; }
+  .uniform-price  { font-family:'Oswald',sans-serif; font-size:15px; font-weight:600; color:var(--gold); margin-top:2px; }
 </style>
 </head>
 <body>
@@ -2123,7 +2172,7 @@ function renderBuiltinFormInline(form) {
     }
     fieldsHtml += '<div class="form-group"><label class="form-label">' + f.label + req + '</label>' + inp + '</div>';
   });
-  container.innerHTML = '<div class="card stripe-bg">'
+  container.innerHTML = '<div class="dark-card">'
     + '<button onclick="backToFormsHub()" style="display:flex;align-items:center;gap:6px;background:none;border:none;color:#8898bb;font-family:\'Oswald\',sans-serif;font-size:13px;cursor:pointer;padding:0;margin-bottom:16px;">\u2039 Back to Forms</button>'
     + '<div class="page-title">' + form.name + '</div>'
     + (form.desc ? '<div class="page-desc">' + form.desc + '</div>' : '')
@@ -2169,7 +2218,7 @@ async function submitBuiltinForm(form) {
 function renderUniformOrderInline() {
   var container = document.getElementById('inline-form-view');
   container.innerHTML = '<button onclick="backToFormsHub()" style="display:flex;align-items:center;gap:6px;background:none;border:none;color:#8898bb;font-family:\'Oswald\',sans-serif;font-size:13px;cursor:pointer;padding:0;margin-bottom:16px;">\u2039 Back to Forms</button>'
-    + '<div id="step-form"><div class="card stripe-bg" style="margin-bottom:14px;">'
+    + '<div id="step-form"><div class="dark-card" style="margin-bottom:14px;">'
     + '<div class="page-title">Uniform</div><div class="page-subtitle">Order Form</div><div class="page-desc">Select items &amp; sizes \ud83d\udc54</div>'
     + '<div class="note-box">\u26a0\ufe0f Orders are confirmed by the officer in charge. You will be contacted when ready.</div>'
     + '<div id="uniform-items"></div>'
@@ -2177,7 +2226,7 @@ function renderUniformOrderInline() {
     + '<div class="total-row"><div class="total-label">Estimated Total</div><div class="total-val" id="order-total">RM 0.00</div></div>'
     + '<button class="submit-btn" style="margin-top:14px;" onclick="goToOrderReview()">\ud83d\udc40 Review Order</button>'
     + '</div></div>'
-    + '<div id="step-review" style="display:none;"><div class="card stripe-bg">'
+    + '<div id="step-review" style="display:none;"><div class="dark-card">'
     + '<div class="page-title">Review</div><div class="page-subtitle">Your Order</div><div class="page-desc">Confirm before submitting \ud83d\udc47</div>'
     + '<div style="background:#fff;border-radius:14px;padding:20px;margin-bottom:18px;" id="review-content"></div>'
     + '<div style="background:#0a1628;border:2px dashed rgba(200,150,30,0.4);border-radius:14px;padding:16px;margin-bottom:16px;">'
