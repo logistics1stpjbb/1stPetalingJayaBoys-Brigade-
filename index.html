@@ -129,9 +129,12 @@
 
   /* Announcements */
   .announcement-item { background: var(--navy2); border-radius: 12px; padding: 16px; margin-bottom: 10px; border-left: 4px solid var(--accent); }
-  .ann-date { font-size: 10px; color: var(--gold); font-weight: 700; letter-spacing: 2px; text-transform: uppercase; margin-bottom: 4px; }
-  .ann-title { font-family: 'Oswald', sans-serif; font-size: 18px; font-weight: 600; color: #fff; margin-bottom: 4px; }
-  .ann-body { font-size: 13px; color: #8898bb; line-height: 1.5; }
+  .ann-date { font-size: 10px; color: var(--gold); font-weight: 700; letter-spacing: 2px; text-transform: uppercase; margin-bottom: 6px; }
+  .ann-title { font-family: 'Oswald', sans-serif; font-size: 20px; font-weight: 700; color: #fff; margin-bottom: 8px; }
+  .ann-body { font-size: 14px; color: #d0d8ee; line-height: 1.7; }
+  .ann-body b, .ann-body strong { color: #fff; }
+  .ann-body i, .ann-body em { color: #c8d8f8; }
+  #ann-body-input:empty:before { content: attr(data-placeholder); color: #556; pointer-events: none; }
 
   /* Admin */
   .admin-row { background: var(--navy2); border-radius: 12px; padding: 14px 16px; margin-bottom: 10px; display: flex; align-items: center; gap: 12px; }
@@ -1037,7 +1040,39 @@
         </div>
         <div style="background:#0a1628;border-radius:14px;padding:18px;margin-bottom:14px;border:1px solid rgba(255,255,255,0.08);">
           <div class="form-group"><label class="form-label" style="color:#8898bb;">Title</label><input class="form-input" id="ann-title-input" type="text" placeholder="e.g. Uniform Collection — Sat 10 May" style="background:#122040;color:#fff;border-color:#2a3a50;"/></div>
-          <div class="form-group"><label class="form-label" style="color:#8898bb;">Message</label><textarea class="form-textarea" id="ann-body-input" placeholder="Details..." style="background:#122040;color:#fff;border-color:#2a3a50;"></textarea></div>
+          <div class="form-group">
+            <label class="form-label" style="color:#8898bb;">Message</label>
+            <!-- Toolbar -->
+            <div style="display:flex;gap:4px;flex-wrap:wrap;background:#0a1628;border:1.5px solid #2a3a50;border-bottom:none;border-radius:10px 10px 0 0;padding:8px 10px;">
+              <button type="button" onclick="annFmt('bold')"         title="Bold"          style="background:#1a2a40;border:1px solid #2a3a50;color:#fff;width:32px;height:32px;border-radius:6px;cursor:pointer;font-weight:700;font-size:13px;">B</button>
+              <button type="button" onclick="annFmt('italic')"       title="Italic"        style="background:#1a2a40;border:1px solid #2a3a50;color:#fff;width:32px;height:32px;border-radius:6px;cursor:pointer;font-style:italic;font-size:13px;">I</button>
+              <button type="button" onclick="annFmt('underline')"    title="Underline"     style="background:#1a2a40;border:1px solid #2a3a50;color:#fff;width:32px;height:32px;border-radius:6px;cursor:pointer;text-decoration:underline;font-size:13px;">U</button>
+              <div style="width:1px;background:#2a3a50;margin:0 2px;"></div>
+              <button type="button" onclick="annFmt('insertUnorderedList')" title="Bullet list" style="background:#1a2a40;border:1px solid #2a3a50;color:#fff;width:32px;height:32px;border-radius:6px;cursor:pointer;font-size:14px;">≡</button>
+              <button type="button" onclick="annInsertLine()"        title="Divider"       style="background:#1a2a40;border:1px solid #2a3a50;color:#8898bb;width:32px;height:32px;border-radius:6px;cursor:pointer;font-size:12px;">—</button>
+              <div style="width:1px;background:#2a3a50;margin:0 2px;"></div>
+              <button type="button" onclick="annFontSize('large')"   title="Large text"    style="background:#1a2a40;border:1px solid #2a3a50;color:#fff;width:32px;height:32px;border-radius:6px;cursor:pointer;font-size:15px;font-weight:700;">A</button>
+              <button type="button" onclick="annFontSize('normal')"  title="Normal text"   style="background:#1a2a40;border:1px solid #2a3a50;color:#aaa;width:32px;height:32px;border-radius:6px;cursor:pointer;font-size:12px;">A</button>
+              <div style="width:1px;background:#2a3a50;margin:0 2px;"></div>
+              <!-- Colour picks -->
+              <button type="button" onclick="annColor('#e8b830')" title="Gold"     style="background:#e8b830;border:1px solid #2a3a50;width:28px;height:28px;border-radius:6px;cursor:pointer;align-self:center;"></button>
+              <button type="button" onclick="annColor('#66bb6a')" title="Green"    style="background:#66bb6a;border:1px solid #2a3a50;width:28px;height:28px;border-radius:6px;cursor:pointer;align-self:center;"></button>
+              <button type="button" onclick="annColor('#ef5350')" title="Red"      style="background:#ef5350;border:1px solid #2a3a50;width:28px;height:28px;border-radius:6px;cursor:pointer;align-self:center;"></button>
+              <button type="button" onclick="annColor('#42a5f5')" title="Blue"     style="background:#42a5f5;border:1px solid #2a3a50;width:28px;height:28px;border-radius:6px;cursor:pointer;align-self:center;"></button>
+              <button type="button" onclick="annColor('#fff')"    title="White"    style="background:#fff;border:1px solid #2a3a50;width:28px;height:28px;border-radius:6px;cursor:pointer;align-self:center;"></button>
+              <div style="width:1px;background:#2a3a50;margin:0 2px;"></div>
+              <!-- Emoji picker -->
+              <div style="position:relative;">
+                <button type="button" onclick="toggleAnnEmoji()" id="ann-emoji-btn" title="Emoji" style="background:#1a2a40;border:1px solid #2a3a50;color:#fff;width:32px;height:32px;border-radius:6px;cursor:pointer;font-size:16px;">😊</button>
+                <div id="ann-emoji-picker" style="display:none;position:absolute;top:36px;left:0;background:#122040;border:1px solid #2a3a50;border-radius:10px;padding:10px;width:220px;z-index:99;flex-wrap:wrap;gap:4px;">
+                </div>
+              </div>
+            </div>
+            <!-- Editable area -->
+            <div id="ann-body-input" contenteditable="true"
+              style="min-height:160px;background:#122040;color:#e0e8ff;border:1.5px solid #2a3a50;border-radius:0 0 10px 10px;padding:14px 16px;font-family:'Roboto',sans-serif;font-size:14px;line-height:1.7;outline:none;word-break:break-word;"
+              data-placeholder="Write your announcement here..."></div>
+          </div>
           <button class="submit-btn gold" id="ann-post-btn" onclick="addAnnouncement()">📢 Post Announcement</button>
         </div>
         <div id="admin-ann-list"></div>
@@ -2597,9 +2632,12 @@ function renderAnnouncements() {
   if (!announcements.length) { list.innerHTML = '<div style="color:#8898bb;font-size:13px;text-align:center;padding:20px;">No announcements yet.</div>'; return; }
   var html = '';
   announcements.slice().reverse().forEach(function(a) {
-    // Convert newlines to <br> so formatting is preserved
-    var bodyHtml = (a.body || '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/\n/g,'<br>');
-    html += '<div class="announcement-item"><div class="ann-date">' + a.date + '</div><div class="ann-title">' + a.title + '</div><div class="ann-body" style="white-space:pre-wrap;">' + bodyHtml + '</div></div>';
+    // Body stored as HTML (rich text) — render directly
+    // For legacy plain-text entries, convert newlines to <br>
+    var bodyHtml = (a.body && a.body.indexOf('<') !== -1)
+      ? a.body
+      : (a.body || '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/\n/g,'<br>');
+    html += '<div class="announcement-item"><div class="ann-date">' + a.date + '</div><div class="ann-title">' + a.title + '</div><div class="ann-body">' + bodyHtml + '</div></div>';
   });
   list.innerHTML = html;
 }
@@ -2642,24 +2680,23 @@ function openEditAnnouncement(idx) {
   var a = announcements[idx];
   if (!a) return;
   var ti = document.getElementById('ann-title-input'); if (ti) ti.value = a.title;
-  var bi = document.getElementById('ann-body-input');  if (bi) bi.value = a.body;
+  var bi = document.getElementById('ann-body-input');  if (bi) bi.innerHTML = a.body;
   var btn = document.getElementById('ann-post-btn');
   if (btn) { btn.textContent = '💾 Save Changes'; btn.setAttribute('data-edit-idx', idx); }
-  // Scroll to form
   var form = document.getElementById('ann-title-input');
   if (form) form.scrollIntoView({ behavior: 'smooth' });
 }
 
 function addAnnouncement() {
   var title   = (document.getElementById('ann-title-input') || {}).value || '';
-  var body    = (document.getElementById('ann-body-input')  || {}).value || '';
+  var bodyEl  = document.getElementById('ann-body-input');
+  var body    = bodyEl ? bodyEl.innerHTML.trim() : '';
   var btn     = document.getElementById('ann-post-btn');
   var editIdx = btn ? parseInt(btn.getAttribute('data-edit-idx') || '-1') : -1;
-  title = title.trim(); body = body.trim();
-  if (!title || !body) { alert('Please fill in both title and message.'); return; }
+  title = title.trim();
+  if (!title || !body || body === '<br>') { alert('Please fill in both title and message.'); return; }
   var date = new Date().toLocaleDateString('en-MY', { day:'numeric', month:'short', year:'numeric' }).toUpperCase();
   if (editIdx >= 0) {
-    // Edit existing
     announcements[editIdx].title = title;
     announcements[editIdx].body  = body;
     if (btn) { btn.textContent = '📢 Post Announcement'; btn.removeAttribute('data-edit-idx'); }
@@ -2668,7 +2705,7 @@ function addAnnouncement() {
   }
   localStorage.setItem('bb_announcements', JSON.stringify(announcements));
   var ti = document.getElementById('ann-title-input'); if (ti) ti.value = '';
-  var bi = document.getElementById('ann-body-input');  if (bi) bi.value = '';
+  if (bodyEl) bodyEl.innerHTML = '';
   renderAnnouncements();
   renderAdminAnnList();
 }
@@ -3656,6 +3693,98 @@ async function deleteTask(id) {
 }
 
 function filterAdminTasks(filter) { switchDeptTab(filter); }
+
+// ── Announcement rich text editor ─────────────────────────────────────────
+var _annSavedRange = null;
+
+function annSaveRange() {
+  var sel = window.getSelection();
+  if (sel && sel.rangeCount > 0) _annSavedRange = sel.getRangeAt(0).cloneRange();
+}
+
+function annRestoreRange() {
+  var editor = document.getElementById('ann-body-input');
+  if (!editor) return;
+  editor.focus();
+  if (_annSavedRange) {
+    var sel = window.getSelection();
+    sel.removeAllRanges();
+    sel.addRange(_annSavedRange);
+  }
+}
+
+function annFmt(cmd) {
+  annRestoreRange();
+  document.execCommand(cmd, false, null);
+}
+
+function annFontSize(size) {
+  annRestoreRange();
+  document.execCommand('fontSize', false, size === 'large' ? '5' : '3');
+}
+
+function annColor(col) {
+  annRestoreRange();
+  document.execCommand('foreColor', false, col);
+}
+
+function annInsertLine() {
+  annRestoreRange();
+  document.execCommand('insertHTML', false, '<hr style="border:none;border-top:1px solid rgba(255,255,255,0.15);margin:10px 0;"/>');
+}
+
+var ANN_EMOJIS = [
+  '📢','📌','✅','❌','⚠️','🎉','🏆','📅','🕐','📝','👥','🎖️',
+  '⭐','🔴','🟡','🟢','🔵','💡','🔔','📋','🏅','👔','🛒','📦',
+  '🙏','💪','🔥','❤️','👍','👎','✊','🫡','😊','😄','🥳','🤝'
+];
+
+function toggleAnnEmoji() {
+  var picker = document.getElementById('ann-emoji-picker');
+  if (!picker) return;
+  annSaveRange();
+  if (picker.style.display === 'none' || !picker.style.display) {
+    if (!picker.innerHTML) {
+      picker.style.display = 'flex';
+      var html = '';
+      ANN_EMOJIS.forEach(function(e) {
+        html += '<button type="button" data-emoji="' + e + '" style="background:none;border:none;cursor:pointer;font-size:20px;width:32px;height:32px;border-radius:6px;padding:0;line-height:1;">' + e + '</button>';
+      });
+      picker.innerHTML = html;
+      picker.querySelectorAll('[data-emoji]').forEach(function(btn) {
+        btn.addEventListener('click', function() {
+          annRestoreRange();
+          document.execCommand('insertText', false, btn.getAttribute('data-emoji'));
+          annSaveRange();
+          picker.style.display = 'none';
+        });
+      });
+    } else {
+      picker.style.display = 'flex';
+    }
+    // Close on outside click
+    setTimeout(function() {
+      document.addEventListener('click', function closeEmoji(e) {
+        if (!picker.contains(e.target) && e.target.id !== 'ann-emoji-btn') {
+          picker.style.display = 'none';
+          document.removeEventListener('click', closeEmoji);
+        }
+      });
+    }, 50);
+  } else {
+    picker.style.display = 'none';
+  }
+}
+
+// Save selection range when user clicks in editor
+document.addEventListener('mouseup', function(e) {
+  var editor = document.getElementById('ann-body-input');
+  if (editor && editor.contains(e.target)) annSaveRange();
+});
+document.addEventListener('keyup', function(e) {
+  var editor = document.getElementById('ann-body-input');
+  if (editor && editor.contains(e.target)) annSaveRange();
+});
 
 // ── Init ───────────────────────────────────────────────────────────────────
 window.addEventListener('load', function() {
