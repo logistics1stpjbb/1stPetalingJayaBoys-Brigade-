@@ -166,6 +166,9 @@
   .task-modal-bg { display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.85); z-index: 8888; overflow-y: auto; padding: 30px 16px; }
   .task-modal { max-width: 480px; margin: 0 auto; background: #122040; border-radius: 16px; padding: 24px; border: 1px solid rgba(200,150,30,0.3); }
 
+  .adm-sort-btn { padding:5px 12px;border:1.5px solid #2a3a50;border-radius:20px;background:transparent;color:#8898bb;font-family:'Oswald',sans-serif;font-size:11px;font-weight:700;cursor:pointer;letter-spacing:1px;text-transform:uppercase;transition:all 0.2s; }
+  .adm-sort-btn:hover { border-color:var(--accent);color:var(--gold); }
+  .active-sort { border-color:var(--accent) !important;background:rgba(200,150,30,0.12) !important;color:var(--gold) !important; }
   /* Form builder */
   .ftype-btn { padding:12px 8px;border:2px solid #2a3a50;border-radius:10px;background:#122040;color:#8898bb;font-family:'Oswald',sans-serif;font-size:14px;font-weight:600;cursor:pointer;transition:all 0.2s;text-align:center;line-height:1.4; }
   .ftype-btn:hover { border-color:var(--accent);color:var(--gold); }
@@ -401,8 +404,9 @@
 
       <!-- REGISTER -->
       <div id="auth-register" style="display:none;">
-        <div class="form-group" style="margin-top:20px;"><label class="form-label">Full Name</label><input class="form-input" id="reg-fullname" type="text" placeholder="e.g. Muhammad Asyraf bin Razali"/></div>
+        <div class="form-group"><label class="form-label">Full Name</label><input class="form-input" id="reg-fullname" type="text" placeholder="e.g. Muhammad Asyraf bin Razali"/></div>
         <div class="form-group"><label class="form-label">IC Number (MyKad)</label><input class="form-input" id="reg-ic" type="text" placeholder="e.g. 050123-10-1234"/></div>
+        <div class="form-group"><label class="form-label">Date of Birth</label><input class="form-input" id="reg-dob" type="date"/></div>
         <div class="form-row">
           <div class="form-group">
             <label class="form-label">Rank</label>
@@ -773,9 +777,17 @@
             <div class="adm-section-desc">Add, edit, assign rank, squad and department</div>
           </div>
         </div>
-        <div style="display:flex;gap:8px;margin-bottom:14px;">
-          <input class="form-input" id="admin-search" type="text" placeholder="Search by name or IC..." oninput="renderAdminList()" style="background:#0a1628;color:#fff;border-color:#2a3a50;flex:1;"/>
+        <div style="display:flex;gap:8px;margin-bottom:10px;flex-wrap:wrap;">
+          <input class="form-input" id="admin-search" type="text" placeholder="Search by name or IC..." oninput="renderAdminList()" style="background:#0a1628;color:#fff;border-color:#2a3a50;flex:1;min-width:160px;"/>
           <button class="submit-btn gold" onclick="openAddMember()" style="width:auto;padding:12px 16px;margin-top:0;font-size:14px;white-space:nowrap;">➕ Add</button>
+        </div>
+        <div style="display:flex;gap:6px;margin-bottom:14px;flex-wrap:wrap;">
+          <span style="font-size:11px;color:#556;align-self:center;margin-right:2px;font-weight:700;letter-spacing:1px;">SORT:</span>
+          <button class="adm-sort-btn active-sort" id="sort-name"    onclick="setAdminSort('name')">Name</button>
+          <button class="adm-sort-btn"              id="sort-age"     onclick="setAdminSort('age')">Age</button>
+          <button class="adm-sort-btn"              id="sort-squad"   onclick="setAdminSort('squad')">Squad</button>
+          <button class="adm-sort-btn"              id="sort-rank"    onclick="setAdminSort('rank')">Rank</button>
+          <button class="adm-sort-btn"              id="sort-joined"  onclick="setAdminSort('joined')">Joined</button>
         </div>
         <div id="admin-members-list"></div>
 
@@ -788,6 +800,7 @@
             </div>
             <div class="form-group"><label class="form-label" style="color:#8898bb;">Full Name</label><input class="form-input" id="em-name" type="text" style="background:#0a1628;color:#fff;border-color:#2a3a50;"/></div>
             <div class="form-group"><label class="form-label" style="color:#8898bb;">IC Number</label><input class="form-input" id="em-ic" type="text" style="background:#0a1628;color:#fff;border-color:#2a3a50;"/></div>
+            <div class="form-group"><label class="form-label" style="color:#8898bb;">Date of Birth</label><input class="form-input" id="em-dob" type="date" style="background:#0a1628;color:#fff;border-color:#2a3a50;"/></div>
             <div class="form-row">
               <div class="form-group">
                 <label class="form-label" style="color:#8898bb;">Rank</label>
@@ -815,6 +828,12 @@
               </select>
             </div>
             <div class="form-group"><label class="form-label" style="color:#8898bb;">Member Since</label><input class="form-input" id="em-joined" type="date" style="background:#0a1628;color:#fff;border-color:#2a3a50;"/></div>
+            <div class="form-group"><label class="form-label" style="color:#8898bb;">Years of Service</label>
+              <div style="display:flex;align-items:center;gap:10px;">
+                <input class="form-input" id="em-service-years" type="number" min="0" max="20" placeholder="0" style="background:#0a1628;color:#fff;border-color:#2a3a50;width:100px;"/>
+                <div style="font-size:11px;color:#556;line-height:1.5;">Admin-controlled.<br>Members cannot edit this.</div>
+              </div>
+            </div>
             <input type="hidden" id="em-original-ic"/>
             <div style="display:flex;gap:8px;margin-top:4px;">
               <button class="submit-btn gold" onclick="saveEditMember()" style="margin-top:0;flex:1;">💾 Save</button>
@@ -1342,15 +1361,9 @@ function renderPresidentsTracker(ic) {
   }
 
   function countServiceBadges() {
-    // Count how many "1 Year Service" repeatable badge slots are ticked
-    var count = 0;
-    defs.forEach(function(b) {
-      if (b.repeatable || b.id.indexOf('svc_') === 0) {
-        var e = migrateE(saved[b.id]);
-        if (e.basic || e.advanced) count++;
-      }
-    });
-    return count;
+    // Admin-set years of service — stored in localStorage from Supabase
+    var adminYears = parseInt(localStorage.getItem('bb_member_service') || '0') || 0;
+    return adminYears;
   }
 
   // ── Group A: Drill & Leadership ───────────────────────────────────────
@@ -1531,7 +1544,7 @@ function renderPresidentsTracker(ic) {
   html += '<div style="background:rgba(255,255,255,0.03);border-radius:10px;padding:10px 12px;margin-bottom:' + (allDone ? '12px' : '0') + ';">';
   html += '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px;">';
   html += '<div style="font-size:12px;font-weight:600;color:' + (serviceYears >= 3 ? '#fff' : '#8898bb') + ';">Service Years <span style="font-size:10px;color:#556;">(need 3 for President\'s)</span></div>';
-  html += '<div style="font-family:\'Oswald\',sans-serif;font-size:18px;font-weight:700;color:' + (serviceYears >= 3 ? 'var(--gold)' : '#fff') + ';">' + serviceYears + ' yr' + (serviceYears !== 1 ? 's' : '') + '</div>';
+  html += '<div style="font-family:\'Oswald\',sans-serif;font-size:18px;font-weight:700;color:' + (serviceYears >= 3 ? 'var(--gold)' : '#fff') + ';">' + serviceYears + ' year' + (serviceYears !== 1 ? 's' : '') + '</div>';
   html += '</div>';
   html += '<div style="display:flex;gap:8px;flex-wrap:wrap;">' + svcDots + '</div>';
   html += '</div>';
@@ -2175,6 +2188,7 @@ function togglePassVis(inputId, btnId) {
 async function registerMember() {
   var name     = (document.getElementById('reg-fullname') || {}).value || '';
   var ic       = ((document.getElementById('reg-ic') || {}).value || '').trim().replace(/\s/g,'');
+  var dob      = (document.getElementById('reg-dob') || {}).value || '';
   var rank     = (document.getElementById('reg-rank') || {}).value || '';
   var squad    = (document.getElementById('reg-squad') || {}).value || '';
   var pass     = (document.getElementById('reg-pass') || {}).value || '';
@@ -2184,6 +2198,7 @@ async function registerMember() {
   name = name.trim();
   if (!name)           return alert('Please enter your full name.');
   if (!ic)             return alert('Please enter your IC number.');
+  if (!dob)            return alert('Please enter your date of birth.');
   if (!rank)           return alert('Please select your rank.');
   if (!squad)          return alert('Please select your squad.');
   if (pass.length < 6) return alert('Password must be at least 6 characters.');
@@ -2194,7 +2209,7 @@ async function registerMember() {
     var existing = await supa.get('bb_members?ic=eq.' + encodeURIComponent(ic) + '&select=ic');
     if (existing && existing.length) return alert('An account with this IC already exists.');
     await supa.post('bb_members', {
-      ic: ic, name: name, rank: rank, squad: squad,
+      ic: ic, name: name, rank: rank, squad: squad, date_of_birth: dob,
       password: btoa(pass), security_question: question, security_answer: answer,
       joined_at: new Date().toISOString()
     });
@@ -2236,7 +2251,9 @@ async function renderDashboard() {
     localStorage.setItem('bb_member_rank', m.rank || '');
     set('m-squad-val',    m.squad ? 'Squad ' + m.squad : '\u2014');
     set('m-since-val',    m.joined_at ? new Date(m.joined_at).toLocaleDateString('en-MY', { day:'numeric', month:'short', year:'numeric' }) : '\u2014');
-    localStorage.setItem('bb_member_joined', m.joined_at || '');
+    localStorage.setItem('bb_member_joined',  m.joined_at || '');
+    localStorage.setItem('bb_member_service', m.service_years != null ? String(m.service_years) : '0');
+    localStorage.setItem('bb_member_service', m.service_years != null ? String(m.service_years) : '0');
     var pfp = localStorage.getItem('bb_pfp_' + ic);
     if (pfp) {
       var img = document.getElementById('m-pfp-img');
@@ -2312,6 +2329,7 @@ function logoutMember() {
   localStorage.removeItem('bb_current');
   localStorage.removeItem('bb_member_rank');
   localStorage.removeItem('bb_member_joined');
+  localStorage.removeItem('bb_member_service');
   document.getElementById('tab-tasks').style.display   = 'none';
   var bt = document.getElementById('tab-badges'); if (bt) bt.style.display = 'none';
   document.getElementById('m-auth').style.display     = 'block';
@@ -2592,16 +2610,6 @@ function renderAdminAnnList() {
 // ── Badges ─────────────────────────────────────────────────────────────────
 var DEFAULT_BB_BADGES = [
   { id:'bb1',  name:'BB Enrolment',       cat:'Core',       hasAdvanced:false },
-  { id:'svc_1',  name:'1 Year Service', cat:'Service Years', hasAdvanced:false, repeatable:true },
-  { id:'svc_2',  name:'1 Year Service', cat:'Service Years', hasAdvanced:false, repeatable:true },
-  { id:'svc_3',  name:'1 Year Service', cat:'Service Years', hasAdvanced:false, repeatable:true },
-  { id:'svc_4',  name:'1 Year Service', cat:'Service Years', hasAdvanced:false, repeatable:true },
-  { id:'svc_5',  name:'1 Year Service', cat:'Service Years', hasAdvanced:false, repeatable:true },
-  { id:'svc_6',  name:'1 Year Service', cat:'Service Years', hasAdvanced:false, repeatable:true },
-  { id:'svc_7',  name:'1 Year Service', cat:'Service Years', hasAdvanced:false, repeatable:true },
-  { id:'svc_8',  name:'1 Year Service', cat:'Service Years', hasAdvanced:false, repeatable:true },
-  { id:'svc_9',  name:'1 Year Service', cat:'Service Years', hasAdvanced:false, repeatable:true },
-  { id:'svc_10', name:'1 Year Service', cat:'Service Years', hasAdvanced:false, repeatable:true },
   { id:'bb2',  name:"BB Founder's Award", cat:'Core',       hasAdvanced:false },
   { id:'bb3',  name:"President's Award",  cat:'Core',       hasAdvanced:false },
   { id:'bb4',  name:'First Aid',          cat:'Skills',     hasAdvanced:true  },
@@ -2637,86 +2645,159 @@ function loadBadges(ic) {
   defs.forEach(function(b) { if (cats.indexOf(b.cat) === -1) cats.push(b.cat); });
   if (!cats.length) { container.innerHTML = '<div style="color:#8898bb;font-size:13px;text-align:center;padding:16px;">No badges defined yet.</div>'; return; }
 
-  var html = '';
+  // Service years read-only display
+  var serviceYears = parseInt(localStorage.getItem('bb_member_service') || '0') || 0;
+  var svcHtml = '<div style="background:#0d1e36;border-radius:12px;padding:14px 16px;margin-bottom:20px;border:1px solid rgba(200,150,30,0.2);">'
+    + '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;">'
+    + '<div><div style="font-family:\'Oswald\',sans-serif;font-size:15px;font-weight:700;color:var(--gold);">Service Years</div>'
+    + '<div style="font-size:11px;color:#556;margin-top:2px;">Set by your officer</div></div>'
+    + '<div style="font-family:\'Oswald\',sans-serif;font-size:28px;font-weight:700;color:#fff;">' + serviceYears + '</div>'
+    + '</div>'
+    + '<div style="display:flex;gap:6px;flex-wrap:wrap;">';
+  for (var yi = 1; yi <= Math.max(serviceYears, 3); yi++) {
+    var done = yi <= serviceYears;
+    svcHtml += '<div style="display:flex;flex-direction:column;align-items:center;gap:3px;">'
+      + '<div style="width:32px;height:32px;border-radius:50%;'
+      + (done ? 'background:var(--gold);' : 'background:#1a2a40;border:2px solid #2a3a50;')
+      + 'display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:700;color:'
+      + (done ? 'var(--navy)' : '#556') + ';">' + (done ? yi : '') + '</div>'
+      + '<div style="font-size:9px;color:' + (done ? '#e8b830' : '#556') + ';">Year ' + yi + '</div>'
+      + '</div>';
+  }
+  svcHtml += '</div></div>';
+
+  var html = svcHtml;
+
   cats.forEach(function(cat) {
     var catBadges = defs.filter(function(b) { return b.cat === cat && b.name !== '(Add badges below)'; });
     if (!catBadges.length) return;
     html += '<div style="margin-bottom:20px;">';
     html += '<div data-cat-label="1" style="font-size:10px;font-weight:700;letter-spacing:2px;color:var(--gold);text-transform:uppercase;margin-bottom:10px;">' + cat + '</div>';
 
-    catBadges.forEach(function(b, bi) {
-      var entry = migrateEntry(saved[b.id]);
-      // For repeatable badges, show "Year N"
-      var displayName = b.repeatable
-        ? '1 Year Service <span style="font-size:11px;color:#8898bb;font-weight:400;">— Year ' + (bi + 1) + '</span>'
-        : b.name;
-
-      // For repeatable badges, only show if this is ticked OR it's the next one to earn
-      if (b.repeatable) {
-        var prevTicked = bi === 0 ? true : (function() {
-          var prevBadge = catBadges[bi - 1];
-          var prevEntry = migrateEntry(saved[prevBadge.id]);
-          return prevEntry.basic || prevEntry.advanced;
-        })();
-        var thisTicked = entry.basic || entry.advanced;
-        if (!thisTicked && !prevTicked) return; // hide future years
-      }
-
-      var bBg   = entry.basic    ? 'rgba(200,150,30,0.18)' : 'transparent';
-      var bBord = entry.basic    ? 'var(--gold)'           : '#2a3a50';
-      var bTxt  = entry.basic    ? '#e8b830'               : '#556';
-      var aBg   = entry.advanced ? 'rgba(239,83,80,0.15)'  : 'transparent';
-      var aBord = entry.advanced ? '#ef5350'               : '#2a3a50';
-      var aTxt  = entry.advanced ? '#ef5350'               : '#556';
-
+    catBadges.forEach(function(b) {
       var imgHtml = b.image
         ? '<img src="' + b.image + '" style="width:36px;height:36px;object-fit:cover;border-radius:8px;flex-shrink:0;border:1px solid rgba(200,150,30,0.3);"/>'
         : '';
 
-      html += '<div data-badge-card="1" data-badge-name="' + b.name.toLowerCase() + '" style="background:#0d1e36;border-radius:10px;padding:12px 14px;margin-bottom:8px;">';
-      html += '<div style="display:flex;align-items:center;gap:10px;margin-bottom:10px;">'
-        + imgHtml
-        + '<div style="font-size:13px;font-weight:600;color:#fff;">' + displayName + '</div>'
-        + '</div>';
+      if (b.repeatable) {
+        // Repeatable badge: counter with +/- and one date field per instance
+        var repData = saved[b.id + '_rep'];
+        if (!repData || typeof repData !== 'object' || Array.isArray(repData)) {
+          var old = migrateEntry(saved[b.id]);
+          repData = { count: (old.basic || old.advanced) ? 1 : 0, dates: old.basic ? [old.basicDate] : [] };
+        }
+        var count = repData.count || 0;
+        var dates = repData.dates || [];
 
-      // Basic row
-      html += '<div style="display:flex;align-items:center;gap:10px;margin-bottom:' + (b.hasAdvanced ? '6px' : '0') + ';">';
-      html += '<div data-badge-id="' + b.id + '" data-tier="basic" data-ic="' + ic + '" '
-        + 'style="width:22px;height:22px;border-radius:6px;border:2px solid ' + bBord + ';background:' + bBg + ';'
-        + 'display:flex;align-items:center;justify-content:center;cursor:pointer;flex-shrink:0;font-size:12px;">'
-        + (entry.basic ? '&#10003;' : '') + '</div>';
-      html += '<span style="font-size:11px;font-weight:700;letter-spacing:1px;color:' + bTxt + ';text-transform:uppercase;width:70px;flex-shrink:0;">Basic</span>';
-      html += '<input type="date" id="badge-basic-' + b.id + '" value="' + entry.basicDate + '" '
-        + 'style="flex:1;background:#0a1628;color:#8898bb;border:1px solid #2a3a50;border-radius:7px;padding:4px 8px;font-size:11px;'
-        + (entry.basic ? '' : 'opacity:0.4;') + '"/>';
-      html += '</div>';
+        html += '<div data-badge-card="1" data-badge-name="' + b.name.toLowerCase() + '" style="background:#0d1e36;border-radius:10px;padding:12px 14px;margin-bottom:8px;">';
+        html += '<div style="display:flex;align-items:center;gap:10px;margin-bottom:12px;">'
+          + imgHtml
+          + '<div style="flex:1;font-size:13px;font-weight:600;color:#fff;">' + b.name + '</div>'
+          + '<span style="font-size:9px;font-weight:700;background:rgba(102,187,106,0.15);color:#66bb6a;border:1px solid rgba(102,187,106,0.3);padding:2px 8px;border-radius:20px;">Repeatable</span>'
+          + '</div>';
 
-      // Advanced row (only if hasAdvanced)
-      if (b.hasAdvanced) {
-        html += '<div style="display:flex;align-items:center;gap:10px;">';
-        html += '<div data-badge-id="' + b.id + '" data-tier="advanced" data-ic="' + ic + '" '
-          + 'style="width:22px;height:22px;border-radius:6px;border:2px solid ' + aBord + ';background:' + aBg + ';'
+        // Counter
+        html += '<div style="display:flex;align-items:center;gap:14px;margin-bottom:' + (count > 0 ? '12px' : '0') + ';">';
+        html += '<button data-rep-dec="' + b.id + '" data-ic="' + ic + '" style="width:32px;height:32px;border-radius:50%;background:#1a2a40;border:2px solid #2a3a50;color:#8898bb;font-size:20px;cursor:pointer;display:flex;align-items:center;justify-content:center;flex-shrink:0;">&minus;</button>';
+        html += '<div style="text-align:center;min-width:40px;">'
+          + '<div style="font-family:\'Oswald\',sans-serif;font-size:32px;font-weight:700;color:' + (count > 0 ? 'var(--gold)' : '#2a3a50') + ';line-height:1;">' + count + '</div>'
+          + '<div style="font-size:10px;color:#556;text-transform:uppercase;letter-spacing:1px;margin-top:2px;">earned</div>'
+          + '</div>';
+        html += '<button data-rep-inc="' + b.id + '" data-ic="' + ic + '" style="width:32px;height:32px;border-radius:50%;background:rgba(200,150,30,0.15);border:2px solid rgba(200,150,30,0.35);color:var(--gold);font-size:20px;cursor:pointer;display:flex;align-items:center;justify-content:center;flex-shrink:0;">+</button>';
+        html += '</div>';
+
+        // Date per instance
+        if (count > 0) {
+          html += '<div style="display:flex;flex-direction:column;gap:6px;">';
+          for (var di = 0; di < count; di++) {
+            html += '<div style="display:flex;align-items:center;gap:8px;">'
+              + '<span style="font-size:11px;font-weight:600;color:#8898bb;width:52px;flex-shrink:0;">Year ' + (di+1) + '</span>'
+              + '<input type="date" id="badge-rep-' + b.id + '-' + di + '" value="' + (dates[di]||'') + '" '
+              + 'style="flex:1;background:#0a1628;color:#8898bb;border:1px solid #2a3a50;border-radius:7px;padding:4px 8px;font-size:11px;"/>'
+              + '</div>';
+          }
+          html += '</div>';
+        }
+
+        html += '</div>';
+
+      } else {
+        // Normal badge
+        var entry = migrateEntry(saved[b.id]);
+        var bBg   = entry.basic    ? 'rgba(200,150,30,0.18)' : 'transparent';
+        var bBord = entry.basic    ? 'var(--gold)'           : '#2a3a50';
+        var bTxt  = entry.basic    ? '#e8b830'               : '#556';
+        var aBg   = entry.advanced ? 'rgba(239,83,80,0.15)'  : 'transparent';
+        var aBord = entry.advanced ? '#ef5350'               : '#2a3a50';
+        var aTxt  = entry.advanced ? '#ef5350'               : '#556';
+
+        html += '<div data-badge-card="1" data-badge-name="' + b.name.toLowerCase() + '" style="background:#0d1e36;border-radius:10px;padding:12px 14px;margin-bottom:8px;">';
+        html += '<div style="display:flex;align-items:center;gap:10px;margin-bottom:10px;">'
+          + imgHtml
+          + '<div style="font-size:13px;font-weight:600;color:#fff;">' + b.name + '</div>'
+          + '</div>';
+
+        html += '<div style="display:flex;align-items:center;gap:10px;margin-bottom:' + (b.hasAdvanced ? '6px' : '0') + ';">';
+        html += '<div data-badge-id="' + b.id + '" data-tier="basic" data-ic="' + ic + '" '
+          + 'style="width:22px;height:22px;border-radius:6px;border:2px solid ' + bBord + ';background:' + bBg + ';'
           + 'display:flex;align-items:center;justify-content:center;cursor:pointer;flex-shrink:0;font-size:12px;">'
-          + (entry.advanced ? '&#10003;' : '') + '</div>';
-        html += '<span style="font-size:11px;font-weight:700;letter-spacing:1px;color:' + aTxt + ';text-transform:uppercase;width:70px;flex-shrink:0;">Advanced</span>';
-        html += '<input type="date" id="badge-adv-' + b.id + '" value="' + entry.advancedDate + '" '
+          + (entry.basic ? '&#10003;' : '') + '</div>';
+        html += '<span style="font-size:11px;font-weight:700;letter-spacing:1px;color:' + bTxt + ';text-transform:uppercase;width:70px;flex-shrink:0;">Basic</span>';
+        html += '<input type="date" id="badge-basic-' + b.id + '" value="' + entry.basicDate + '" '
           + 'style="flex:1;background:#0a1628;color:#8898bb;border:1px solid #2a3a50;border-radius:7px;padding:4px 8px;font-size:11px;'
-          + (entry.advanced ? '' : 'opacity:0.4;') + '"/>';
+          + (entry.basic ? '' : 'opacity:0.4;') + '"/>';
+        html += '</div>';
+
+        if (b.hasAdvanced) {
+          html += '<div style="display:flex;align-items:center;gap:10px;">';
+          html += '<div data-badge-id="' + b.id + '" data-tier="advanced" data-ic="' + ic + '" '
+            + 'style="width:22px;height:22px;border-radius:6px;border:2px solid ' + aBord + ';background:' + aBg + ';'
+            + 'display:flex;align-items:center;justify-content:center;cursor:pointer;flex-shrink:0;font-size:12px;">'
+            + (entry.advanced ? '&#10003;' : '') + '</div>';
+          html += '<span style="font-size:11px;font-weight:700;letter-spacing:1px;color:' + aTxt + ';text-transform:uppercase;width:70px;flex-shrink:0;">Advanced</span>';
+          html += '<input type="date" id="badge-adv-' + b.id + '" value="' + entry.advancedDate + '" '
+            + 'style="flex:1;background:#0a1628;color:#8898bb;border:1px solid #2a3a50;border-radius:7px;padding:4px 8px;font-size:11px;'
+            + (entry.advanced ? '' : 'opacity:0.4;') + '"/>';
+          html += '</div>';
+        }
+
         html += '</div>';
       }
-
-      html += '</div>';
     });
     html += '</div>';
   });
 
   container.innerHTML = html;
+
   container.querySelectorAll('[data-badge-id]').forEach(function(el) {
     el.addEventListener('click', function() {
       toggleBadge(el.getAttribute('data-badge-id'), el.getAttribute('data-ic'), el.getAttribute('data-tier'));
     });
   });
+  container.querySelectorAll('[data-rep-inc]').forEach(function(btn) {
+    btn.addEventListener('click', function() { adjustRepBadge(btn.getAttribute('data-rep-inc'), btn.getAttribute('data-ic'), 1); });
+  });
+  container.querySelectorAll('[data-rep-dec]').forEach(function(btn) {
+    btn.addEventListener('click', function() { adjustRepBadge(btn.getAttribute('data-rep-dec'), btn.getAttribute('data-ic'), -1); });
+  });
 }
+
+function adjustRepBadge(badgeId, ic, delta) {
+  var saved   = JSON.parse(localStorage.getItem('bb_badges_' + ic) || '{}');
+  var repData = saved[badgeId + '_rep'];
+  if (!repData || typeof repData !== 'object' || Array.isArray(repData)) {
+    var old = migrateEntry(saved[badgeId]);
+    repData = { count: (old.basic || old.advanced) ? 1 : 0, dates: old.basic ? [old.basicDate] : [] };
+  }
+  var newCount = Math.max(0, (repData.count || 0) + delta);
+  var dates    = (repData.dates || []).slice(0, newCount);
+  while (dates.length < newCount) dates.push('');
+  saved[badgeId + '_rep'] = { count: newCount, dates: dates };
+  localStorage.setItem('bb_badges_' + ic, JSON.stringify(saved));
+  loadBadges(ic);
+  renderPresidentsTracker(ic);
+}
+
 
 function toggleBadge(badgeId, ic, tier) {
   var saved = JSON.parse(localStorage.getItem('bb_badges_' + ic) || '{}');
@@ -2735,12 +2816,24 @@ function saveBadges() {
   var defs  = getBadgeDefs();
   var saved = JSON.parse(localStorage.getItem('bb_badges_' + ic) || '{}');
   defs.forEach(function(b) {
-    var entry = migrateEntry(saved[b.id]);
-    var bd = document.getElementById('badge-basic-' + b.id);
-    var ad = document.getElementById('badge-adv-'   + b.id);
-    if (bd) entry.basicDate    = bd.value;
-    if (ad) entry.advancedDate = ad.value;
-    saved[b.id] = entry;
+    if (b.repeatable) {
+      // Save repeatable dates
+      var repData = saved[b.id + '_rep'] || { count: 0, dates: [] };
+      var newDates = [];
+      for (var di = 0; di < repData.count; di++) {
+        var el = document.getElementById('badge-rep-' + b.id + '-' + di);
+        newDates.push(el ? el.value : '');
+      }
+      repData.dates = newDates;
+      saved[b.id + '_rep'] = repData;
+    } else {
+      var entry = migrateEntry(saved[b.id]);
+      var bd = document.getElementById('badge-basic-' + b.id);
+      var ad = document.getElementById('badge-adv-'   + b.id);
+      if (bd) entry.basicDate    = bd.value;
+      if (ad) entry.advancedDate = ad.value;
+      saved[b.id] = entry;
+    }
   });
   localStorage.setItem('bb_badges_' + ic, JSON.stringify(saved));
   renderPresidentsTracker(ic);
@@ -2762,17 +2855,22 @@ function renderAdminBadges() {
           var advLabel = b.hasAdvanced
             ? '<span style="font-size:9px;font-weight:700;background:rgba(239,83,80,0.15);color:#ef5350;border:1px solid rgba(239,83,80,0.3);padding:2px 7px;border-radius:20px;margin-left:6px;">Basic + Advanced</span>'
             : '<span style="font-size:9px;color:#556;margin-left:6px;">Basic only</span>';
+          var repLabel = b.repeatable
+            ? '<span style="font-size:9px;font-weight:700;background:rgba(102,187,106,0.15);color:#66bb6a;border:1px solid rgba(102,187,106,0.3);padding:2px 7px;border-radius:20px;margin-left:4px;">Repeatable</span>'
+            : '';
           var imgThumb = b.image
             ? '<img src="' + b.image + '" style="width:32px;height:32px;object-fit:cover;border-radius:6px;border:1px solid rgba(200,150,30,0.3);flex-shrink:0;"/>'
             : '<div style="width:32px;height:32px;border-radius:6px;background:#122040;border:1px dashed #2a3a50;display:flex;align-items:center;justify-content:center;font-size:14px;flex-shrink:0;">&#127885;</div>';
           return '<div style="display:flex;align-items:center;gap:8px;padding:9px 0;border-bottom:1px solid rgba(255,255,255,0.05);">'
             + imgThumb
-            + '<div style="flex:1;"><span style="font-size:13px;color:#ccc;">' + b.name + '</span>' + advLabel + '</div>'
+            + '<div style="flex:1;"><span style="font-size:13px;color:#ccc;">' + b.name + '</span>' + advLabel + repLabel + '</div>'
             + '<label title="Upload badge image" style="cursor:pointer;background:#1a2a40;border:1px solid #2a3a50;border-radius:7px;padding:5px 8px;font-size:11px;color:#8898bb;white-space:nowrap;position:relative;">'
               + '&#128247;<input type="file" accept="image/*" data-img-badge="' + b.id + '" style="position:absolute;inset:0;opacity:0;cursor:pointer;width:100%;height:100%;"/>'
             + '</label>'
             + (b.image ? '<button data-clear-img="' + b.id + '" title="Remove image" style="background:none;border:none;color:#f66;font-size:12px;cursor:pointer;padding:2px 6px;">&#10005;</button>' : '')
-            + '<label style="display:flex;align-items:center;gap:5px;cursor:pointer;font-size:11px;color:#8898bb;white-space:nowrap;">'
+            + '<label style="display:flex;align-items:center;gap:4px;cursor:pointer;font-size:11px;color:#66bb6a;white-space:nowrap;">'
+              + '<input type="checkbox" data-toggle-rep="' + b.id + '" ' + (b.repeatable ? 'checked' : '') + ' style="accent-color:#66bb6a;cursor:pointer;"/> Rep</label>'
+            + '<label style="display:flex;align-items:center;gap:4px;cursor:pointer;font-size:11px;color:#8898bb;white-space:nowrap;">'
               + '<input type="checkbox" data-toggle-adv="' + b.id + '" ' + (b.hasAdvanced ? 'checked' : '') + ' style="accent-color:#ef5350;cursor:pointer;"/> Adv</label>'
             + '<button data-del-badge="' + b.id + '" style="background:none;border:none;color:#f66;font-size:14px;cursor:pointer;padding:2px 6px;">\u00d7</button>'
             + '</div>';
@@ -2821,6 +2919,14 @@ function renderAdminBadges() {
       if (badge) { delete badge.image; saveBadgeDefs(defs); renderAdminBadges(); }
     });
   });
+  container.querySelectorAll('[data-toggle-rep]').forEach(function(chk) {
+    chk.addEventListener('change', function() {
+      var id    = chk.getAttribute('data-toggle-rep');
+      var defs  = getBadgeDefs();
+      var badge = defs.find(function(b) { return b.id === id; });
+      if (badge) { badge.repeatable = chk.checked; saveBadgeDefs(defs); renderAdminBadges(); }
+    });
+  });
   container.querySelectorAll('[data-toggle-adv]').forEach(function(chk) {
     chk.addEventListener('change', function() {
       var id    = chk.getAttribute('data-toggle-adv');
@@ -2854,7 +2960,7 @@ function renderAdminBadges() {
       var name  = input ? input.value.trim() : '';
       if (!name) { alert('Please enter a badge name.'); return; }
       var defs  = getBadgeDefs().filter(function(b) { return !(b.cat === cat && b.name === '(Add badges below)'); });
-      defs.push({ id: 'b_' + Date.now(), name: name, cat: cat, hasAdvanced: false });
+      defs.push({ id: 'b_' + Date.now(), name: name, cat: cat, hasAdvanced: false, repeatable: false });
       saveBadgeDefs(defs);
       if (input) input.value = '';
       renderAdminBadges();
@@ -2988,27 +3094,95 @@ function toggleTaskForm() {
 }
 
 // ── Admin Members ─────────────────────────────────────────────────────────
+var _adminSortBy = 'name';
+
+function calcAge(dob) {
+  if (!dob) return null;
+  var today = new Date();
+  var birth = new Date(dob);
+  var age   = today.getFullYear() - birth.getFullYear();
+  var m     = today.getMonth() - birth.getMonth();
+  if (m < 0 || (m === 0 && today.getDate() < birth.getDate())) age--;
+  return age;
+}
+
+var RANK_ORDER = ['Recruit','Private','Lance Corporal','Corporal','Sergeant','Staff Sergeant'];
+
+function setAdminSort(by) {
+  _adminSortBy = by;
+  ['name','age','squad','rank','joined'].forEach(function(s) {
+    var btn = document.getElementById('sort-' + s);
+    if (btn) btn.classList.toggle('active-sort', s === by);
+  });
+  renderAdminList();
+}
+
 async function renderAdminList() {
   var search = ((document.getElementById('admin-search') || {}).value || '').toLowerCase();
   var list   = document.getElementById('admin-members-list');
   if (!list) return;
   list.innerHTML = '<div style="color:#888;text-align:center;padding:20px;"><span class="spinner"></span> Loading...</div>';
   try {
-    var members = await supa.get('bb_members?select=*&order=joined_at.desc');
+    var members = await supa.get('bb_members?select=*&order=name.asc');
     var filtered = members.filter(function(m) {
       return (m.name||'').toLowerCase().includes(search) || (m.ic||'').includes(search);
     });
     if (!filtered.length) { list.innerHTML = '<div style="color:#666;text-align:center;padding:20px;">No members found.</div>'; return; }
+
+    // Sort
+    filtered.sort(function(a, b) {
+      if (_adminSortBy === 'age') {
+        var aa = calcAge(a.date_of_birth), ba = calcAge(b.date_of_birth);
+        if (aa === null && ba === null) return 0;
+        if (aa === null) return 1;
+        if (ba === null) return -1;
+        return aa - ba;
+      }
+      if (_adminSortBy === 'squad') {
+        var sq = (a.squad||'').localeCompare(b.squad||'');
+        return sq !== 0 ? sq : (a.name||'').localeCompare(b.name||'');
+      }
+      if (_adminSortBy === 'rank') {
+        var ri = RANK_ORDER.indexOf(a.rank||''), rj = RANK_ORDER.indexOf(b.rank||'');
+        if (ri === -1) ri = 99; if (rj === -1) rj = 99;
+        return ri - rj;
+      }
+      if (_adminSortBy === 'joined') {
+        return (a.joined_at||'').localeCompare(b.joined_at||'');
+      }
+      return (a.name||'').localeCompare(b.name||'');
+    });
+
     window._adminMembers = {};
     filtered.forEach(function(m) { window._adminMembers[m.ic] = m; });
+
+    // Group headers when sorting by squad
+    var lastSquad = null;
     var html = '';
     filtered.forEach(function(m) {
+      var age    = calcAge(m.date_of_birth);
+      var ageStr = age !== null ? age + ' years' : '\u2014';
+
+      if (_adminSortBy === 'squad') {
+        var sq = m.squad || 'No Squad';
+        if (sq !== lastSquad) {
+          html += '<div style="font-family:\'Oswald\',sans-serif;font-size:11px;font-weight:700;color:var(--gold);letter-spacing:2px;text-transform:uppercase;padding:10px 4px 4px;">Squad ' + sq + '</div>';
+          lastSquad = sq;
+        }
+      }
+
       html += '<div class="admin-row" data-edit-ic="' + m.ic + '" style="cursor:pointer;">'
-        + '<div style="flex:1;"><div class="admin-name">' + m.name + '</div>'
-        + '<div class="admin-sub">IC: ' + m.ic + ' \xb7 ' + (m.squad ? 'Squad ' + m.squad : 'No squad') + ' \xb7 ' + (m.rank||'No rank') + '</div></div>'
-        + '<div class="admin-rank-badge">' + (m.rank||'\u2014') + '</div>'
+        + '<div style="flex:1;">'
+          + '<div class="admin-name">' + m.name + '</div>'
+          + '<div class="admin-sub">IC: ' + m.ic + ' \xb7 ' + (m.squad ? 'Squad ' + m.squad : 'No squad') + ' \xb7 ' + (m.rank||'No rank') + '</div>'
+        + '</div>'
+        + '<div style="text-align:right;flex-shrink:0;">'
+          + '<div class="admin-rank-badge">' + (m.rank||'\u2014') + '</div>'
+          + '<div style="font-size:11px;color:#8898bb;margin-top:3px;">' + ageStr + '</div>'
+        + '</div>'
         + '<div style="color:#8898bb;font-size:18px;margin-left:8px;">\u203a</div></div>';
     });
+
     list.innerHTML = html;
     list.querySelectorAll('[data-edit-ic]').forEach(function(row) {
       row.addEventListener('click', function() { openEditMember(row.getAttribute('data-edit-ic')); });
@@ -3017,7 +3191,7 @@ async function renderAdminList() {
 }
 
 function openAddMember() {
-  ['em-name','em-ic','em-joined'].forEach(function(id) { var el = document.getElementById(id); if (el) el.value = ''; });
+  ['em-name','em-ic','em-joined','em-service-years','em-dob'].forEach(function(id) { var el = document.getElementById(id); if (el) el.value = ''; });
   ['em-rank','em-squad','em-dept'].forEach(function(id) { var el = document.getElementById(id); if (el) el.value = ''; });
   var ic = document.getElementById('em-ic'); if (ic) ic.readOnly = false;
   var ti = document.getElementById('em-modal-title'); if (ti) ti.textContent = '\u2795 Add New Member';
@@ -3034,7 +3208,9 @@ function openEditMember(ic) {
   set('em-rank',  m.rank);
   set('em-squad', m.squad);
   set('em-dept',  m.department);
-  set('em-joined', m.joined_at ? m.joined_at.slice(0,10) : '');
+  set('em-joined',       m.joined_at    ? m.joined_at.slice(0,10)    : '');
+  set('em-dob',          m.date_of_birth ? m.date_of_birth.slice(0,10) : '');
+  set('em-service-years', m.service_years != null ? m.service_years : '');
   set('em-original-ic', m.ic);
   var icEl = document.getElementById('em-ic'); if (icEl) icEl.readOnly = true;
   var ti   = document.getElementById('em-modal-title'); if (ti) ti.textContent = '\u270f\ufe0f Edit Member';
@@ -3051,19 +3227,25 @@ async function saveEditMember() {
   var rank       = (document.getElementById('em-rank') || {}).value || '';
   var squad      = (document.getElementById('em-squad') || {}).value || '';
   var department = (document.getElementById('em-dept') || {}).value || '';
-  var joinedRaw  = (document.getElementById('em-joined') || {}).value || '';
-  var joined_at  = joinedRaw ? new Date(joinedRaw).toISOString() : null;
+  var joinedRaw     = (document.getElementById('em-joined') || {}).value || '';
+  var joined_at     = joinedRaw ? new Date(joinedRaw).toISOString() : null;
+  var dobRaw        = (document.getElementById('em-dob') || {}).value || '';
+  var date_of_birth = dobRaw || null;
+  var serviceYrsRaw = (document.getElementById('em-service-years') || {}).value;
+  var service_years = serviceYrsRaw !== '' ? parseInt(serviceYrsRaw) || 0 : null;
   if (!name) return alert('Name cannot be empty.');
   if (!ic)   return alert('IC number cannot be empty.');
   try {
     if (!originalIc) {
       var existing = await supa.get('bb_members?ic=eq.' + encodeURIComponent(ic) + '&select=ic');
       if (existing && existing.length) return alert('A member with this IC already exists.');
-      await supa.post('bb_members', { ic: ic, name: name, rank: rank, squad: squad, department: department, password: btoa(ic), joined_at: joined_at || new Date().toISOString() });
+      await supa.post('bb_members', { ic: ic, name: name, rank: rank, squad: squad, department: department, date_of_birth: date_of_birth, password: btoa(ic), joined_at: joined_at || new Date().toISOString(), service_years: service_years || 0 });
       alert('\u2705 Member added!\n\nDefault password is their IC number: ' + ic);
     } else {
       var updates = { name: name, rank: rank, squad: squad, department: department };
-      if (joined_at) updates.joined_at = joined_at;
+      if (joined_at)     updates.joined_at     = joined_at;
+      if (date_of_birth) updates.date_of_birth = date_of_birth;
+      if (service_years !== null) updates.service_years = service_years;
       await supa.patch('bb_members?ic=eq.' + encodeURIComponent(originalIc), updates);
       alert('\u2705 Member updated!');
     }
