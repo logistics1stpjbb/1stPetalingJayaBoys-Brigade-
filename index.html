@@ -30,7 +30,7 @@
   .nav-logo .bb-badge { background:linear-gradient(135deg,var(--accent),var(--gold)); color:var(--navy); font-family:'Oswald',sans-serif; font-size:13px; font-weight:700; width:36px; height:36px; border-radius:8px; display:flex; align-items:center; justify-content:center; letter-spacing:1px; box-shadow:0 2px 10px rgba(200,150,30,0.5); flex-shrink:0; }
   .nav-logo .nav-name { font-family:'Oswald',sans-serif; font-size:13px; font-weight:600; color:var(--white); letter-spacing:1px; line-height:1.2; }
   .nav-logo .nav-sub  { font-size:9px; color:var(--accent); letter-spacing:2px; font-weight:500; text-transform:uppercase; }
-  .tab-btn { background:none; border:none; color:#5a6a88; font-family:'Oswald',sans-serif; font-size:12px; font-weight:600; letter-spacing:1px; text-transform:uppercase; padding:16px 13px; cursor:pointer; border-bottom:3px solid transparent; transition:all 0.2s; white-space:nowrap; flex-shrink:0; }
+  .tab-btn { background:none; border:none; color:#5a6a88; font-family:'Oswald',sans-serif; font-size:11px; font-weight:600; letter-spacing:0.5px; text-transform:uppercase; padding:16px 10px; cursor:pointer; border-bottom:3px solid transparent; transition:all 0.2s; white-space:nowrap; flex-shrink:0; }
   .tab-btn:hover { color:var(--white); }
   .tab-btn.active { color:var(--gold); border-bottom:3px solid var(--gold); }
 
@@ -259,7 +259,7 @@
     <button class="tab-btn" id="tab-order" onclick="switchTab('order',this)">📋 Forms</button>
     <button class="tab-btn" id="tab-member" onclick="switchTab('member',this)">🪪 Member</button>
     <button class="tab-btn" id="tab-tasks" onclick="switchTab('tasks',this)" style="display:none;">✅ Tasks</button>
-    <button class="tab-btn" id="tab-badges" onclick="switchTab('badges',this)" style="display:none;">&#127885; Badges</button>
+    <button class="tab-btn" id="tab-badges" onclick="switchTab('badges',this)" style="display:none;">🏅 Badges</button>
   </div>
 </nav>
 
@@ -611,16 +611,18 @@
     </div>
 
     <!-- Task detail modal -->
-    <div class="task-modal-bg" id="task-detail-modal">
-      <div class="task-modal">
-        <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:16px;">
-          <div style="font-family:'Oswald',sans-serif;font-size:20px;font-weight:700;color:#fff;flex:1;line-height:1.3;" id="tdm-title"></div>
-          <button onclick="closeTaskDetail()" style="background:#1a2a40;border:1px solid #2a3a50;color:#fff;padding:5px 12px;border-radius:8px;cursor:pointer;margin-left:12px;flex-shrink:0;">✕</button>
+    <div id="task-detail-modal" style="display:none;position:fixed;inset:0;z-index:998;">
+      <div class="task-modal-bg" onclick="closeTaskDetail()"></div>
+      <div style="position:absolute;bottom:0;left:0;right:0;max-width:620px;margin:0 auto;background:#111e35;border-radius:20px 20px 0 0;border:1px solid rgba(200,150,30,0.2);padding:22px 20px 36px;box-shadow:0 -8px 40px rgba(0,0,0,0.6);">
+        <div style="width:36px;height:4px;background:rgba(255,255,255,0.15);border-radius:4px;margin:0 auto 20px;"></div>
+        <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:14px;">
+          <div style="font-family:'Oswald',sans-serif;font-size:22px;font-weight:700;color:#fff;flex:1;line-height:1.3;" id="tdm-title"></div>
+          <button onclick="closeTaskDetail()" style="background:rgba(255,255,255,0.07);border:none;color:#8898bb;padding:6px 12px;border-radius:8px;cursor:pointer;margin-left:12px;flex-shrink:0;font-size:18px;">✕</button>
         </div>
         <div id="tdm-meta" style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:14px;"></div>
-        <div style="font-size:13px;color:#8898bb;line-height:1.7;margin-bottom:16px;" id="tdm-desc"></div>
-        <div style="background:#0a1628;border-radius:10px;padding:12px 14px;">
-          <div style="display:flex;justify-content:space-between;font-size:11px;color:#556;text-transform:uppercase;letter-spacing:1px;margin-bottom:8px;">
+        <div style="font-size:14px;color:#c0d0e8;line-height:1.7;margin-bottom:16px;" id="tdm-desc"></div>
+        <div style="background:#0a1628;border-radius:12px;padding:14px 16px;margin-bottom:14px;">
+          <div style="display:flex;justify-content:space-between;font-size:10px;color:#556;text-transform:uppercase;letter-spacing:1.5px;margin-bottom:8px;font-weight:700;">
             <span>Assigned To</span><span>Due Date</span>
           </div>
           <div style="display:flex;justify-content:space-between;align-items:center;">
@@ -628,6 +630,7 @@
             <div style="font-family:'Oswald',sans-serif;font-size:15px;color:#fff;" id="tdm-due">—</div>
           </div>
         </div>
+        <div id="tdm-status-btns" style="display:flex;gap:8px;flex-wrap:wrap;"></div>
       </div>
     </div>
 
@@ -2511,7 +2514,7 @@ async function renderTasksBoard(dept) {
     var html = '';
     cols[status].forEach(function(t) {
       window._taskMap[t.id] = t;
-      var pc = t.priority === 'high' ? 'prio-high' : t.priority === 'low' ? 'prio-low' : 'prio-medium';
+      var pc = t.priority === 'high' ? 'high' : t.priority === 'low' ? 'low' : 'medium';
       var pl = (t.priority || 'medium').charAt(0).toUpperCase() + (t.priority || 'medium').slice(1);
       var dueHtml = '';
       if (t.due_date) {
@@ -2554,8 +2557,13 @@ function openTaskDetail(id) {
   var t = (window._taskMap && window._taskMap[id]) || {};
   var set = function(elId, val) { var el = document.getElementById(elId); if (el) el.textContent = val; };
   set('tdm-title', t.title || '');
-  set('tdm-desc',  t.description || 'No description.');
-  var pc = t.priority === 'high' ? 'prio-high' : t.priority === 'low' ? 'prio-low' : 'prio-medium';
+  // Description — support rich text
+  var descEl = document.getElementById('tdm-desc');
+  if (descEl) {
+    var desc = t.description || '';
+    descEl.innerHTML = (desc && desc.indexOf('<') !== -1) ? desc : (desc || '<span style="color:#556;">No description.</span>');
+  }
+  var pc = t.priority === 'high' ? 'high' : t.priority === 'low' ? 'low' : 'medium';
   var pl = (t.priority || 'medium').charAt(0).toUpperCase() + (t.priority || 'medium').slice(1);
   var sl = t.status === 'inprogress' ? 'In Progress' : t.status === 'done' ? 'Done' : 'To Do';
   var sc = t.status === 'done' ? '#66bb6a' : t.status === 'inprogress' ? '#42a5f5' : '#8898bb';
@@ -2566,6 +2574,28 @@ function openTaskDetail(id) {
     + (dept.cls ? '<span class="dept-badge ' + dept.cls + '">' + dept.label + '</span>' : '');
   set('tdm-assignee', t.assignee_name || '\u2014');
   set('tdm-due', t.due_date ? new Date(t.due_date).toLocaleDateString('en-MY', { day:'numeric', month:'short', year:'numeric' }) : '\u2014');
+  // Status buttons
+  var btns = document.getElementById('tdm-status-btns');
+  if (btns) {
+    var statuses = [
+      { key:'todo',       label:'To Do',       c:'#8898bb' },
+      { key:'inprogress', label:'In Progress',  c:'#42a5f5' },
+      { key:'done',       label:'Done',         c:'#66bb6a' }
+    ];
+    btns.innerHTML = statuses.map(function(s) {
+      var active = t.status === s.key || (s.key === 'todo' && !t.status);
+      return '<button data-tdm-status="' + s.key + '" data-tdm-id="' + id + '" data-tdm-dept="' + (t.department||'') + '" '
+        + 'style="flex:1;padding:10px;border-radius:10px;border:1.5px solid ' + s.c + (active ? '' : '44') + ';background:' + s.c + (active ? '22' : '11') + ';'
+        + 'color:' + s.c + ';font-family:\'Oswald\',sans-serif;font-size:13px;font-weight:700;cursor:pointer;transition:all 0.2s;">'
+        + s.label + '</button>';
+    }).join('');
+    btns.querySelectorAll('[data-tdm-status]').forEach(function(btn) {
+      btn.addEventListener('click', function() {
+        memberUpdateTaskStatus(btn.getAttribute('data-tdm-id'), btn.getAttribute('data-tdm-status'), btn.getAttribute('data-tdm-dept'));
+        closeTaskDetail();
+      });
+    });
+  }
   var modal = document.getElementById('task-detail-modal');
   if (modal) modal.style.display = 'block';
 }
@@ -3677,7 +3707,7 @@ async function renderAdminTasks(filter) {
     var html = '';
     _allAdminTasks.forEach(function(t) {
       var dept = DEPT_CONFIG[t.department] || { label: t.department || '', cls: '' };
-      var pc   = t.priority === 'high' ? 'prio-high' : t.priority === 'low' ? 'prio-low' : 'prio-medium';
+      var pc   = t.priority === 'high' ? 'high' : t.priority === 'low' ? 'low' : 'medium';
       var sc   = SC[t.status] || '#888';
       var statusBtns = Object.keys(SL).map(function(s) {
         var a = s === t.status;
