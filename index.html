@@ -1038,7 +1038,7 @@
         <div style="background:#0a1628;border-radius:14px;padding:18px;margin-bottom:14px;border:1px solid rgba(255,255,255,0.08);">
           <div class="form-group"><label class="form-label" style="color:#8898bb;">Title</label><input class="form-input" id="ann-title-input" type="text" placeholder="e.g. Uniform Collection — Sat 10 May" style="background:#122040;color:#fff;border-color:#2a3a50;"/></div>
           <div class="form-group"><label class="form-label" style="color:#8898bb;">Message</label><textarea class="form-textarea" id="ann-body-input" placeholder="Details..." style="background:#122040;color:#fff;border-color:#2a3a50;"></textarea></div>
-          <button class="submit-btn gold" onclick="addAnnouncement()">📢 Post Announcement</button>
+          <button class="submit-btn gold" id="ann-post-btn" onclick="addAnnouncement()">📢 Post Announcement</button>
         </div>
         <div id="admin-ann-list"></div>
       </div>
@@ -2597,24 +2597,13 @@ function renderAnnouncements() {
   if (!announcements.length) { list.innerHTML = '<div style="color:#8898bb;font-size:13px;text-align:center;padding:20px;">No announcements yet.</div>'; return; }
   var html = '';
   announcements.slice().reverse().forEach(function(a) {
-    html += '<div class="announcement-item"><div class="ann-date">' + a.date + '</div><div class="ann-title">' + a.title + '</div><div class="ann-body">' + a.body + '</div></div>';
+    // Convert newlines to <br> so formatting is preserved
+    var bodyHtml = (a.body || '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/\n/g,'<br>');
+    html += '<div class="announcement-item"><div class="ann-date">' + a.date + '</div><div class="ann-title">' + a.title + '</div><div class="ann-body" style="white-space:pre-wrap;">' + bodyHtml + '</div></div>';
   });
   list.innerHTML = html;
 }
 
-function addAnnouncement() {
-  var title = (document.getElementById('ann-title-input') || {}).value || '';
-  var body  = (document.getElementById('ann-body-input')  || {}).value || '';
-  title = title.trim(); body = body.trim();
-  if (!title || !body) { alert('Please fill in both title and message.'); return; }
-  var date = new Date().toLocaleDateString('en-MY', { day:'numeric', month:'short', year:'numeric' }).toUpperCase();
-  announcements.push({ title: title, body: body, date: date });
-  localStorage.setItem('bb_announcements', JSON.stringify(announcements));
-  var ti = document.getElementById('ann-title-input'); if (ti) ti.value = '';
-  var bi = document.getElementById('ann-body-input');  if (bi) bi.value = '';
-  renderAnnouncements();
-  renderAdminAnnList();
-}
 
 function deleteAnnouncement(idx) {
   announcements.splice(idx, 1);
@@ -2631,14 +2620,57 @@ function renderAdminAnnList() {
   var rev = announcements.slice().reverse();
   rev.forEach(function(a, ri) {
     var i = announcements.length - 1 - ri;
-    html += '<div style="background:#122040;border-radius:10px;padding:12px;margin-bottom:8px;border-left:3px solid var(--accent);display:flex;justify-content:space-between;align-items:flex-start;gap:10px;">'
+    html += '<div style="background:#122040;border-radius:10px;padding:12px;margin-bottom:8px;border-left:3px solid var(--accent);">'
+      + '<div style="display:flex;justify-content:space-between;align-items:flex-start;gap:10px;">'
       + '<div style="flex:1;"><div style="font-family:\'Oswald\',sans-serif;font-size:14px;color:#fff;font-weight:600;">' + a.title + '</div><div style="font-size:11px;color:#8898bb;margin-top:2px;">' + a.date + '</div></div>'
-      + '<button data-del-ann="' + i + '" style="background:none;border:none;color:#f66;font-size:16px;cursor:pointer;flex-shrink:0;">\ud83d\uddd1\ufe0f</button></div>';
+      + '<div style="display:flex;gap:6px;flex-shrink:0;">'
+      + '<button data-edit-ann="' + i + '" style="background:#1a3a6e;border:1px solid #2a4a8e;color:#fff;padding:4px 10px;border-radius:7px;cursor:pointer;font-size:12px;font-weight:600;">✏️</button>'
+      + '<button data-del-ann="' + i + '" style="background:none;border:none;color:#f66;font-size:16px;cursor:pointer;">🗑️</button>'
+      + '</div></div>'
+      + '</div>';
   });
   container.innerHTML = html;
   container.querySelectorAll('[data-del-ann]').forEach(function(btn) {
     btn.addEventListener('click', function() { deleteAnnouncement(parseInt(btn.getAttribute('data-del-ann'))); });
   });
+  container.querySelectorAll('[data-edit-ann]').forEach(function(btn) {
+    btn.addEventListener('click', function() { openEditAnnouncement(parseInt(btn.getAttribute('data-edit-ann'))); });
+  });
+}
+
+function openEditAnnouncement(idx) {
+  var a = announcements[idx];
+  if (!a) return;
+  var ti = document.getElementById('ann-title-input'); if (ti) ti.value = a.title;
+  var bi = document.getElementById('ann-body-input');  if (bi) bi.value = a.body;
+  var btn = document.getElementById('ann-post-btn');
+  if (btn) { btn.textContent = '💾 Save Changes'; btn.setAttribute('data-edit-idx', idx); }
+  // Scroll to form
+  var form = document.getElementById('ann-title-input');
+  if (form) form.scrollIntoView({ behavior: 'smooth' });
+}
+
+function addAnnouncement() {
+  var title   = (document.getElementById('ann-title-input') || {}).value || '';
+  var body    = (document.getElementById('ann-body-input')  || {}).value || '';
+  var btn     = document.getElementById('ann-post-btn');
+  var editIdx = btn ? parseInt(btn.getAttribute('data-edit-idx') || '-1') : -1;
+  title = title.trim(); body = body.trim();
+  if (!title || !body) { alert('Please fill in both title and message.'); return; }
+  var date = new Date().toLocaleDateString('en-MY', { day:'numeric', month:'short', year:'numeric' }).toUpperCase();
+  if (editIdx >= 0) {
+    // Edit existing
+    announcements[editIdx].title = title;
+    announcements[editIdx].body  = body;
+    if (btn) { btn.textContent = '📢 Post Announcement'; btn.removeAttribute('data-edit-idx'); }
+  } else {
+    announcements.push({ title: title, body: body, date: date });
+  }
+  localStorage.setItem('bb_announcements', JSON.stringify(announcements));
+  var ti = document.getElementById('ann-title-input'); if (ti) ti.value = '';
+  var bi = document.getElementById('ann-body-input');  if (bi) bi.value = '';
+  renderAnnouncements();
+  renderAdminAnnList();
 }
 
 // ── Badges ─────────────────────────────────────────────────────────────────
