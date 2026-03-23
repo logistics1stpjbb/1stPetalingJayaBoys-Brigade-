@@ -828,12 +828,7 @@
               </select>
             </div>
             <div class="form-group"><label class="form-label" style="color:#8898bb;">Member Since</label><input class="form-input" id="em-joined" type="date" style="background:#0a1628;color:#fff;border-color:#2a3a50;"/></div>
-            <div class="form-group"><label class="form-label" style="color:#8898bb;">Years of Service</label>
-              <div style="display:flex;align-items:center;gap:10px;">
-                <input class="form-input" id="em-service-years" type="number" min="0" max="20" placeholder="0" style="background:#0a1628;color:#fff;border-color:#2a3a50;width:100px;"/>
-                <div style="font-size:11px;color:#556;line-height:1.5;">Admin-controlled.<br>Members cannot edit this.</div>
-              </div>
-            </div>
+
             <input type="hidden" id="em-original-ic"/>
             <div style="display:flex;gap:8px;margin-top:4px;">
               <button class="submit-btn gold" onclick="saveEditMember()" style="margin-top:0;flex:1;">💾 Save</button>
@@ -1361,9 +1356,20 @@ function renderPresidentsTracker(ic) {
   }
 
   function countServiceBadges() {
-    // Admin-set years of service — stored in localStorage from Supabase
-    var adminYears = parseInt(localStorage.getItem('bb_member_service') || '0') || 0;
-    return adminYears;
+    // Count total instances of ALL repeatable badges from the member's saved data
+    var count = 0;
+    defs.forEach(function(b) {
+      if (!b.repeatable) return;
+      var repData = saved[b.id + '_rep'];
+      if (repData && repData.count) {
+        count += repData.count;
+      } else {
+        // Legacy: check old basic tick
+        var old = migrateE(saved[b.id]);
+        if (old.basic || old.advanced) count++;
+      }
+    });
+    return count;
   }
 
   // ── Group A: Drill & Leadership ───────────────────────────────────────
@@ -2252,8 +2258,6 @@ async function renderDashboard() {
     set('m-squad-val',    m.squad ? 'Squad ' + m.squad : '\u2014');
     set('m-since-val',    m.joined_at ? new Date(m.joined_at).toLocaleDateString('en-MY', { day:'numeric', month:'short', year:'numeric' }) : '\u2014');
     localStorage.setItem('bb_member_joined',  m.joined_at || '');
-    localStorage.setItem('bb_member_service', m.service_years != null ? String(m.service_years) : '0');
-    localStorage.setItem('bb_member_service', m.service_years != null ? String(m.service_years) : '0');
     var pfp = localStorage.getItem('bb_pfp_' + ic);
     if (pfp) {
       var img = document.getElementById('m-pfp-img');
@@ -2329,7 +2333,6 @@ function logoutMember() {
   localStorage.removeItem('bb_current');
   localStorage.removeItem('bb_member_rank');
   localStorage.removeItem('bb_member_joined');
-  localStorage.removeItem('bb_member_service');
   document.getElementById('tab-tasks').style.display   = 'none';
   var bt = document.getElementById('tab-badges'); if (bt) bt.style.display = 'none';
   document.getElementById('m-auth').style.display     = 'block';
@@ -2645,28 +2648,8 @@ function loadBadges(ic) {
   defs.forEach(function(b) { if (cats.indexOf(b.cat) === -1) cats.push(b.cat); });
   if (!cats.length) { container.innerHTML = '<div style="color:#8898bb;font-size:13px;text-align:center;padding:16px;">No badges defined yet.</div>'; return; }
 
-  // Service years read-only display
-  var serviceYears = parseInt(localStorage.getItem('bb_member_service') || '0') || 0;
-  var svcHtml = '<div style="background:#0d1e36;border-radius:12px;padding:14px 16px;margin-bottom:20px;border:1px solid rgba(200,150,30,0.2);">'
-    + '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;">'
-    + '<div><div style="font-family:\'Oswald\',sans-serif;font-size:15px;font-weight:700;color:var(--gold);">Service Years</div>'
-    + '<div style="font-size:11px;color:#556;margin-top:2px;">Set by your officer</div></div>'
-    + '<div style="font-family:\'Oswald\',sans-serif;font-size:28px;font-weight:700;color:#fff;">' + serviceYears + '</div>'
-    + '</div>'
-    + '<div style="display:flex;gap:6px;flex-wrap:wrap;">';
-  for (var yi = 1; yi <= Math.max(serviceYears, 3); yi++) {
-    var done = yi <= serviceYears;
-    svcHtml += '<div style="display:flex;flex-direction:column;align-items:center;gap:3px;">'
-      + '<div style="width:32px;height:32px;border-radius:50%;'
-      + (done ? 'background:var(--gold);' : 'background:#1a2a40;border:2px solid #2a3a50;')
-      + 'display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:700;color:'
-      + (done ? 'var(--navy)' : '#556') + ';">' + (done ? yi : '') + '</div>'
-      + '<div style="font-size:9px;color:' + (done ? '#e8b830' : '#556') + ';">Year ' + yi + '</div>'
-      + '</div>';
-  }
-  svcHtml += '</div></div>';
 
-  var html = svcHtml;
+  var html = '';
 
   cats.forEach(function(cat) {
     var catBadges = defs.filter(function(b) { return b.cat === cat && b.name !== '(Add badges below)'; });
@@ -3098,12 +3081,8 @@ var _adminSortBy = 'name';
 
 function calcAge(dob) {
   if (!dob) return null;
-  var today = new Date();
-  var birth = new Date(dob);
-  var age   = today.getFullYear() - birth.getFullYear();
-  var m     = today.getMonth() - birth.getMonth();
-  if (m < 0 || (m === 0 && today.getDate() < birth.getDate())) age--;
-  return age;
+  // "Turning X this year" = current year minus birth year
+  return new Date().getFullYear() - new Date(dob).getFullYear();
 }
 
 var RANK_ORDER = ['Recruit','Private','Lance Corporal','Corporal','Sergeant','Staff Sergeant'];
@@ -3191,7 +3170,7 @@ async function renderAdminList() {
 }
 
 function openAddMember() {
-  ['em-name','em-ic','em-joined','em-service-years','em-dob'].forEach(function(id) { var el = document.getElementById(id); if (el) el.value = ''; });
+  ['em-name','em-ic','em-joined','em-dob'].forEach(function(id) { var el = document.getElementById(id); if (el) el.value = ''; });
   ['em-rank','em-squad','em-dept'].forEach(function(id) { var el = document.getElementById(id); if (el) el.value = ''; });
   var ic = document.getElementById('em-ic'); if (ic) ic.readOnly = false;
   var ti = document.getElementById('em-modal-title'); if (ti) ti.textContent = '\u2795 Add New Member';
@@ -3210,7 +3189,6 @@ function openEditMember(ic) {
   set('em-dept',  m.department);
   set('em-joined',       m.joined_at    ? m.joined_at.slice(0,10)    : '');
   set('em-dob',          m.date_of_birth ? m.date_of_birth.slice(0,10) : '');
-  set('em-service-years', m.service_years != null ? m.service_years : '');
   set('em-original-ic', m.ic);
   var icEl = document.getElementById('em-ic'); if (icEl) icEl.readOnly = true;
   var ti   = document.getElementById('em-modal-title'); if (ti) ti.textContent = '\u270f\ufe0f Edit Member';
@@ -3231,21 +3209,18 @@ async function saveEditMember() {
   var joined_at     = joinedRaw ? new Date(joinedRaw).toISOString() : null;
   var dobRaw        = (document.getElementById('em-dob') || {}).value || '';
   var date_of_birth = dobRaw || null;
-  var serviceYrsRaw = (document.getElementById('em-service-years') || {}).value;
-  var service_years = serviceYrsRaw !== '' ? parseInt(serviceYrsRaw) || 0 : null;
   if (!name) return alert('Name cannot be empty.');
   if (!ic)   return alert('IC number cannot be empty.');
   try {
     if (!originalIc) {
       var existing = await supa.get('bb_members?ic=eq.' + encodeURIComponent(ic) + '&select=ic');
       if (existing && existing.length) return alert('A member with this IC already exists.');
-      await supa.post('bb_members', { ic: ic, name: name, rank: rank, squad: squad, department: department, date_of_birth: date_of_birth, password: btoa(ic), joined_at: joined_at || new Date().toISOString(), service_years: service_years || 0 });
+      await supa.post('bb_members', { ic: ic, name: name, rank: rank, squad: squad, department: department, date_of_birth: date_of_birth, password: btoa(ic), joined_at: joined_at || new Date().toISOString() });
       alert('\u2705 Member added!\n\nDefault password is their IC number: ' + ic);
     } else {
       var updates = { name: name, rank: rank, squad: squad, department: department };
       if (joined_at)     updates.joined_at     = joined_at;
       if (date_of_birth) updates.date_of_birth = date_of_birth;
-      if (service_years !== null) updates.service_years = service_years;
       await supa.patch('bb_members?ic=eq.' + encodeURIComponent(originalIc), updates);
       alert('\u2705 Member updated!');
     }
