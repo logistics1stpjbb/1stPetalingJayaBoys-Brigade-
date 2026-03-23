@@ -1335,66 +1335,208 @@ function renderPresidentsTracker(ic) {
     return { basic:r.basic||false, basicDate:r.basicDate||'', advanced:r.advanced||false, advancedDate:r.advancedDate||'' };
   }
 
-  var results = getPresidentsReqs().map(function(req) {
-    var badge = defs.find(function(b) {
-      return b.name.toLowerCase().indexOf(req.badgeMatch.toLowerCase()) !== -1;
+  function badgeEntry(nameMatch) {
+    var b = defs.find(function(x) { return x.name.toLowerCase().indexOf(nameMatch.toLowerCase()) !== -1; });
+    if (!b) return null;
+    return { badge: b, entry: migrateE(saved[b.id]) };
+  }
+
+  function countServiceBadges() {
+    var count = 0;
+    defs.forEach(function(b) {
+      if (b.repeatable || b.id.indexOf('svc_') === 0 ||
+          b.name.toLowerCase().indexOf('1 year service') !== -1 ||
+          b.name.toLowerCase().indexOf('1-year service') !== -1) {
+        var e = migrateE(saved[b.id]);
+        if (e.basic || e.advanced) count++;
+      }
     });
-    if (!badge) return { label: req.label, done: false };
-    var entry = migrateE(saved[badge.id]);
-    var done = req.tier === 'advanced' ? entry.advanced
-             : req.tier === 'basic'    ? entry.basic
-             : (entry.basic || entry.advanced);
-    return { label: req.label, done: done };
+    return count;
+  }
+
+  // ── Group A: Drill & Leadership ───────────────────────────────────────
+  var groupA = [
+    badgeEntry('Marching'),
+    badgeEntry('Best Driller'),
+    badgeEntry('Leadership'),
+  ].filter(Boolean);
+
+  // ── Group B: Outdoor & Sports ─────────────────────────────────────────
+  var groupB = [
+    badgeEntry('Best Camper'),
+    badgeEntry('Orienteering'),
+    badgeEntry('Swimming'),
+  ].filter(Boolean);
+
+  // ── Group C: Skills & Safety ──────────────────────────────────────────
+  var groupC = [
+    badgeEntry('First Aid'),
+    badgeEntry('Fire Safety'),
+  ].filter(Boolean);
+
+  // ── Group D: Service & Arts ───────────────────────────────────────────
+  var groupD = [
+    badgeEntry('Community Service'),
+    badgeEntry('Music & Worship'),
+  ].filter(Boolean);
+
+  var groups = [
+    { label: 'Group A', sub: 'Drill & Leadership', items: groupA, color: '#42a5f5' },
+    { label: 'Group B', sub: 'Outdoor & Sports',   items: groupB, color: '#66bb6a' },
+    { label: 'Group C', sub: 'Skills & Safety',    items: groupC, color: '#e8b830' },
+    { label: 'Group D', sub: 'Service & Arts',     items: groupD, color: '#ce93d8' },
+  ];
+
+  // Count awards per group (badge counts if basic OR advanced earned)
+  // Also count advanced separately
+  var totalAwarded = 0;
+  var totalAdvanced = 0;
+  var atLeastOnePerGroup = true;
+
+  var groupResults = groups.map(function(g) {
+    var awarded  = g.items.filter(function(i) { return i.entry.basic || i.entry.advanced; }).length;
+    var advanced = g.items.filter(function(i) { return i.entry.advanced; }).length;
+    if (awarded === 0) atLeastOnePerGroup = false;
+    totalAwarded  += awarded;
+    totalAdvanced += advanced;
+    return { label: g.label, sub: g.sub, color: g.color, items: g.items, awarded: awarded, advanced: advanced };
   });
 
-  var earned   = results.filter(function(r) { return r.done; }).length;
-  var total    = results.length;
-  var pct      = Math.round((earned / total) * 100);
-  var allDone  = earned === total;
+  var serviceYears = countServiceBadges();
 
-  var html = '<div style="background:linear-gradient(135deg,#1a2a40,#0d1e36);border:1.5px solid ' + (allDone ? 'var(--gold)' : 'rgba(200,150,30,0.25)') + ';border-radius:14px;padding:16px 18px;margin-bottom:4px;">';
+  // ── Requirements ─────────────────────────────────────────────────────
+  var reqs = [
+    {
+      id: 'service',
+      label: '3 Years of Service',
+      detail: serviceYears + ' / 3 years completed',
+      done: serviceYears >= 3,
+      pct: Math.min(100, Math.round((serviceYears / 3) * 100))
+    },
+    {
+      id: 'total6',
+      label: 'At least 6 awards total (Groups A-D)',
+      detail: totalAwarded + ' / 6 awards',
+      done: totalAwarded >= 6,
+      pct: Math.min(100, Math.round((totalAwarded / 6) * 100))
+    },
+    {
+      id: 'onepergroup',
+      label: 'At least 1 award from each group (A, B, C, D)',
+      detail: groupResults.map(function(g) { return g.label + ':' + g.awarded; }).join('  '),
+      done: atLeastOnePerGroup,
+      pct: atLeastOnePerGroup ? 100 : Math.round((groupResults.filter(function(g){return g.awarded>0;}).length / 4)*100)
+    },
+    {
+      id: 'basic2',
+      label: 'At least 2 awards at Basic level',
+      detail: Math.max(0, totalAwarded - totalAdvanced) + ' / 2 Basic awards',
+      done: (totalAwarded - totalAdvanced) >= 2,
+      pct: Math.min(100, Math.round((Math.max(0, totalAwarded - totalAdvanced) / 2) * 100))
+    },
+    {
+      id: 'adv4',
+      label: 'At least 4 awards at Advanced level',
+      detail: totalAdvanced + ' / 4 Advanced awards',
+      done: totalAdvanced >= 4,
+      pct: Math.min(100, Math.round((totalAdvanced / 4) * 100))
+    }
+  ];
+
+  var metCount = reqs.filter(function(r) { return r.done; }).length;
+  var allDone  = metCount === reqs.length;
+  var overallPct = Math.round((metCount / reqs.length) * 100);
+
+  // ── Build HTML ────────────────────────────────────────────────────────
+  var html = '<div style="background:linear-gradient(135deg,#1a2a40,#0d1e36);border:1.5px solid '
+    + (allDone ? 'var(--gold)' : 'rgba(200,150,30,0.25)') + ';border-radius:14px;padding:16px 18px;margin-bottom:16px;">';
 
   // Header
-  html += '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;">';
+  html += '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px;">';
   html += '<div style="display:flex;align-items:center;gap:10px;">';
-  html += '<div style="font-size:28px;">' + (allDone ? '🏆' : '🎖️') + '</div>';
+  html += '<div style="font-size:28px;">' + (allDone ? '&#127942;' : '&#127894;') + '</div>';
   html += '<div>';
   html += '<div style="font-family:\'Oswald\',sans-serif;font-size:16px;font-weight:700;color:var(--gold);">President\'s Award</div>';
-  html += '<div style="font-size:11px;color:#8898bb;margin-top:1px;">' + earned + ' of ' + total + ' requirements met</div>';
+  html += '<div style="font-size:11px;color:#8898bb;margin-top:1px;">' + metCount + ' of ' + reqs.length + ' requirements met</div>';
   html += '</div></div>';
-  html += '<div style="font-family:\'Oswald\',sans-serif;font-size:22px;font-weight:700;color:' + (allDone ? 'var(--gold)' : '#fff') + ';">' + pct + '%</div>';
+  html += '<div style="font-family:\'Oswald\',sans-serif;font-size:24px;font-weight:700;color:' + (allDone ? 'var(--gold)' : '#fff') + ';">' + overallPct + '%</div>';
   html += '</div>';
 
-  // Progress bar
-  html += '<div style="background:#0a1628;border-radius:20px;height:10px;overflow:hidden;margin-bottom:14px;">';
-  html += '<div style="height:100%;width:' + pct + '%;border-radius:20px;background:linear-gradient(90deg,var(--accent),var(--gold));transition:width 0.5s ease;"></div>';
+  // Overall progress bar
+  html += '<div style="background:#0a1628;border-radius:20px;height:8px;overflow:hidden;margin-bottom:16px;">';
+  html += '<div style="height:100%;width:' + overallPct + '%;border-radius:20px;background:linear-gradient(90deg,var(--accent),var(--gold));"></div>';
   html += '</div>';
 
   // Requirements list
-  html += '<div style="display:flex;flex-direction:column;gap:6px;">';
-  results.forEach(function(r) {
-    html += '<div style="display:flex;align-items:center;gap:10px;">';
-    html += '<div style="width:20px;height:20px;border-radius:50%;flex-shrink:0;display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:700;'
-      + (r.done ? 'background:var(--gold);color:var(--navy);' : 'background:#1a2a40;border:2px solid #2a3a50;color:#556;') + '">'
-      + (r.done ? '✓' : '') + '</div>';
-    html += '<div style="font-size:12px;color:' + (r.done ? '#fff' : '#8898bb') + ';' + (r.done ? '' : 'text-decoration:none;') + '">' + r.label + '</div>';
-    if (r.done) html += '<div style="margin-left:auto;font-size:10px;color:var(--gold);font-weight:700;">✓ Done</div>';
+  html += '<div style="display:flex;flex-direction:column;gap:8px;margin-bottom:14px;">';
+  reqs.forEach(function(r) {
+    var tickBg   = r.done ? 'var(--gold)' : '#1a2a40';
+    var tickCol  = r.done ? 'var(--navy)' : '#556';
+    var border   = r.done ? '' : 'border:2px solid #2a3a50;';
+    html += '<div style="background:rgba(255,255,255,0.03);border-radius:10px;padding:10px 12px;">';
+    html += '<div style="display:flex;align-items:center;gap:10px;margin-bottom:' + (r.pct < 100 ? '8px' : '0') + ';">';
+    html += '<div style="width:22px;height:22px;border-radius:50%;flex-shrink:0;display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:700;background:' + tickBg + ';color:' + tickCol + ';' + border + '">' + (r.done ? '&#10003;' : '') + '</div>';
+    html += '<div style="flex:1;">';
+    html += '<div style="font-size:12px;font-weight:600;color:' + (r.done ? '#fff' : '#8898bb') + ';">' + r.label + '</div>';
+    html += '<div style="font-size:10px;color:#556;margin-top:1px;">' + r.detail + '</div>';
+    html += '</div>';
+    if (r.done) html += '<span style="font-size:10px;color:var(--gold);font-weight:700;white-space:nowrap;">&#10003; Done</span>';
+    html += '</div>';
+    if (r.pct < 100) {
+      html += '<div style="background:#0a1628;border-radius:20px;height:4px;overflow:hidden;">';
+      html += '<div style="height:100%;width:' + r.pct + '%;border-radius:20px;background:' + (r.done ? 'var(--gold)' : '#2a4a70') + ';"></div>';
+      html += '</div>';
+    }
     html += '</div>';
   });
   html += '</div>';
 
+  // Group breakdown
+  html += '<div style="font-size:10px;font-weight:700;letter-spacing:2px;color:#556;text-transform:uppercase;margin-bottom:8px;">Award Groups</div>';
+  html += '<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:12px;">';
+  groupResults.forEach(function(g) {
+    var badgeLines = g.items.map(function(i) {
+      var e = i.entry;
+      var both = e.basic && e.advanced;
+      var basicDot  = e.basic    ? '<span style="color:#e8b830;font-size:11px;">&#9679;</span>' : '<span style="color:#2a3a50;font-size:11px;">&#9675;</span>';
+      var advDot    = i.badge.hasAdvanced ? (e.advanced ? '<span style="color:#ef5350;font-size:11px;">&#9679;</span>' : '<span style="color:#2a3a50;font-size:11px;">&#9675;</span>') : '';
+      return '<div style="display:flex;align-items:center;gap:4px;margin-top:3px;"><span style="font-size:11px;color:#8898bb;flex:1;">' + i.badge.name + '</span>' + basicDot + advDot + '</div>';
+    }).join('');
+    html += '<div style="background:rgba(255,255,255,0.03);border-radius:8px;padding:8px 10px;border-left:3px solid ' + g.color + ';">';
+    html += '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:4px;">';
+    html += '<div style="font-family:\'Oswald\',sans-serif;font-size:13px;font-weight:700;color:' + g.color + ';">' + g.label + '</div>';
+    html += '<div style="font-size:10px;color:#8898bb;">' + g.awarded + ' awarded</div>';
+    html += '</div>';
+    html += '<div style="font-size:10px;color:#556;margin-bottom:6px;">' + g.sub + '</div>';
+    html += badgeLines;
+    html += '</div>';
+  });
+  html += '</div>';
+
+  // Service years
+  html += '<div style="background:rgba(255,255,255,0.03);border-radius:10px;padding:10px 12px;margin-bottom:' + (allDone ? '12px' : '0') + ';">';
+  html += '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px;">';
+  html += '<div style="font-size:12px;font-weight:600;color:' + (serviceYears >= 3 ? '#fff' : '#8898bb') + ';">Service Years <span style="font-size:10px;color:#556;">(need 3)</span></div>';
+  html += '<div style="font-family:\'Oswald\',sans-serif;font-size:16px;font-weight:700;color:' + (serviceYears >= 3 ? 'var(--gold)' : '#fff') + ';">' + serviceYears + '</div>';
+  html += '</div>';
+  html += '<div style="background:#0a1628;border-radius:20px;height:6px;overflow:hidden;">';
+  html += '<div style="height:100%;width:' + Math.min(100, Math.round(serviceYears/3*100)) + '%;border-radius:20px;background:' + (serviceYears >= 3 ? 'var(--gold)' : '#2a4a70') + ';"></div>';
+  html += '</div>';
+  html += '</div>';
+
   // Completion banner
   if (allDone) {
-    html += '<div style="background:linear-gradient(135deg,rgba(200,150,30,0.2),rgba(232,184,48,0.1));border:1px solid var(--gold);border-radius:10px;padding:12px 14px;margin-top:14px;text-align:center;">';
-    html += '<div style="font-size:20px;margin-bottom:4px;">🏆</div>';
-    html += '<div style="font-family:\'Oswald\',sans-serif;font-size:16px;font-weight:700;color:var(--gold);">All Requirements Met!</div>';
-    html += '<div style="font-size:12px;color:#c8a870;margin-top:4px;">You are eligible for the President\'s Award. See your officer to confirm.</div>';
+    html += '<div style="background:linear-gradient(135deg,rgba(200,150,30,0.2),rgba(232,184,48,0.1));border:1px solid var(--gold);border-radius:10px;padding:14px;text-align:center;margin-top:0;">';
+    html += '<div style="font-size:24px;margin-bottom:6px;">&#127942;</div>';
+    html += '<div style="font-family:\'Oswald\',sans-serif;font-size:18px;font-weight:700;color:var(--gold);">All Requirements Met!</div>';
+    html += '<div style="font-size:12px;color:#c8a870;margin-top:6px;line-height:1.6;">Congratulations! You are eligible for the President\'s Award.<br>See your officer to confirm and collect.</div>';
     html += '</div>';
   }
 
   html += '</div>';
   container.innerHTML = html;
 }
+
 
 function filterBadges(query) {
   var q = query.toLowerCase().trim();
@@ -2436,6 +2578,11 @@ function renderAdminAnnList() {
 // ── Badges ─────────────────────────────────────────────────────────────────
 var DEFAULT_BB_BADGES = [
   { id:'bb1',  name:'BB Enrolment',       cat:'Core',       hasAdvanced:false },
+  { id:'svc_1', name:'1 Year Service',    cat:'Service',    hasAdvanced:false, repeatable:true },
+  { id:'svc_2', name:'1 Year Service',    cat:'Service',    hasAdvanced:false, repeatable:true },
+  { id:'svc_3', name:'1 Year Service',    cat:'Service',    hasAdvanced:false, repeatable:true },
+  { id:'svc_4', name:'1 Year Service',    cat:'Service',    hasAdvanced:false, repeatable:true },
+  { id:'svc_5', name:'1 Year Service',    cat:'Service',    hasAdvanced:false, repeatable:true },
   { id:'bb2',  name:"BB Founder's Award", cat:'Core',       hasAdvanced:false },
   { id:'bb3',  name:"President's Award",  cat:'Core',       hasAdvanced:false },
   { id:'bb4',  name:'First Aid',          cat:'Skills',     hasAdvanced:true  },
@@ -2478,8 +2625,12 @@ function loadBadges(ic) {
     html += '<div style="margin-bottom:20px;">';
     html += '<div data-cat-label="1" style="font-size:10px;font-weight:700;letter-spacing:2px;color:var(--gold);text-transform:uppercase;margin-bottom:10px;">' + cat + '</div>';
 
-    catBadges.forEach(function(b) {
+    catBadges.forEach(function(b, bi) {
       var entry = migrateEntry(saved[b.id]);
+      // For repeatable badges, show "Year N"
+      var displayName = b.repeatable
+        ? b.name + ' <span style="font-size:11px;color:#8898bb;font-weight:400;">(Year ' + (bi + 1) + ')</span>'
+        : b.name;
 
       var bBg   = entry.basic    ? 'rgba(200,150,30,0.18)' : 'transparent';
       var bBord = entry.basic    ? 'var(--gold)'           : '#2a3a50';
@@ -2495,7 +2646,7 @@ function loadBadges(ic) {
       html += '<div data-badge-card="1" data-badge-name="' + b.name.toLowerCase() + '" style="background:#0d1e36;border-radius:10px;padding:12px 14px;margin-bottom:8px;">';
       html += '<div style="display:flex;align-items:center;gap:10px;margin-bottom:10px;">'
         + imgHtml
-        + '<div style="font-size:13px;font-weight:600;color:#fff;">' + b.name + '</div>'
+        + '<div style="font-size:13px;font-weight:600;color:#fff;">' + displayName + '</div>'
         + '</div>';
 
       // Basic row
