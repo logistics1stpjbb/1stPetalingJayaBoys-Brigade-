@@ -2626,20 +2626,69 @@ function loadAnnouncements() {
   renderAnnouncements();
 }
 
+var REACT_EMOJIS = ['👍','❤️','😂','😮','🙏','🔥'];
+
 function renderAnnouncements() {
   var list = document.getElementById('announcements-list');
   if (!list) return;
   if (!announcements.length) { list.innerHTML = '<div style="color:#8898bb;font-size:13px;text-align:center;padding:20px;">No announcements yet.</div>'; return; }
+  var ic  = localStorage.getItem('bb_current') || '';
   var html = '';
-  announcements.slice().reverse().forEach(function(a) {
-    // Body stored as HTML (rich text) — render directly
-    // For legacy plain-text entries, convert newlines to <br>
+  announcements.slice().reverse().forEach(function(a, ri) {
+    var realIdx = announcements.length - 1 - ri;
     var bodyHtml = (a.body && a.body.indexOf('<') !== -1)
       ? a.body
       : (a.body || '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/\n/g,'<br>');
-    html += '<div class="announcement-item"><div class="ann-date">' + a.date + '</div><div class="ann-title">' + a.title + '</div><div class="ann-body">' + bodyHtml + '</div></div>';
+    var reactions = a.reactions || {};
+
+    // Build reaction buttons
+    var reactHtml = '<div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:12px;padding-top:10px;border-top:1px solid rgba(255,255,255,0.06);">';
+    REACT_EMOJIS.forEach(function(emoji) {
+      var who   = reactions[emoji] || [];
+      var count = who.length;
+      var mine  = ic && who.indexOf(ic) !== -1;
+      reactHtml += '<button data-react="' + realIdx + '" data-emoji="' + emoji + '" '
+        + 'style="display:flex;align-items:center;gap:5px;padding:5px 10px;border-radius:20px;border:1.5px solid '
+        + (mine ? 'var(--gold)' : 'rgba(255,255,255,0.1)') + ';background:'
+        + (mine ? 'rgba(200,150,30,0.15)' : 'rgba(255,255,255,0.04)') + ';cursor:pointer;transition:all 0.15s;">'
+        + '<span style="font-size:16px;">' + emoji + '</span>'
+        + (count > 0 ? '<span style="font-size:12px;font-weight:700;color:' + (mine ? 'var(--gold)' : '#8898bb') + ';">' + count + '</span>' : '')
+        + '</button>';
+    });
+    reactHtml += '</div>';
+
+    html += '<div class="announcement-item" id="ann-item-' + realIdx + '">'
+      + '<div class="ann-date">' + a.date + '</div>'
+      + '<div class="ann-title">' + a.title + '</div>'
+      + '<div class="ann-body">' + bodyHtml + '</div>'
+      + reactHtml
+      + '</div>';
   });
   list.innerHTML = html;
+
+  // Attach reaction listeners
+  list.querySelectorAll('[data-react]').forEach(function(btn) {
+    btn.addEventListener('click', function() {
+      var idx   = parseInt(btn.getAttribute('data-react'));
+      var emoji = btn.getAttribute('data-emoji');
+      toggleReaction(idx, emoji);
+    });
+  });
+}
+
+function toggleReaction(annIdx, emoji) {
+  var ic = localStorage.getItem('bb_current');
+  if (!ic) { alert('Please log in to react to announcements.'); return; }
+  var a = announcements[annIdx];
+  if (!a) return;
+  if (!a.reactions) a.reactions = {};
+  if (!a.reactions[emoji]) a.reactions[emoji] = [];
+  var who = a.reactions[emoji];
+  var pos = who.indexOf(ic);
+  if (pos === -1) who.push(ic);
+  else who.splice(pos, 1);
+  localStorage.setItem('bb_announcements', JSON.stringify(announcements));
+  renderAnnouncements();
 }
 
 
