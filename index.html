@@ -876,6 +876,15 @@
               <div class="form-group"><label class="form-label" style="color:#8898bb;">Size Options</label><input class="form-input" id="prod-sizes" type="text" placeholder="S, M, L, XL or 28, 30, 32" style="background:#122040;color:#fff;border-color:#2a3a50;"/></div>
             </div>
             <div style="font-size:11px;color:#556;margin-top:-10px;margin-bottom:12px;">Separate sizes with commas. Leave blank if no size needed.</div>
+            <div class="form-group" style="margin-top:4px;">
+              <label style="display:flex;align-items:center;gap:10px;cursor:pointer;background:#122040;border:1.5px solid #2a3a50;border-radius:10px;padding:12px 14px;">
+                <input type="checkbox" id="prod-nco-only" style="width:16px;height:16px;accent-color:var(--accent);cursor:pointer;flex-shrink:0;"/>
+                <div>
+                  <div style="font-size:13px;color:#fff;font-weight:600;">NCO Only</div>
+                  <div style="font-size:11px;color:#8898bb;margin-top:2px;">Restrict to Lance Corporal and above. Recruits and Privates cannot see this item.</div>
+                </div>
+              </label>
+            </div>
             <div class="form-group">
               <label class="form-label" style="color:#8898bb;">Product Image</label>
               <div style="border:2px dashed rgba(200,150,30,0.3);border-radius:10px;padding:16px;text-align:center;position:relative;cursor:pointer;background:#122040;" id="prod-img-drop">
@@ -1131,6 +1140,7 @@ function checkOrderAccess() {
   populateOrderBar(ic);
   loadCustomForms();
   renderFormsHub();
+  renderOrderItems(localStorage.getItem('bb_member_rank') || '');
 }
 
 async function populateOrderBar(ic) {
@@ -1144,6 +1154,7 @@ async function populateOrderBar(ic) {
     var squadEl = document.getElementById('order-member-squad');
     if (nameEl)  nameEl.textContent  = m.name;
     if (rankEl)  rankEl.textContent  = m.rank || '';
+    localStorage.setItem('bb_member_rank', m.rank || '');
     if (squadIl) squadIl.textContent = m.squad ? m.squad + ' Squad \xb7' : '';
     if (squadEl) squadEl.textContent = m.squad ? 'Squad ' + m.squad : '\u2014';
     var pfp = localStorage.getItem('bb_pfp_' + ic);
@@ -1157,15 +1168,21 @@ async function populateOrderBar(ic) {
 }
 
 // ── Uniform order form ─────────────────────────────────────────────────────
-function renderOrderItems() {
+var NCO_RANKS = ['Lance Corporal','Corporal','Sergeant','Staff Sergeant','Officer Cadet','2nd Lieutenant','Lieutenant'];
+function isNCO(rank) { return NCO_RANKS.indexOf(rank) !== -1; }
+
+function renderOrderItems(memberRank) {
   var container = document.getElementById('uniform-items');
   if (!container) return;
-  if (!UNIFORM_ITEMS.length) {
+  var rank    = memberRank || localStorage.getItem('bb_member_rank') || '';
+  var nco     = isNCO(rank);
+  var visible = UNIFORM_ITEMS.filter(function(item) { return !item.ncoOnly || nco; });
+  if (!visible.length) {
     container.innerHTML = '<div style="color:var(--muted);text-align:center;padding:20px;font-size:13px;">No products available yet.</div>';
     return;
   }
   var html = '';
-  UNIFORM_ITEMS.forEach(function(item) {
+  visible.forEach(function(item) {
     var sizes = item.sizes && item.sizes.length ? item.sizes : [];
     var sizeButtons = '';
     sizes.forEach(function(s) {
@@ -1173,7 +1190,7 @@ function renderOrderItems() {
     });
     var imgHtml = item.image
       ? '<img src="' + item.image + '" style="width:44px;height:44px;object-fit:cover;border-radius:8px;flex-shrink:0;" alt="' + item.name + '"/>'
-      : '<span class="uniform-icon">\ud83d\udc54</span>';
+      : '<span class="uniform-icon">&#128084;</span>';
     var priceLabel = item.price ? 'RM ' + parseFloat(item.price).toFixed(2) : 'RM TBA';
     var sizeWrap = sizes.length
       ? '<div id="' + item.key + '-size-wrap" style="display:none;margin-top:12px;"><div class="form-label">Size</div><div class="size-grid" id="' + item.key + '-size-grid">' + sizeButtons + '</div></div>'
@@ -1181,14 +1198,14 @@ function renderOrderItems() {
     html += '<div class="uniform-item" id="ui-' + item.key + '">'
       + '<div class="uniform-item-header">' + imgHtml + '<div class="uniform-name">' + item.name + '</div><div class="uniform-price" id="' + item.key + '-price-label">' + priceLabel + '</div></div>'
       + '<div class="qty-ctrl">'
-      + '<button class="qty-btn" onclick="changeQty(\'' + item.key + '\',-1)">\u2212</button>'
+      + '<button class="qty-btn" onclick="changeQty(\'' + item.key + '\',-1)">&#8722;</button>'
       + '<div class="qty-display" id="' + item.key + '-qty">0</div>'
       + '<button class="qty-btn" onclick="changeQty(\'' + item.key + '\',1)">+</button>'
       + '<span style="font-size:12px;color:var(--muted);margin-left:4px;">pcs</span></div>'
       + sizeWrap + '</div>';
   });
   container.innerHTML = html;
-  UNIFORM_ITEMS.forEach(function(i) { itemQtys[i.key] = 0; delete itemSizes[i.key]; });
+  visible.forEach(function(i) { itemQtys[i.key] = 0; delete itemSizes[i.key]; });
   updateTotal();
 }
 
@@ -1412,8 +1429,6 @@ function renderAdminForms() {
   if (filter) {
     var opts = '<option value="">All forms</option>';
     _customForms.forEach(function(f) { opts += '<option value="' + f.id + '">' + f.name + '</option>'; });
-    // Add built-in leave form
-    opts += '<option value="__leave__">Leave Application</option>';
     filter.innerHTML = opts;
   }
   if (!_customForms.length) { container.innerHTML = '<div style="color:#8898bb;text-align:center;padding:20px;font-size:13px;">No forms yet.</div>'; return; }
@@ -1461,7 +1476,7 @@ async function renderFormResponses() {
           return (o.notes || '') === formFilter ||
                  (items.form_name && (items.form_name === formFilter ||
                   _customForms.find(function(f) { return f.id === formFilter && f.name === items.form_name; }))) ||
-                 formFilter === '__leave__' && items.form_name === 'Leave Application';
+                 false;
         } catch(e) { return false; }
       });
     }
@@ -1519,22 +1534,13 @@ async function renderFormResponses() {
 }
 
 // ── Forms hub (member side) ───────────────────────────────────────────────
-var BUILTIN_LEAVE = {
-  id: '__leave__', name: 'Leave Application', desc: 'Submit a leave request', type: 'builtin', icon: '\ud83d\udcdd',
-  fields: [
-    { id: 'lf1', label: 'Reason for Leave',     type: 'textarea', required: true  },
-    { id: 'lf2', label: 'Start Date',            type: 'date',     required: true  },
-    { id: 'lf3', label: 'End Date',              type: 'date',     required: true  },
-    { id: 'lf4', label: 'Contact During Leave',  type: 'text',     required: false }
-  ]
-};
+// Leave Application removed
 
 function renderFormsHub() {
   loadCustomForms();
   var hub = document.getElementById('forms-hub');
   if (!hub) return;
   var all = [
-    { id: '__leave__',  name: 'Leave Application', desc: 'Submit a leave request',  type: 'builtin', icon: '\ud83d\udcdd' },
     { id: '__uniform__',name: 'Uniform Order',      desc: 'Order BB uniform items',  type: 'uniform', icon: '\ud83d\udc54' }
   ].concat(_customForms.filter(function(f) { return f.active !== false; }));
   if (!all.length) { hub.innerHTML = '<div style="color:#8898bb;text-align:center;padding:30px;font-size:13px;">No forms available.</div>'; return; }
@@ -1562,7 +1568,7 @@ function openFormForMember(formId) {
     renderUniformOrderInline();
     return;
   }
-  var all = [BUILTIN_LEAVE].concat(_customForms);
+  var all = [].concat(_customForms);
   var form = all.find(function(f) { return f.id === formId; });
   if (!form) return;
   if (form.type === 'link') { window.open(form.url, '_blank'); return; }
@@ -1739,6 +1745,7 @@ async function renderDashboard() {
     set('m-display-name', m.name);
     set('m-display-ic',   'IC: ' + m.ic);
     set('m-rank-val',     m.rank  || '\u2014');
+    localStorage.setItem('bb_member_rank', m.rank || '');
     set('m-squad-val',    m.squad ? 'Squad ' + m.squad : '\u2014');
     set('m-since-val',    m.joined_at ? new Date(m.joined_at).toLocaleDateString('en-MY', { day:'numeric', month:'short', year:'numeric' }) : '\u2014');
     var pfp = localStorage.getItem('bb_pfp_' + ic);
@@ -1754,6 +1761,7 @@ async function renderDashboard() {
 
 function logoutMember() {
   localStorage.removeItem('bb_current');
+  localStorage.removeItem('bb_member_rank');
   document.getElementById('tab-tasks').style.display  = 'none';
   document.getElementById('m-auth').style.display     = 'block';
   document.getElementById('m-dashboard').style.display = 'none';
@@ -2486,14 +2494,17 @@ function renderAdminProducts() {
   UNIFORM_ITEMS.forEach(function(item) {
     var imgHtml = item.image
       ? '<img src="' + item.image + '" style="width:50px;height:50px;object-fit:cover;border-radius:8px;flex-shrink:0;" alt="' + item.name + '"/>'
-      : '<div style="width:50px;height:50px;border-radius:8px;background:#1a2a40;display:flex;align-items:center;justify-content:center;font-size:22px;flex-shrink:0;">\ud83d\udc54</div>';
+      : '<div style="width:50px;height:50px;border-radius:8px;background:#1a2a40;display:flex;align-items:center;justify-content:center;font-size:22px;flex-shrink:0;">&#128084;</div>';
+    var ncoBadge = item.ncoOnly
+      ? ' <span style="font-size:9px;font-weight:700;background:rgba(232,184,48,0.2);color:var(--gold);border:1px solid rgba(232,184,48,0.4);padding:2px 7px;border-radius:20px;letter-spacing:1px;">NCO ONLY</span>'
+      : '';
     html += '<div style="background:#0a1628;border-radius:12px;padding:12px 14px;margin-bottom:10px;display:flex;align-items:center;gap:12px;border:1px solid rgba(255,255,255,0.06);">'
       + imgHtml + '<div style="flex:1;">'
-      + '<div style="font-family:\'Oswald\',sans-serif;font-size:15px;font-weight:600;color:#fff;">' + item.name + '</div>'
-      + '<div style="font-size:11px;color:#8898bb;">RM ' + (item.price ? parseFloat(item.price).toFixed(2) : 'TBA') + ' \xb7 Sizes: ' + ((item.sizes && item.sizes.length) ? item.sizes.join(', ') : 'None') + '</div>'
+      + '<div style="font-size:13px;color:#fff;font-weight:600;">' + item.name + ncoBadge + '</div>'
+      + '<div style="font-size:11px;color:#8898bb;">RM ' + (item.price ? parseFloat(item.price).toFixed(2) : 'TBA') + (item.sizes && item.sizes.length ? ' &middot; ' + item.sizes.join(', ') : '') + '</div>'
       + '</div>'
-      + '<button data-edit-prod="' + item.key + '" style="background:#1a3a6e;border:1px solid #2a4a8e;color:#fff;padding:6px 12px;border-radius:8px;cursor:pointer;font-size:12px;font-weight:600;">\u270f\ufe0f</button>'
-      + '<button data-del-prod="' + item.key + '" style="background:#3a1a1a;border:1px solid #6a2a2a;color:#f66;padding:6px 12px;border-radius:8px;cursor:pointer;font-size:12px;">\ud83d\uddd1\ufe0f</button>'
+      + '<button data-edit-prod="' + item.key + '" style="background:#1a3a6e;border:1px solid #2a4a8e;color:#fff;padding:6px 12px;border-radius:8px;cursor:pointer;font-size:12px;font-weight:600;">Edit</button>'
+      + '<button data-del-prod="' + item.key + '" style="background:#3a1a1a;border:1px solid #6a2a2a;color:#f66;padding:6px 12px;border-radius:8px;cursor:pointer;font-size:12px;">Del</button>'
       + '</div>';
   });
   list.innerHTML = html;
@@ -2515,6 +2526,7 @@ function previewProductImg(input) {
 
 function clearProductForm() {
   ['prod-name','prod-price','prod-sizes','prod-img-data','prod-edit-key'].forEach(function(id) { var el = document.getElementById(id); if (el) el.value = ''; });
+  var nc = document.getElementById('prod-nco-only'); if (nc) nc.checked = false;
   var pi = document.getElementById('prod-img-prev-img'); if (pi) pi.src = '';
   var pv = document.getElementById('prod-img-preview');  if (pv) pv.style.display = 'none';
   var ph = document.getElementById('prod-img-placeholder'); if (ph) ph.style.display = 'block';
@@ -2528,9 +2540,10 @@ function saveProduct() {
   var sizes    = sizesRaw ? sizesRaw.split(',').map(function(s) { return s.trim(); }).filter(Boolean) : [];
   var image    = (document.getElementById('prod-img-data') || {}).value || '';
   var editKey  = (document.getElementById('prod-edit-key') || {}).value || '';
+  var ncoOnly = !!(document.getElementById('prod-nco-only') || {}).checked;
   if (!name) { alert('Please enter a product name.'); return; }
   var key  = editKey || name.toLowerCase().replace(/[^a-z0-9]/g,'_') + '_' + Date.now();
-  var item = { key: key, name: name, price: price, sizes: sizes, image: image };
+  var item = { key: key, name: name, price: price, sizes: sizes, image: image, ncoOnly: ncoOnly };
   var idx  = UNIFORM_ITEMS.findIndex(function(i) { return i.key === key; });
   if (idx >= 0) UNIFORM_ITEMS[idx] = item; else UNIFORM_ITEMS.push(item);
   saveUniformItems();
@@ -2550,6 +2563,7 @@ function editProduct(key) {
   set('prod-sizes',    (item.sizes || []).join(', '));
   set('prod-edit-key', key);
   var ft = document.getElementById('prod-form-title'); if (ft) ft.textContent = '\u270f\ufe0f Edit: ' + item.name;
+  var nc = document.getElementById('prod-nco-only'); if (nc) nc.checked = !!item.ncoOnly;
   if (item.image) {
     set('prod-img-data', item.image);
     var pi = document.getElementById('prod-img-prev-img'); if (pi) pi.src = item.image;
