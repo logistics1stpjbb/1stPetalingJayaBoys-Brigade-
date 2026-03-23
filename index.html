@@ -1073,7 +1073,9 @@ var itemSizes = {};
 
 function loadPrices() {
   try { prices = JSON.parse(localStorage.getItem('bb_prices') || '{}'); } catch(e) { prices = {}; }
+  // Sync prices from item.price (admin-saved) into the prices map
   UNIFORM_ITEMS.forEach(function(item) {
+    if (item.price) prices[item.key] = parseFloat(item.price) || 0;
     var p  = prices[item.key] || 0;
     var el = document.getElementById(item.key + '-price-label');
     if (el) el.textContent = p ? 'RM ' + p.toFixed(2) : 'RM TBA';
@@ -1083,7 +1085,9 @@ function loadPrices() {
 function updateTotal() {
   var total = 0;
   UNIFORM_ITEMS.forEach(function(item) {
-    total += (itemQtys[item.key] || 0) * (prices[item.key] || 0);
+    // Use item.price first (set in admin), fall back to legacy prices map
+    var unitPrice = parseFloat(item.price) || prices[item.key] || 0;
+    total += (itemQtys[item.key] || 0) * unitPrice;
   });
   var el = document.getElementById('order-total');
   if (el) el.textContent = 'RM ' + total.toFixed(2);
@@ -1221,7 +1225,7 @@ function goToOrderReview() {
       var sizes = item.sizes && item.sizes.length ? item.sizes : [];
       var size  = itemSizes[item.key] || '';
       if (sizes.length && !size) { alert('Please select a size for ' + item.name); valid = false; return; }
-      var p = prices[item.key] || 0;
+      var p = parseFloat(item.price) || prices[item.key] || 0;
       lines.push({ name: item.name, qty: qty, size: size, subtotal: qty * p });
     }
   });
@@ -1259,7 +1263,7 @@ async function submitOrder() {
   var items = {};
   UNIFORM_ITEMS.forEach(function(item) {
     var qty = itemQtys[item.key] || 0;
-    if (qty > 0) items[item.key] = { qty: qty, size: itemSizes[item.key] || null, price: prices[item.key] || 0 };
+    if (qty > 0) items[item.key] = { qty: qty, size: itemSizes[item.key] || null, price: parseFloat(item.price) || prices[item.key] || 0 };
   });
   var orderNum = 'BB-' + Date.now().toString(36).toUpperCase();
   try {
