@@ -401,7 +401,7 @@
 
       <!-- REGISTER -->
       <div id="auth-register" style="display:none;">
-        <div class="form-group"><label class="form-label">Full Name</label><input class="form-input" id="reg-fullname" type="text" placeholder="e.g. Joshua Ethan Yogendran"/></div>
+        <div class="form-group"><label class="form-label">Full Name</label><input class="form-input" id="reg-fullname" type="text" placeholder="e.g. Muhammad Asyraf bin Razali"/></div>
         <div class="form-group"><label class="form-label">IC Number (MyKad)</label><input class="form-input" id="reg-ic" type="text" placeholder="e.g. 050123-10-1234"/></div>
         <div class="form-group"><label class="form-label">Date of Birth</label><input class="form-input" id="reg-dob" type="date"/></div>
         <div class="form-row">
@@ -3273,19 +3273,20 @@ async function renderAdminBadges() {
     });
   });
   container.querySelectorAll('[data-del-cat]').forEach(function(btn) {
-    btn.addEventListener('click', function() {
+    btn.addEventListener('click', async function() {
       var cat = btn.getAttribute('data-del-cat');
       if (!confirm('Delete the "' + cat + '" section and all its badges?')) return;
-      saveBadgeDefs(getBadgeDefs().filter(function(b) { return b.cat !== cat; }));
+      await saveBadgeDefs((await getBadgeDefs()).filter(function(b) { return b.cat !== cat; }));
       renderAdminBadges();
     });
   });
   container.querySelectorAll('[data-del-badge]').forEach(function(btn) {
     btn.addEventListener('click', async function() {
       var id    = btn.getAttribute('data-del-badge');
-      var badge = (await getBadgeDefs()).find(function(b) { return b.id === id; });
+      var defs  = await getBadgeDefs();
+      var badge = defs.find(function(b) { return b.id === id; });
       if (!badge || !confirm('Delete badge "' + badge.name + '"?')) return;
-      saveBadgeDefs((await getBadgeDefs()).filter(function(b) { return b.id !== id; }));
+      await saveBadgeDefs(defs.filter(function(b) { return b.id !== id; }));
       renderAdminBadges();
     });
   });
@@ -3304,7 +3305,7 @@ async function renderAdminBadges() {
     });
   });
   var addCatBtn = document.getElementById('btn-add-cat');
-  addCatBtn.addEventListener('click', async function() {
+  if (addCatBtn) addCatBtn.addEventListener('click', async function() {
     var input = document.getElementById('new-cat-name');
     var name  = input ? input.value.trim() : '';
     if (!name) { alert('Please enter a section name.'); return; }
