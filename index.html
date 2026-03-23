@@ -259,6 +259,7 @@
     <button class="tab-btn" id="tab-order" onclick="switchTab('order',this)">📋 Forms</button>
     <button class="tab-btn" id="tab-member" onclick="switchTab('member',this)">🪪 Member</button>
     <button class="tab-btn" id="tab-tasks" onclick="switchTab('tasks',this)" style="display:none;">✅ Tasks</button>
+    <button class="tab-btn" id="tab-badges" onclick="switchTab('badges',this)" style="display:none;">&#127885; Badges</button>
   </div>
 </nav>
 
@@ -501,23 +502,11 @@
 
 
 
-      <!-- Badges section -->
-      <div class="dark-card" style="margin-bottom:14px;">
-        <div style="display:flex;align-items:center;gap:10px;margin-bottom:6px;">
-          <div style="font-family:'Oswald',sans-serif;font-size:20px;font-weight:700;color:#fff;">🏅 My Badges</div>
-        </div>
-        <div style="background:rgba(200,150,30,0.08);border:1px solid rgba(200,150,30,0.2);border-radius:10px;padding:10px 14px;margin-bottom:14px;">
-          <div style="font-size:11px;color:#c8a870;line-height:1.6;">📝 <strong>Self-reported:</strong> Tick the badges you have earned and enter the date achieved. This section is for your own record — it is not automatically verified.</div>
-        </div>
-        <div id="badges-list"></div>
-        <button class="submit-btn gold" onclick="saveBadges()" style="margin-top:8px;">💾 Save Badges</button>
-      </div>
-
       <!-- My Orders -->
       <div class="dark-card" style="margin-bottom:14px;">
         <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px;">
-          <div style="font-family:'Oswald',sans-serif;font-size:20px;font-weight:700;color:#fff;">📦 My Orders</div>
-          <button onclick="loadMemberOrders()" style="background:rgba(200,150,30,0.1);border:1px solid rgba(200,150,30,0.3);color:var(--gold);padding:6px 12px;border-radius:8px;cursor:pointer;font-family:'Oswald',sans-serif;font-size:12px;font-weight:700;">↻ Refresh</button>
+          <div style="font-family:'Oswald',sans-serif;font-size:20px;font-weight:700;color:#fff;">&#128230; My Orders</div>
+          <button onclick="loadMemberOrders()" style="background:rgba(200,150,30,0.1);border:1px solid rgba(200,150,30,0.3);color:var(--gold);padding:6px 12px;border-radius:8px;cursor:pointer;font-family:'Oswald',sans-serif;font-size:12px;font-weight:700;">&#8635; Refresh</button>
         </div>
         <div id="member-orders-list"><div style="color:#556;font-size:13px;text-align:center;padding:16px;">Loading orders...</div></div>
       </div>
@@ -528,7 +517,28 @@
   </div>
 </div>
 
-<!-- TASKS PAGE -->
+<!-- ───────── BADGES ───────── -->
+<div class="page" id="page-badges">
+  <div style="width:100%;">
+    <div class="card stripe-bg" id="badges-gate" style="display:none;text-align:center;padding:40px 20px;">
+      <div style="font-size:48px;margin-bottom:14px;">🔒</div>
+      <div class="page-title" style="text-align:center;">Members Only</div>
+      <div style="font-size:13px;color:var(--muted);margin-bottom:24px;">Login to view and track your badges.</div>
+      <button class="submit-btn gold" onclick="goToMemberTab()">🪪 Login / Register</button>
+    </div>
+    <div id="badges-logged-in" style="display:none;">
+      <div class="page-title">My Badges</div>
+      <div class="page-subtitle">Achievement Tracker</div>
+      <div style="background:rgba(200,150,30,0.08);border:1px solid rgba(200,150,30,0.2);border-radius:10px;padding:10px 14px;margin:12px 0 18px;">
+        <div style="font-size:11px;color:#c8a870;line-height:1.6;">📝 <strong>Self-reported:</strong> Tick the badges you have earned and enter the date achieved. This is for your own record — it is not automatically verified.</div>
+      </div>
+      <div id="badges-list"></div>
+      <button class="submit-btn gold" onclick="saveBadges()" style="margin-top:8px;">💾 Save Badges</button>
+    </div>
+  </div>
+</div>
+
+<!-- ───────── TASKS ─────────
 <div class="page" id="page-tasks">
   <div style="width:100%;">
 
@@ -1137,6 +1147,21 @@ function switchTab(tab, btn) {
   btn.classList.add('active');
   if (tab === 'order')  checkOrderAccess();
   if (tab === 'tasks')  checkTasksAccess();
+  if (tab === 'badges') checkBadgesAccess();
+}
+
+function checkBadgesAccess() {
+  var ic = localStorage.getItem('bb_current');
+  var gate  = document.getElementById('badges-gate');
+  var loggedIn = document.getElementById('badges-logged-in');
+  if (!ic) {
+    if (gate) gate.style.display = 'block';
+    if (loggedIn) loggedIn.style.display = 'none';
+  } else {
+    if (gate) gate.style.display = 'none';
+    if (loggedIn) loggedIn.style.display = 'block';
+    loadBadges(ic);
+  }
 }
 
 function goToMemberTab() {
@@ -1811,8 +1836,8 @@ async function renderDashboard() {
       if (img) { img.src = pfp; img.style.display = 'block'; }
       if (ph)  ph.style.display = 'none';
     }
-    loadBadges(ic);
     loadMemberOrders();
+    var bt = document.getElementById('tab-badges'); if (bt) bt.style.display = 'block';
   } catch(e) { console.error(e); }
 }
 
@@ -1878,7 +1903,8 @@ async function loadMemberOrders() {
 function logoutMember() {
   localStorage.removeItem('bb_current');
   localStorage.removeItem('bb_member_rank');
-  document.getElementById('tab-tasks').style.display  = 'none';
+  document.getElementById('tab-tasks').style.display   = 'none';
+  var bt = document.getElementById('tab-badges'); if (bt) bt.style.display = 'none';
   document.getElementById('m-auth').style.display     = 'block';
   document.getElementById('m-dashboard').style.display = 'none';
   showAuthMode('login');
@@ -2851,7 +2877,11 @@ window.addEventListener('load', function() {
   loadCustomForms();
   renderOrderItems();
   var ic = localStorage.getItem('bb_current');
-  if (ic) { renderDashboard(); checkTasksAccess(); }
+  if (ic) {
+    renderDashboard();
+    checkTasksAccess();
+    var bt = document.getElementById('tab-badges'); if (bt) bt.style.display = 'block';
+  }
   if (window.location.hash === '#admin') openAdmin();
 });
 window.addEventListener('hashchange', function() {
