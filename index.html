@@ -1251,6 +1251,37 @@ function goBackOrder() {
   var sr = document.getElementById('step-review'); if (sr) sr.style.display = 'none';
 }
 
+function previewTngScreenshot(input) {
+  var file = input.files[0];
+  if (!file) return;
+  var reader = new FileReader();
+  reader.onload = function(e) {
+    var img = document.getElementById('tng-preview-img');
+    var pre = document.getElementById('tng-preview');
+    var ph  = document.getElementById('tng-placeholder');
+    if (img) img.src = e.target.result;
+    if (pre) pre.style.display = 'block';
+    if (ph)  ph.style.display  = 'none';
+  };
+  reader.readAsDataURL(file);
+}
+
+function clearTngScreenshot() {
+  var input = document.getElementById('tng-screenshot-input');
+  var img   = document.getElementById('tng-preview-img');
+  var pre   = document.getElementById('tng-preview');
+  var ph    = document.getElementById('tng-placeholder');
+  if (input) input.value = '';
+  if (img)   img.src = '';
+  if (pre)   pre.style.display = 'none';
+  if (ph)    ph.style.display  = 'block';
+}
+
+function getTngScreenshot() {
+  var img = document.getElementById('tng-preview-img');
+  return (img && img.src && img.src.startsWith('data:')) ? img.src : null;
+}
+
 async function submitOrder() {
   var btn = document.getElementById('confirm-btn');
   if (btn) { btn.innerHTML = '<span class="spinner"></span> Submitting...'; btn.disabled = true; }
@@ -1265,13 +1296,15 @@ async function submitOrder() {
     var qty = itemQtys[item.key] || 0;
     if (qty > 0) items[item.key] = { qty: qty, size: itemSizes[item.key] || null, price: parseFloat(item.price) || prices[item.key] || 0 };
   });
-  var orderNum = 'BB-' + Date.now().toString(36).toUpperCase();
+  var orderNum   = 'BB-' + Date.now().toString(36).toUpperCase();
+  var screenshot = getTngScreenshot();
   try {
     await supa.post('bb_orders', {
       order_number: orderNum, ic: ic,
       member_name: memberData.name || ic, rank: memberData.rank || '', squad: memberData.squad || '',
       items: JSON.stringify(items), notes: (document.getElementById('order-notes') || {}).value || '',
-      status: 'pending', created_at: new Date().toISOString()
+      status: 'pending', created_at: new Date().toISOString(),
+      payment_screenshot: screenshot || null
     });
     var sf = document.getElementById('step-review'); if (sf) sf.style.display = 'none';
     var sn = document.getElementById('s-ordernum');  if (sn) sn.textContent = orderNum;
@@ -1283,6 +1316,7 @@ async function submitOrder() {
       var c  = document.getElementById('ui-' + i.key); if (c) c.classList.remove('has-qty');
     });
     var on = document.getElementById('order-notes'); if (on) on.value = '';
+    clearTngScreenshot();
     updateTotal();
   } catch(e) {
     alert('Failed to submit: ' + e.message);
@@ -1662,6 +1696,14 @@ function renderUniformOrderInline() {
     + '<div id="step-review" style="display:none;"><div class="card stripe-bg">'
     + '<div class="page-title">Review</div><div class="page-subtitle">Your Order</div><div class="page-desc">Confirm before submitting \ud83d\udc47</div>'
     + '<div style="background:#fff;border-radius:14px;padding:20px;margin-bottom:18px;" id="review-content"></div>'
+    + '<div style="background:#0a1628;border:2px dashed rgba(200,150,30,0.4);border-radius:14px;padding:16px;margin-bottom:16px;">'
+    + '<div style="font-family:\'Oswald\',sans-serif;font-size:14px;font-weight:600;color:var(--gold);margin-bottom:6px;">&#128247; TNG Payment Screenshot</div>'
+    + '<div style="font-size:12px;color:#8898bb;margin-bottom:12px;">Please make payment via TNG and upload your payment screenshot before confirming.</div>'
+    + '<div style="position:relative;border-radius:10px;background:#122040;overflow:hidden;" id="tng-upload-area">'
+    + '<input type="file" id="tng-screenshot-input" accept="image/*" style="position:absolute;inset:0;opacity:0;cursor:pointer;width:100%;height:100%;z-index:2;" onchange="previewTngScreenshot(this)"/>'
+    + '<div id="tng-placeholder" style="padding:20px;text-align:center;color:#8898bb;font-size:13px;"><span style="font-size:28px;display:block;margin-bottom:6px;">&#128247;</span>Tap to upload screenshot</div>'
+    + '<div id="tng-preview" style="display:none;"><img id="tng-preview-img" style="width:100%;max-height:240px;object-fit:contain;display:block;border-radius:10px;" alt="TNG Screenshot"/><button type="button" onclick="clearTngScreenshot()" style="position:absolute;top:8px;right:8px;background:rgba(0,0,0,0.6);border:none;color:#fff;width:28px;height:28px;border-radius:50%;cursor:pointer;font-size:14px;z-index:3;">&#10005;</button></div>'
+    + '</div></div>'
     + '<div style="display:flex;gap:10px;"><button class="submit-btn danger" style="flex:1;margin-top:0;" onclick="goBackOrder()">\u270f\ufe0f Edit</button><button class="submit-btn" style="flex:2;margin-top:0;" onclick="submitOrder()" id="confirm-btn">\u2705 Confirm &amp; Submit</button></div>'
     + '</div></div>'
     + '<div class="success-box" id="order-success" style="display:none;"><div class="s-icon">\ud83c\udf89</div><div class="s-title">Order Submitted!</div><div class="s-msg">Order <strong id="s-ordernum" style="color:var(--accent);"></strong> received! The officer will contact you when ready.</div></div>';
@@ -2460,14 +2502,18 @@ async function renderAdminOrders() {
         var active = s === status;
         return '<button data-order-num="' + o.order_number + '" data-order-status="' + s + '" style="padding:3px 10px;border:1.5px solid ' + (active ? SC[s] : '#2a3a50') + ';border-radius:6px;background:' + (active ? SC[s] + '22' : 'transparent') + ';color:' + (active ? SC[s] : '#556') + ';font-size:11px;font-weight:700;cursor:pointer;font-family:\'Oswald\',sans-serif;">' + s + '</button>';
       }).join('');
+      var screenshotHtml = o.payment_screenshot
+        ? '<div style="margin:10px 0;"><div style="font-size:10px;color:#8898bb;font-weight:700;letter-spacing:1px;text-transform:uppercase;margin-bottom:6px;">&#128247; Payment Screenshot</div><img src="' + o.payment_screenshot + '" alt="TNG" style="max-width:100%;max-height:160px;object-fit:contain;border-radius:10px;border:1px solid rgba(200,150,30,0.3);cursor:pointer;display:block;" onclick="this.style.maxHeight=this.style.maxHeight===\'none\'?\'160px\':\'none\'"/><div style="font-size:10px;color:#556;margin-top:3px;">Tap to expand</div></div>'
+        : '<div style="font-size:11px;color:#3a4a60;margin:6px 0 10px;font-style:italic;">No payment screenshot</div>';
       html += '<div style="background:#0a1628;border-radius:12px;padding:14px 16px;margin-bottom:10px;border:1px solid rgba(255,255,255,0.06);">'
         + '<div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:8px;">'
         + '<div><div style="font-family:\'Oswald\',sans-serif;font-size:15px;font-weight:700;color:#fff;">' + o.order_number + '</div>'
         + '<div style="font-size:11px;color:#8898bb;">' + (o.member_name||o.ic) + ' \xb7 ' + (o.rank||'') + ' \xb7 ' + created + '</div></div>'
         + '<div style="font-size:11px;font-weight:600;padding:3px 10px;border-radius:20px;background:' + sc + '22;color:' + sc + ';border:1px solid ' + sc + '44;font-family:\'Oswald\',sans-serif;">' + status.toUpperCase() + '</div></div>'
-        + '<div style="margin-bottom:10px;">' + itemsDisplay + '</div>'
+        + '<div style="margin-bottom:4px;">' + itemsDisplay + '</div>'
+        + screenshotHtml
         + '<div style="display:flex;gap:5px;flex-wrap:wrap;">' + btns
-        + '<button data-del-sub="' + o.order_number + '" style="margin-left:auto;background:#3a1a1a;border:1px solid #6a2a2a;color:#f66;padding:3px 10px;border-radius:6px;cursor:pointer;font-size:11px;font-weight:700;">\ud83d\uddd1\ufe0f</button>'
+        + '<button data-del-sub="' + o.order_number + '" style="margin-left:auto;background:#3a1a1a;border:1px solid #6a2a2a;color:#f66;padding:3px 10px;border-radius:6px;cursor:pointer;font-size:11px;font-weight:700;">&#128465;</button>'
         + '</div></div>';
     });
     list.innerHTML = html;
