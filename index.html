@@ -1159,11 +1159,39 @@ const supa = {
     if (!r.ok) { const e = await r.text(); throw new Error(e); }
     return r.status === 204 ? null : r.json();
   },
-  get: function(p)    { return supa.req('GET', p); },
-  post: function(p,b) { return supa.req('POST', p, b); },
-  patch: function(p,b){ return supa.req('PATCH', p, b); },
-  delete: function(p) { return supa.req('DELETE', p); }
+  get:    function(p)    { return supa.req('GET',    p);    },
+  post:   function(p, b) { return supa.req('POST',   p, b); },
+  patch:  function(p, b) { return supa.req('PATCH',  p, b); },
+  delete: function(p)    { return supa.req('DELETE', p);    },
+  // ── Storage (for gallery images) ──────────────────────────────────────
+  async uploadFile(bucket, filePath, blob) {
+    const r = await fetch(SUPA_URL + '/storage/v1/object/' + bucket + '/' + filePath, {
+      method: 'POST',
+      headers: { apikey: SUPA_KEY, Authorization: 'Bearer ' + SUPA_KEY,
+                 'Content-Type': blob.type || 'image/jpeg', 'x-upsert': 'true' },
+      body: blob
+    });
+    if (!r.ok) { const e = await r.text(); throw new Error(e); }
+    return r.json();
+  },
+  fileUrl(bucket, filePath) {
+    return SUPA_URL + '/storage/v1/object/public/' + bucket + '/' + filePath;
+  },
+  async deleteFile(bucket, filePath) {
+    const r = await fetch(SUPA_URL + '/storage/v1/object/' + bucket, {
+      method: 'DELETE',
+      headers: { apikey: SUPA_KEY, Authorization: 'Bearer ' + SUPA_KEY,
+                 'Content-Type': 'application/json' },
+      body: JSON.stringify({ prefixes: [filePath] })
+    });
+    return r.ok;
+  }
 };
+
+// ── In-memory session (replaces localStorage for auth state) ──────────────
+var _session = { ic: null, rank: '', joined: '' };
+function sessionSet(k, v) { _session[k] = v; }
+function sessionGet(k)    { return (_session[k] !== undefined && _session[k] !== null) ? _session[k] : null; }
 
 const ADMIN_PASSWORD = 'bb2024admin';
 
@@ -1176,17 +1204,22 @@ const DEFAULT_UNIFORM_ITEMS = [
   { key: 'haversack', name: 'Haversack',           hasSize: false      },
   { key: 'lanyard',   name: 'Lanyard',             hasSize: false      }
 ];
-var UNIFORM_ITEMS = (function() {
-  try { var s = localStorage.getItem('bb_uniform_items'); return s ? JSON.parse(s) : DEFAULT_UNIFORM_ITEMS; } catch(e) { return DEFAULT_UNIFORM_ITEMS; }
-})();
+var UNIFORM_ITEMS = DEFAULT_UNIFORM_ITEMS.slice(); // loaded async from Supabase
 
 var prices   = {};
 var itemQtys = {};
 var itemSizes = {};
 
-function loadPrices() {
-  try { prices = JSON.parse(localStorage.getItem('bb_prices') || '{}'); } catch(e) { prices = {}; }
-  // Sync prices from item.price (admin-saved) into the prices map
+async function loadPrices() {
+  try {
+    var rows = await supa.get('bb_config?key=in.(bb_prices,bb_uniform_items)&select=key,value');
+    if (rows && rows.length) {
+      rows.forEach(function(row) {
+        if (row.key === 'bb_prices')        { try { prices = JSON.parse(row.value || '{}'); }       catch(e) { prices = {}; } }
+        if (row.key === 'bb_uniform_items') { try { var it = JSON.parse(row.value); if (it && it.length) UNIFORM_ITEMS = it; } catch(e) {} }
+      });
+    }
+  } catch(e) { prices = {}; }
   UNIFORM_ITEMS.forEach(function(item) {
     if (item.price) prices[item.key] = parseFloat(item.price) || 0;
     var p  = prices[item.key] || 0;
@@ -1229,8 +1262,12 @@ function selectSize(item, size, btn) {
   btn.classList.add('selected');
 }
 
-function saveUniformItems() {
-  localStorage.setItem('bb_uniform_items', JSON.stringify(UNIFORM_ITEMS));
+async function saveUniformItems() {
+  try {
+    await supa.req('POST', 'bb_config?on_conflict=key', { key: 'bb_uniform_items', value: JSON.stringify(UNIFORM_ITEMS) });
+  } catch(e) {
+    try { await supa.patch('bb_config?key=eq.bb_uniform_items', { value: JSON.stringify(UNIFORM_ITEMS) }); } catch(e2) { console.error('saveUniformItems:', e2); }
+  }
 }
 
 // ── Navigation ────────────────────────────────────────────────────────────
@@ -1245,7 +1282,7 @@ function switchTab(tab, btn) {
 }
 
 function checkBadgesAccess() {
-  var ic = localStorage.getItem('bb_current');
+  var ic = sessionGet('ic');
   var gate     = document.getElementById('badges-gate');
   var loggedIn = document.getElementById('badges-logged-in');
   if (!ic) {
@@ -1271,14 +1308,23 @@ var DEFAULT_PRESIDENTS_REQS = [
   { label: 'Fire Safety',              badgeMatch: 'Fire Safety',       tier: 'any'      },
 ];
 
-function getPresidentsReqs() {
-  try { return JSON.parse(localStorage.getItem('bb_presidents_reqs') || 'null') || DEFAULT_PRESIDENTS_REQS; }
-  catch(e) { return DEFAULT_PRESIDENTS_REQS; }
+async function getPresidentsReqs() {
+  try {
+    var rows = await supa.get('bb_config?key=eq.bb_presidents_reqs&select=value');
+    if (rows && rows.length) { var v = JSON.parse(rows[0].value); if (v && v.length) return v; }
+  } catch(e) {}
+  return DEFAULT_PRESIDENTS_REQS;
 }
-function savePresidentsReqs(reqs) { localStorage.setItem('bb_presidents_reqs', JSON.stringify(reqs)); }
+async function savePresidentsReqs(reqs) {
+  try {
+    await supa.req('POST', 'bb_config?on_conflict=key', { key: 'bb_presidents_reqs', value: JSON.stringify(reqs) });
+  } catch(e) {
+    try { await supa.patch('bb_config?key=eq.bb_presidents_reqs', { value: JSON.stringify(reqs) }); } catch(e2) {}
+  }
+}
 
 // Use dynamic reqs everywhere
-var PRESIDENTS_REQS = getPresidentsReqs(); // kept for compatibility, refreshed before use
+var PRESIDENTS_REQS = DEFAULT_PRESIDENTS_REQS; // refreshed async before use
 
 function switchBadgeSubtab(sub) {
   ['badgedefs','presidentsreqs'].forEach(function(s) {
@@ -1300,9 +1346,9 @@ function setReqTier(tier) {
   });
 }
 
-function renderAdminPresidentsReqs() {
-  var reqs      = getPresidentsReqs();
-  var defs      = getBadgeDefs();
+async function renderAdminPresidentsReqs() {
+  var reqs      = await getPresidentsReqs();
+  var defs      = await getBadgeDefs();
   var container = document.getElementById('admin-presidents-reqs-list');
   if (!container) return;
 
@@ -1339,41 +1385,45 @@ function renderAdminPresidentsReqs() {
   container.innerHTML = html;
 
   container.querySelectorAll('[data-del-req]').forEach(function(btn) {
-    btn.addEventListener('click', function() {
+    btn.addEventListener('click', async function() {
       var idx  = parseInt(btn.getAttribute('data-del-req'));
-      var reqs = getPresidentsReqs();
+      var reqs = await getPresidentsReqs();
       var name = reqs[idx] ? reqs[idx].badgeMatch : '';
       if (!confirm('Remove "' + name + '" from requirements?')) return;
       reqs.splice(idx, 1);
-      savePresidentsReqs(reqs);
+      await savePresidentsReqs(reqs);
       renderAdminPresidentsReqs();
     });
   });
 }
 
-function addPresidentsReq() {
+async function addPresidentsReq() {
   var sel  = document.getElementById('req-badge-select');
   var tier = (document.getElementById('req-tier-val') || {}).value || 'any';
   var name = sel ? sel.value.trim() : '';
   if (!name) { alert('Please select a badge.'); return; }
   var tierLabel = { any: '(any level)', basic: '(Basic)', advanced: '(Advanced)' };
   var label = name + ' ' + (tierLabel[tier] || '');
-  var reqs  = getPresidentsReqs();
+  var reqs  = await getPresidentsReqs();
   if (reqs.some(function(r) { return r.badgeMatch === name && r.tier === tier; })) {
     alert('This badge and level combination is already a requirement.'); return;
   }
   reqs.push({ label: label, badgeMatch: name, tier: tier });
-  savePresidentsReqs(reqs);
+  await savePresidentsReqs(reqs);
   renderAdminPresidentsReqs();
   if (sel) sel.value = '';
   setReqTier('any');
 }
 
-function renderPresidentsTracker(ic) {
+async function renderPresidentsTracker(ic) {
   var container = document.getElementById('presidents-tracker');
   if (!container) return;
-  var saved = JSON.parse(localStorage.getItem('bb_badges_' + ic) || '{}');
-  var defs  = getBadgeDefs();
+  var saved = {};
+  try {
+    var brows = await supa.get('bb_member_badges?ic=eq.' + encodeURIComponent(ic) + '&select=badge_data');
+    if (brows && brows.length) saved = JSON.parse(brows[0].badge_data || '{}');
+  } catch(e) {}
+  var defs  = await getBadgeDefs();
 
   function migrateE(r) {
     if (!r) return { basic:false, basicDate:'', advanced:false, advancedDate:'' };
@@ -1659,7 +1709,7 @@ function goToMemberTab() {
 
 // ── Order / Forms access ──────────────────────────────────────────────────
 function checkOrderAccess() {
-  var ic = localStorage.getItem('bb_current');
+  var ic = sessionGet('ic');
   var gate     = document.getElementById('order-gate');
   var loggedIn = document.getElementById('order-logged-in');
   if (!ic) { gate.style.display = 'block'; loggedIn.style.display = 'none'; return; }
@@ -1667,7 +1717,7 @@ function checkOrderAccess() {
   populateOrderBar(ic);
   loadCustomForms();
   renderFormsHub();
-  renderOrderItems(localStorage.getItem('bb_member_rank') || '');
+  renderOrderItems(sessionGet('rank') || '');
 }
 
 async function populateOrderBar(ic) {
@@ -1681,16 +1731,21 @@ async function populateOrderBar(ic) {
     var squadEl = document.getElementById('order-member-squad');
     if (nameEl)  nameEl.textContent  = m.name;
     if (rankEl)  rankEl.textContent  = m.rank || '';
-    localStorage.setItem('bb_member_rank', m.rank || '');
+    sessionSet('rank', m.rank || '');
     if (squadIl) squadIl.textContent = m.squad ? m.squad + ' Squad \xb7' : '';
     if (squadEl) squadEl.textContent = m.squad ? 'Squad ' + m.squad : '\u2014';
-    var pfp = localStorage.getItem('bb_pfp_' + ic);
-    if (pfp) {
-      var img = document.getElementById('order-pfp-img');
-      var ph  = document.getElementById('order-pfp-ph');
-      if (img) { img.src = pfp; img.style.display = 'block'; }
-      if (ph)  ph.style.display = 'none';
-    }
+    // Load profile picture from Supabase Storage
+    try {
+      var pfpUrl = supa.fileUrl('avatars', ic + '.jpg');
+      var testImg = new Image();
+      testImg.onload = function() {
+        var img = document.getElementById('order-pfp-img');
+        var ph  = document.getElementById('order-pfp-ph');
+        if (img) { img.src = pfpUrl; img.style.display = 'block'; }
+        if (ph)  ph.style.display = 'none';
+      };
+      testImg.src = pfpUrl + '?t=' + Date.now();
+    } catch(e) {}
   } catch(e) { console.error(e); }
 }
 
@@ -1701,7 +1756,7 @@ function isNCO(rank) { return NCO_RANKS.indexOf(rank) !== -1; }
 function renderOrderItems(memberRank) {
   var container = document.getElementById('uniform-items');
   if (!container) return;
-  var rank    = memberRank || localStorage.getItem('bb_member_rank') || '';
+  var rank    = memberRank || sessionGet('rank') || '';
   var nco     = isNCO(rank);
   var visible = UNIFORM_ITEMS.filter(function(item) { return !item.ncoOnly || nco; });
   if (!visible.length) {
@@ -1743,7 +1798,7 @@ function renderOrderItems(memberRank) {
 }
 
 function goToOrderReview() {
-  var ic = localStorage.getItem('bb_current') || '';
+  var ic = sessionGet('ic') || '';
   var lines = [];
   var hasAny = false;
   var valid  = true;
@@ -1814,7 +1869,7 @@ function getTngScreenshot() {
 async function submitOrder() {
   var btn = document.getElementById('confirm-btn');
   if (btn) { btn.innerHTML = '<span class="spinner"></span> Submitting...'; btn.disabled = true; }
-  var ic = localStorage.getItem('bb_current') || '';
+  var ic = sessionGet('ic') || '';
   var memberData = {};
   try {
     var d = await supa.get('bb_members?ic=eq.' + encodeURIComponent(ic) + '&select=*');
@@ -1859,10 +1914,20 @@ var _customForms     = [];
 var _currentFormType = 'link';
 var _fbFields        = [];
 
-function loadCustomForms() {
-  try { _customForms = JSON.parse(localStorage.getItem('bb_custom_forms') || '[]'); } catch(e) { _customForms = []; }
+async function loadCustomForms() {
+  try {
+    var rows = await supa.get('bb_config?key=eq.bb_custom_forms&select=value');
+    if (rows && rows.length) { _customForms = JSON.parse(rows[0].value || '[]'); }
+    else { _customForms = []; }
+  } catch(e) { _customForms = []; }
 }
-function saveCustomForms() { localStorage.setItem('bb_custom_forms', JSON.stringify(_customForms)); }
+async function saveCustomForms() {
+  try {
+    await supa.req('POST', 'bb_config?on_conflict=key', { key: 'bb_custom_forms', value: JSON.stringify(_customForms) });
+  } catch(e) {
+    try { await supa.patch('bb_config?key=eq.bb_custom_forms', { value: JSON.stringify(_customForms) }); } catch(e2) {}
+  }
+}
 
 function setFormType(type) {
   _currentFormType = type;
@@ -2203,7 +2268,7 @@ async function submitBuiltinForm(form) {
     answers[f.label] = val;
   });
   if (!valid) { alert('Please fill in all required fields.'); return; }
-  var ic   = localStorage.getItem('bb_current') || '';
+  var ic   = sessionGet('ic') || '';
   var name = (document.getElementById('order-member-name') || {}).textContent || ic;
   var rank = (document.getElementById('order-member-rank') || {}).textContent || '';
   try {
@@ -2294,7 +2359,7 @@ async function registerMember() {
       password: btoa(pass), security_question: question, security_answer: answer,
       joined_at: new Date().toISOString()
     });
-    localStorage.setItem('bb_current', ic);
+    sessionSet('ic', ic);
     renderDashboard();
     checkTasksAccess();
     alert('\u2705 Account created! Welcome, ' + name + '!');
@@ -2310,14 +2375,14 @@ async function loginMember() {
     if (!data || !data.length) return alert('No account found with this IC number.');
     var m = data[0];
     if (atob(m.password || '') !== pass) return alert('Incorrect password!');
-    localStorage.setItem('bb_current', ic);
+    sessionSet('ic', ic);
     renderDashboard();
     checkTasksAccess();
   } catch(e) { alert('Login failed: ' + e.message); }
 }
 
 async function renderDashboard() {
-  var ic = localStorage.getItem('bb_current');
+  var ic = sessionGet('ic');
   if (!ic) return;
   document.getElementById('m-auth').style.display      = 'none';
   document.getElementById('m-dashboard').style.display = 'block';
@@ -2329,24 +2394,29 @@ async function renderDashboard() {
     set('m-display-name', m.name);
     set('m-display-ic',   'IC: ' + m.ic);
     set('m-rank-val',     m.rank  || '\u2014');
-    localStorage.setItem('bb_member_rank', m.rank || '');
+    sessionSet('rank',   m.rank || '');
+    sessionSet('joined', m.joined_at || '');
     set('m-squad-val',    m.squad ? 'Squad ' + m.squad : '\u2014');
     set('m-since-val',    m.joined_at ? new Date(m.joined_at).toLocaleDateString('en-MY', { day:'numeric', month:'short', year:'numeric' }) : '\u2014');
-    localStorage.setItem('bb_member_joined',  m.joined_at || '');
-    var pfp = localStorage.getItem('bb_pfp_' + ic);
-    if (pfp) {
-      var img = document.getElementById('m-pfp-img');
-      var ph  = document.getElementById('m-pfp-ph');
-      if (img) { img.src = pfp; img.style.display = 'block'; }
-      if (ph)  ph.style.display = 'none';
-    }
+    // Load profile picture from Supabase Storage
+    try {
+      var pfpUrl = supa.fileUrl('avatars', ic + '.jpg');
+      var testImg = new Image();
+      testImg.onload = function() {
+        var img = document.getElementById('m-pfp-img');
+        var ph  = document.getElementById('m-pfp-ph');
+        if (img) { img.src = pfpUrl; img.style.display = 'block'; }
+        if (ph)  ph.style.display = 'none';
+      };
+      testImg.src = pfpUrl + '?t=' + Date.now();
+    } catch(e) {}
     loadMemberOrders();
     var bt = document.getElementById('tab-badges'); if (bt) bt.style.display = 'block';
   } catch(e) { console.error(e); }
 }
 
 async function loadMemberOrders() {
-  var ic        = localStorage.getItem('bb_current');
+  var ic        = sessionGet('ic');
   var container = document.getElementById('member-orders-list');
   if (!ic || !container) return;
   container.innerHTML = '<div style="color:#556;font-size:13px;text-align:center;padding:16px;"><span class="spinner"></span> Loading...</div>';
@@ -2405,9 +2475,7 @@ async function loadMemberOrders() {
 }
 
 function logoutMember() {
-  localStorage.removeItem('bb_current');
-  localStorage.removeItem('bb_member_rank');
-  localStorage.removeItem('bb_member_joined');
+  sessionSet('ic', null); sessionSet('rank', ''); sessionSet('joined', '');
   document.getElementById('tab-tasks').style.display   = 'none';
   var bt = document.getElementById('tab-badges'); if (bt) bt.style.display = 'none';
   document.getElementById('m-auth').style.display     = 'block';
@@ -2415,19 +2483,20 @@ function logoutMember() {
   showAuthMode('login');
 }
 
-function uploadPfp(input) {
+async function uploadPfp(input) {
   var file = input.files[0];
   if (!file) return;
-  var reader = new FileReader();
-  reader.onload = function(e) {
-    var ic = localStorage.getItem('bb_current');
-    localStorage.setItem('bb_pfp_' + ic, e.target.result);
+  var ic = sessionGet('ic');
+  if (!ic) return;
+  try {
+    var blob = new Blob([await file.arrayBuffer()], { type: file.type });
+    await supa.uploadFile('avatars', ic + '.jpg', blob);
+    var pfpUrl = supa.fileUrl('avatars', ic + '.jpg') + '?t=' + Date.now();
     var img = document.getElementById('m-pfp-img');
     var ph  = document.getElementById('m-pfp-ph');
-    if (img) { img.src = e.target.result; img.style.display = 'block'; }
+    if (img) { img.src = pfpUrl; img.style.display = 'block'; }
     if (ph)  ph.style.display = 'none';
-  };
-  reader.readAsDataURL(file);
+  } catch(e) { alert('Failed to upload photo: ' + e.message); }
 }
 
 async function loadSecurityQuestion() {
@@ -2468,7 +2537,7 @@ var DEPT_CONFIG = {
 };
 
 async function checkTasksAccess() {
-  var ic = localStorage.getItem('bb_current');
+  var ic = sessionGet('ic');
   var tab = document.getElementById('tab-tasks');
   ['tasks-gate','tasks-no-dept','tasks-board'].forEach(function(id) {
     var el = document.getElementById(id); if (el) el.style.display = 'none';
@@ -2610,8 +2679,12 @@ async function memberUpdateTaskStatus(id, status, dept) {
 // ── Gallery ────────────────────────────────────────────────────────────────
 var galleryImages = [];
 
-function loadGallery() {
-  try { galleryImages = JSON.parse(localStorage.getItem('bb_gallery') || '[]'); } catch(e) { galleryImages = []; }
+async function loadGallery() {
+  try {
+    var rows = await supa.req('GET', 'bb_gallery?order=created_at.asc&select=id,url');
+    if (rows && rows.length) { galleryImages = rows.map(function(r) { return { id: r.id, url: r.url }; }); }
+    else { galleryImages = []; }
+  } catch(e) { galleryImages = []; }
   renderGallery();
 }
 
@@ -2640,25 +2713,46 @@ function renderGallery() {
   }
 }
 
-function handleGalleryUpload(input) {
-  Array.from(input.files).forEach(function(file) {
-    var r = new FileReader();
-    r.onload = function(e) { galleryImages.push(e.target.result); localStorage.setItem('bb_gallery', JSON.stringify(galleryImages)); renderGallery(); };
-    r.readAsDataURL(file);
-  });
+async function handleGalleryUpload(input) {
+  var files = Array.from(input.files);
+  for (var fi = 0; fi < files.length; fi++) {
+    var file = files[fi];
+    try {
+      var fname = 'photo_' + Date.now() + '_' + fi + '.' + (file.name.split('.').pop() || 'jpg');
+      var blob  = new Blob([await file.arrayBuffer()], { type: file.type });
+      await supa.uploadFile('gallery', fname, blob);
+      var url = supa.fileUrl('gallery', fname);
+      var row = await supa.post('bb_gallery', { url: url, created_at: new Date().toISOString() });
+      var id  = row && row[0] ? row[0].id : null;
+      galleryImages.push({ id: id, url: url });
+    } catch(e) { alert('Upload failed: ' + e.message); }
+  }
+  renderGallery();
 }
 
-function deleteGalleryImage(idx) {
+async function deleteGalleryImage(idx, rowId) {
+  var item = galleryImages[idx];
+  var url  = item ? (typeof item === 'string' ? item : item.url) : null;
   galleryImages.splice(idx, 1);
-  localStorage.setItem('bb_gallery', JSON.stringify(galleryImages));
   renderGallery();
+  // Delete from Supabase in background
+  try {
+    if (rowId) await supa.delete('bb_gallery?id=eq.' + rowId);
+    if (url) {
+      var fname = url.split('/').pop();
+      await supa.deleteFile('gallery', fname);
+    }
+  } catch(e) { console.error('deleteGalleryImage:', e); }
 }
 
 // ── Announcements ──────────────────────────────────────────────────────────
 var announcements = [];
 
-function loadAnnouncements() {
-  try { announcements = JSON.parse(localStorage.getItem('bb_announcements') || '[]'); } catch(e) { announcements = []; }
+async function loadAnnouncements() {
+  try {
+    var rows = await supa.get('bb_announcements?order=created_at.asc&select=*');
+    announcements = rows || [];
+  } catch(e) { announcements = []; }
   renderAnnouncements();
 }
 
@@ -2668,7 +2762,7 @@ function renderAnnouncements() {
   var list = document.getElementById('announcements-list');
   if (!list) return;
   if (!announcements.length) { list.innerHTML = '<div style="color:#8898bb;font-size:13px;text-align:center;padding:20px;">No announcements yet.</div>'; return; }
-  var ic  = localStorage.getItem('bb_current') || '';
+  var ic  = sessionGet('ic') || '';
   var html = '';
   announcements.slice().reverse().forEach(function(a, ri) {
     var realIdx = announcements.length - 1 - ri;
@@ -2712,8 +2806,8 @@ function renderAnnouncements() {
   });
 }
 
-function toggleReaction(annIdx, emoji) {
-  var ic = localStorage.getItem('bb_current');
+async function toggleReaction(annIdx, emoji) {
+  var ic = sessionGet('ic');
   if (!ic) { alert('Please log in to react to announcements.'); return; }
   var a = announcements[annIdx];
   if (!a) return;
@@ -2721,18 +2815,20 @@ function toggleReaction(annIdx, emoji) {
   if (!a.reactions[emoji]) a.reactions[emoji] = [];
   var who = a.reactions[emoji];
   var pos = who.indexOf(ic);
-  if (pos === -1) who.push(ic);
-  else who.splice(pos, 1);
-  localStorage.setItem('bb_announcements', JSON.stringify(announcements));
+  if (pos === -1) who.push(ic); else who.splice(pos, 1);
+  try { await supa.patch('bb_announcements?id=eq.' + a.id, { reactions: a.reactions }); }
+  catch(e) { console.error('toggleReaction:', e); }
   renderAnnouncements();
 }
 
 
-function deleteAnnouncement(idx) {
+async function deleteAnnouncement(idx) {
+  var a = announcements[idx];
   announcements.splice(idx, 1);
-  localStorage.setItem('bb_announcements', JSON.stringify(announcements));
   renderAnnouncements();
   renderAdminAnnList();
+  try { if (a && a.id) await supa.delete('bb_announcements?id=eq.' + a.id); }
+  catch(e) { console.error('deleteAnnouncement:', e); }
 }
 
 function renderAdminAnnList() {
@@ -2772,7 +2868,7 @@ function openEditAnnouncement(idx) {
   if (form) form.scrollIntoView({ behavior: 'smooth' });
 }
 
-function addAnnouncement() {
+async function addAnnouncement() {
   var title   = (document.getElementById('ann-title-input') || {}).value || '';
   var bodyEl  = document.getElementById('ann-body-input');
   var body    = bodyEl ? bodyEl.innerHTML.trim() : '';
@@ -2782,13 +2878,17 @@ function addAnnouncement() {
   if (!title || !body || body === '<br>') { alert('Please fill in both title and message.'); return; }
   var date = new Date().toLocaleDateString('en-MY', { day:'numeric', month:'short', year:'numeric' }).toUpperCase();
   if (editIdx >= 0) {
-    announcements[editIdx].title = title;
-    announcements[editIdx].body  = body;
+    var a = announcements[editIdx];
+    a.title = title; a.body = body;
+    try { if (a.id) await supa.patch('bb_announcements?id=eq.' + a.id, { title: title, body: body }); }
+    catch(e) { console.error('editAnn:', e); }
     if (btn) { btn.textContent = '📢 Post Announcement'; btn.removeAttribute('data-edit-idx'); }
   } else {
-    announcements.push({ title: title, body: body, date: date });
+    try {
+      var row = await supa.post('bb_announcements', { title: title, body: body, date: date, reactions: {}, created_at: new Date().toISOString() });
+      if (row && row[0]) announcements.push(row[0]);
+    } catch(e) { alert('Failed to post: ' + e.message); return; }
   }
-  localStorage.setItem('bb_announcements', JSON.stringify(announcements));
   var ti = document.getElementById('ann-title-input'); if (ti) ti.value = '';
   if (bodyEl) bodyEl.innerHTML = '';
   renderAnnouncements();
@@ -2812,11 +2912,32 @@ var DEFAULT_BB_BADGES = [
   { id:'bb13', name:'Music & Worship',    cat:'Arts',       hasAdvanced:false }
 ];
 
-function getBadgeDefs() {
-  try { return JSON.parse(localStorage.getItem('bb_badge_defs') || 'null') || DEFAULT_BB_BADGES; }
-  catch(e) { return DEFAULT_BB_BADGES; }
+async function getBadgeDefs() {
+  try {
+    var rows = await supa.get('bb_config?key=eq.bb_badge_defs&select=value');
+    if (rows && rows.length) { var v = JSON.parse(rows[0].value); if (v && v.length) return v; }
+  } catch(e) {}
+  return DEFAULT_BB_BADGES;
 }
-function saveBadgeDefs(defs) { localStorage.setItem('bb_badge_defs', JSON.stringify(defs)); }
+async function saveBadgeDefs(defs) {
+  try {
+    await supa.req('POST', 'bb_config?on_conflict=key', { key: 'bb_badge_defs', value: JSON.stringify(defs) });
+  } catch(e) {
+    try { await supa.patch('bb_config?key=eq.bb_badge_defs', { value: JSON.stringify(defs) }); } catch(e2) {}
+  }
+}
+
+// ── Badge upsert helper ───────────────────────────────────────────────────
+async function upsertMemberBadges(ic, saved) {
+  try {
+    var existing = await supa.get('bb_member_badges?ic=eq.' + encodeURIComponent(ic) + '&select=id');
+    if (existing && existing.length) {
+      await supa.patch('bb_member_badges?ic=eq.' + encodeURIComponent(ic), { badge_data: JSON.stringify(saved), updated_at: new Date().toISOString() });
+    } else {
+      await supa.post('bb_member_badges', { ic: ic, badge_data: JSON.stringify(saved), updated_at: new Date().toISOString() });
+    }
+  } catch(e) { console.error('upsertMemberBadges:', e); }
+}
 
 function migrateEntry(raw) {
   if (!raw) return { basic:false, basicDate:'', advanced:false, advancedDate:'' };
@@ -2824,9 +2945,13 @@ function migrateEntry(raw) {
   return { basic:raw.basic||false, basicDate:raw.basicDate||'', advanced:raw.advanced||false, advancedDate:raw.advancedDate||'' };
 }
 
-function loadBadges(ic) {
-  var saved     = JSON.parse(localStorage.getItem('bb_badges_' + ic) || '{}');
-  var defs      = getBadgeDefs();
+async function loadBadges(ic) {
+  var saved = {};
+  try {
+    var brows = await supa.get('bb_member_badges?ic=eq.' + encodeURIComponent(ic) + '&select=badge_data');
+    if (brows && brows.length) saved = JSON.parse(brows[0].badge_data || '{}');
+  } catch(e) {}
+  var defs = await getBadgeDefs();
   var container = document.getElementById('badges-list');
   if (!container) return;
   var cats = [];
@@ -2973,8 +3098,12 @@ function loadBadges(ic) {
   });
 }
 
-function adjustRepBadge(badgeId, ic, delta) {
-  var saved   = JSON.parse(localStorage.getItem('bb_badges_' + ic) || '{}');
+async function adjustRepBadge(badgeId, ic, delta) {
+  var saved = {};
+  try {
+    var brows = await supa.get('bb_member_badges?ic=eq.' + encodeURIComponent(ic) + '&select=badge_data');
+    if (brows && brows.length) saved = JSON.parse(brows[0].badge_data || '{}');
+  } catch(e) {}
   var repData = saved[badgeId + '_rep'];
   if (!repData || typeof repData !== 'object' || Array.isArray(repData)) {
     var old = migrateEntry(saved[badgeId]);
@@ -2984,31 +3113,38 @@ function adjustRepBadge(badgeId, ic, delta) {
   var dates    = (repData.dates || []).slice(0, newCount);
   while (dates.length < newCount) dates.push('');
   saved[badgeId + '_rep'] = { count: newCount, dates: dates };
-  localStorage.setItem('bb_badges_' + ic, JSON.stringify(saved));
+  await upsertMemberBadges(ic, saved);
   loadBadges(ic);
   renderPresidentsTracker(ic);
 }
 
 
-function toggleBadge(badgeId, ic, tier) {
-  var saved = JSON.parse(localStorage.getItem('bb_badges_' + ic) || '{}');
+async function toggleBadge(badgeId, ic, tier) {
+  var saved = {};
+  try {
+    var brows = await supa.get('bb_member_badges?ic=eq.' + encodeURIComponent(ic) + '&select=badge_data');
+    if (brows && brows.length) saved = JSON.parse(brows[0].badge_data || '{}');
+  } catch(e) {}
   var entry = migrateEntry(saved[badgeId]);
   if (tier === 'advanced') entry.advanced = !entry.advanced;
   else entry.basic = !entry.basic;
   saved[badgeId] = entry;
-  localStorage.setItem('bb_badges_' + ic, JSON.stringify(saved));
+  await upsertMemberBadges(ic, saved);
   loadBadges(ic);
   renderPresidentsTracker(ic);
 }
 
-function saveBadges() {
-  var ic = localStorage.getItem('bb_current');
+async function saveBadges() {
+  var ic = sessionGet('ic');
   if (!ic) return;
-  var defs  = getBadgeDefs();
-  var saved = JSON.parse(localStorage.getItem('bb_badges_' + ic) || '{}');
+  var defs = await getBadgeDefs();
+  var saved = {};
+  try {
+    var brows = await supa.get('bb_member_badges?ic=eq.' + encodeURIComponent(ic) + '&select=badge_data');
+    if (brows && brows.length) saved = JSON.parse(brows[0].badge_data || '{}');
+  } catch(e) {}
   defs.forEach(function(b) {
     if (b.repeatable) {
-      // Save repeatable dates
       var repData = saved[b.id + '_rep'] || { count: 0, dates: [] };
       var newDates = [];
       for (var di = 0; di < repData.count; di++) {
@@ -3026,13 +3162,13 @@ function saveBadges() {
       saved[b.id] = entry;
     }
   });
-  localStorage.setItem('bb_badges_' + ic, JSON.stringify(saved));
+  await upsertMemberBadges(ic, saved);
   renderPresidentsTracker(ic);
   alert('\u2705 Badges saved!');
 }
 
-function renderAdminBadges() {
-  var defs      = getBadgeDefs();
+async function renderAdminBadges() {
+  var defs      = await getBadgeDefs();
   var cats      = [];
   defs.forEach(function(b) { if (cats.indexOf(b.cat) === -1) cats.push(b.cat); });
   var container = document.getElementById('admin-badges-content');
@@ -3149,7 +3285,7 @@ function renderAdminBadges() {
       var id    = btn.getAttribute('data-del-badge');
       var badge = getBadgeDefs().find(function(b) { return b.id === id; });
       if (!badge || !confirm('Delete badge "' + badge.name + '"?')) return;
-      saveBadgeDefs(getBadgeDefs().filter(function(b) { return b.id !== id; }));
+      saveBadgeDefs((await getBadgeDefs()).filter(function(b) { return b.id !== id; }));
       renderAdminBadges();
     });
   });
@@ -3160,9 +3296,9 @@ function renderAdminBadges() {
       var input = document.getElementById(key);
       var name  = input ? input.value.trim() : '';
       if (!name) { alert('Please enter a badge name.'); return; }
-      var defs  = getBadgeDefs().filter(function(b) { return !(b.cat === cat && b.name === '(Add badges below)'); });
+      var defs  = (await getBadgeDefs()).filter(function(b) { return !(b.cat === cat && b.name === '(Add badges below)'); });
       defs.push({ id: 'b_' + Date.now(), name: name, cat: cat, hasAdvanced: false, tier: 'basic', repeatable: false });
-      saveBadgeDefs(defs);
+      await saveBadgeDefs(defs);
       if (input) input.value = '';
       renderAdminBadges();
     });
@@ -3172,10 +3308,10 @@ function renderAdminBadges() {
     var input = document.getElementById('new-cat-name');
     var name  = input ? input.value.trim() : '';
     if (!name) { alert('Please enter a section name.'); return; }
-    var defs  = getBadgeDefs();
+    var defs  = await getBadgeDefs();
     if (defs.some(function(b) { return b.cat === name; })) { alert('Section already exists.'); return; }
     defs.push({ id: 'b_' + Date.now(), name: '(Add badges below)', cat: name, hasAdvanced: false });
-    saveBadgeDefs(defs);
+    await saveBadgeDefs(defs);
     if (input) input.value = '';
     renderAdminBadges();
   });
@@ -3188,7 +3324,7 @@ var ADMIN_SECTIONS = ['members','orders','uniform','tasks','announcements','badg
 function openAdmin() {
   document.getElementById('admin-overlay').style.display = 'block';
   document.body.style.overflow = 'hidden';
-  localStorage.removeItem('bb_admin');
+  sessionSet('adminAuthed', false);
   document.getElementById('admin-login-box').style.display = 'block';
   document.getElementById('admin-panel').style.display     = 'none';
   var passEl = document.getElementById('admin-pass');
@@ -3201,7 +3337,7 @@ function closeAdmin() {
 }
 
 function logoutAdmin() {
-  localStorage.removeItem('bb_admin');
+  sessionSet('adminAuthed', false);
   document.getElementById('admin-panel').style.display     = 'none';
   document.getElementById('admin-login-box').style.display = 'block';
   var passEl = document.getElementById('admin-pass');
@@ -3211,7 +3347,7 @@ function logoutAdmin() {
 function adminLogin() {
   var pass = (document.getElementById('admin-pass') || {}).value || '';
   if (pass !== ADMIN_PASSWORD) { alert('Wrong password!'); return; }
-  localStorage.setItem('bb_admin', '1');
+  sessionSet('adminAuthed', true);
   document.getElementById('admin-login-box').style.display = 'none';
   document.getElementById('admin-panel').style.display     = 'block';
   backToAdminHome();
@@ -3984,7 +4120,7 @@ window.addEventListener('load', function() {
   loadAnnouncements();
   loadCustomForms();
   renderOrderItems();
-  var ic = localStorage.getItem('bb_current');
+  var ic = sessionGet('ic');
   if (ic) {
     renderDashboard();
     checkTasksAccess();
@@ -4004,8 +4140,18 @@ document.addEventListener('DOMContentLoaded', function() {
     e.preventDefault(); drop.classList.remove('dragover');
     Array.from(e.dataTransfer.files).filter(function(f) { return f.type.startsWith('image/'); }).forEach(function(f) {
       var r = new FileReader();
-      r.onload = function(ev) { galleryImages.push(ev.target.result); localStorage.setItem('bb_gallery', JSON.stringify(galleryImages)); renderGallery(); };
-      r.readAsDataURL(f);
+      (async function(f) {
+        try {
+          var fname = 'photo_' + Date.now() + '.' + (f.name.split('.').pop() || 'jpg');
+          var blob  = new Blob([await f.arrayBuffer()], { type: f.type });
+          await supa.uploadFile('gallery', fname, blob);
+          var url = supa.fileUrl('gallery', fname);
+          var row = await supa.post('bb_gallery', { url: url, created_at: new Date().toISOString() });
+          var id  = row && row[0] ? row[0].id : null;
+          galleryImages.push({ id: id, url: url });
+          renderGallery();
+        } catch(e) { alert('Upload failed: ' + e.message); }
+      })(f);
     });
   });
 });
