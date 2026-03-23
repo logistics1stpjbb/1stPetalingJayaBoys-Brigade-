@@ -2182,21 +2182,19 @@ function renderAdminAnnList() {
 
 // ── Badges ─────────────────────────────────────────────────────────────────
 var DEFAULT_BB_BADGES = [
-  { id:'bb1',  name:'BB Enrolment',          cat:'Core'       },
-  { id:'bb2',  name:"BB Founder's Award",    cat:'Core'       },
-  { id:'bb3',  name:"President's Award",     cat:'Core'       },
-  { id:'bb4',  name:'First Aid (Basic)',      cat:'Skills'     },
-  { id:'bb5',  name:'First Aid (Advanced)',   cat:'Skills'     },
-  { id:'bb6',  name:'Fire Safety',            cat:'Skills'     },
-  { id:'bb7',  name:'Marching',               cat:'Drill'      },
-  { id:'bb8',  name:'Best Driller',           cat:'Drill'      },
-  { id:'bb9',  name:'Leadership',             cat:'Leadership' },
-  { id:'bb10', name:'Community Service',      cat:'Service'    },
-  { id:'bb11', name:'Best Camper',            cat:'Outdoor'    },
-  { id:'bb12', name:'Orienteering',           cat:'Outdoor'    },
-  { id:'bb13', name:'Swimming (Beginner)',     cat:'Sports'     },
-  { id:'bb14', name:'Swimming (Proficiency)', cat:'Sports'     },
-  { id:'bb15', name:'Music & Worship',        cat:'Arts'       }
+  { id:'bb1',  name:'BB Enrolment',       cat:'Core',       hasAdvanced:false },
+  { id:'bb2',  name:"BB Founder's Award", cat:'Core',       hasAdvanced:false },
+  { id:'bb3',  name:"President's Award",  cat:'Core',       hasAdvanced:false },
+  { id:'bb4',  name:'First Aid',          cat:'Skills',     hasAdvanced:true  },
+  { id:'bb5',  name:'Fire Safety',        cat:'Skills',     hasAdvanced:false },
+  { id:'bb6',  name:'Marching',           cat:'Drill',      hasAdvanced:true  },
+  { id:'bb7',  name:'Best Driller',       cat:'Drill',      hasAdvanced:false },
+  { id:'bb8',  name:'Leadership',         cat:'Leadership', hasAdvanced:true  },
+  { id:'bb9',  name:'Community Service',  cat:'Service',    hasAdvanced:false },
+  { id:'bb10', name:'Best Camper',        cat:'Outdoor',    hasAdvanced:true  },
+  { id:'bb11', name:'Orienteering',       cat:'Outdoor',    hasAdvanced:false },
+  { id:'bb12', name:'Swimming',           cat:'Sports',     hasAdvanced:true  },
+  { id:'bb13', name:'Music & Worship',    cat:'Arts',       hasAdvanced:false }
 ];
 
 function getBadgeDefs() {
@@ -2204,6 +2202,12 @@ function getBadgeDefs() {
   catch(e) { return DEFAULT_BB_BADGES; }
 }
 function saveBadgeDefs(defs) { localStorage.setItem('bb_badge_defs', JSON.stringify(defs)); }
+
+function migrateEntry(raw) {
+  if (!raw) return { basic:false, basicDate:'', advanced:false, advancedDate:'' };
+  if (typeof raw.earned !== 'undefined') return { basic:raw.earned, basicDate:raw.date||'', advanced:false, advancedDate:'' };
+  return { basic:raw.basic||false, basicDate:raw.basicDate||'', advanced:raw.advanced||false, advancedDate:raw.advancedDate||'' };
+}
 
 function loadBadges(ic) {
   var saved     = JSON.parse(localStorage.getItem('bb_badges_' + ic) || '{}');
@@ -2213,37 +2217,72 @@ function loadBadges(ic) {
   var cats = [];
   defs.forEach(function(b) { if (cats.indexOf(b.cat) === -1) cats.push(b.cat); });
   if (!cats.length) { container.innerHTML = '<div style="color:#8898bb;font-size:13px;text-align:center;padding:16px;">No badges defined yet.</div>'; return; }
+
   var html = '';
   cats.forEach(function(cat) {
     var catBadges = defs.filter(function(b) { return b.cat === cat && b.name !== '(Add badges below)'; });
     if (!catBadges.length) return;
-    html += '<div style="margin-bottom:16px;">'
-      + '<div style="font-size:10px;font-weight:700;letter-spacing:2px;color:var(--gold);text-transform:uppercase;margin-bottom:8px;">' + cat + '</div>';
+    html += '<div style="margin-bottom:20px;">';
+    html += '<div style="font-size:10px;font-weight:700;letter-spacing:2px;color:var(--gold);text-transform:uppercase;margin-bottom:10px;">' + cat + '</div>';
+
     catBadges.forEach(function(b) {
-      var entry   = saved[b.id] || { earned: false, date: '' };
-      var chkBg   = entry.earned ? 'rgba(200,150,30,0.2)' : 'transparent';
-      var chkBord = entry.earned ? 'var(--gold)' : '#2a3a50';
-      var chkTxt  = entry.earned ? '\u2713' : '';
-      var txtCol  = entry.earned ? '#fff' : '#8898bb';
-      var opacity = entry.earned ? '' : 'opacity:0.4;';
-      html += '<div style="display:flex;align-items:center;gap:10px;padding:8px 0;border-bottom:1px solid rgba(255,255,255,0.05);">'
-        + '<div data-badge-id="' + b.id + '" data-ic="' + ic + '" style="width:22px;height:22px;border-radius:6px;border:2px solid ' + chkBord + ';background:' + chkBg + ';display:flex;align-items:center;justify-content:center;cursor:pointer;flex-shrink:0;font-size:13px;">' + chkTxt + '</div>'
-        + '<div style="flex:1;font-size:13px;color:' + txtCol + ';">' + b.name + '</div>'
-        + '<input type="date" id="badge-date-' + b.id + '" value="' + (entry.date||'') + '" style="background:#0a1628;color:#8898bb;border:1px solid #2a3a50;border-radius:7px;padding:4px 8px;font-size:11px;width:130px;' + opacity + '"/>'
-        + '</div>';
+      var entry = migrateEntry(saved[b.id]);
+
+      var bBg   = entry.basic    ? 'rgba(200,150,30,0.18)' : 'transparent';
+      var bBord = entry.basic    ? 'var(--gold)'           : '#2a3a50';
+      var bTxt  = entry.basic    ? '#e8b830'               : '#556';
+      var aBg   = entry.advanced ? 'rgba(66,165,245,0.15)' : 'transparent';
+      var aBord = entry.advanced ? '#42a5f5'               : '#2a3a50';
+      var aTxt  = entry.advanced ? '#42a5f5'               : '#556';
+
+      html += '<div style="background:#0d1e36;border-radius:10px;padding:12px 14px;margin-bottom:8px;">';
+      html += '<div style="font-size:13px;font-weight:600;color:#fff;margin-bottom:10px;">' + b.name + '</div>';
+
+      // Basic row
+      html += '<div style="display:flex;align-items:center;gap:10px;margin-bottom:' + (b.hasAdvanced ? '6px' : '0') + ';">';
+      html += '<div data-badge-id="' + b.id + '" data-tier="basic" data-ic="' + ic + '" '
+        + 'style="width:22px;height:22px;border-radius:6px;border:2px solid ' + bBord + ';background:' + bBg + ';'
+        + 'display:flex;align-items:center;justify-content:center;cursor:pointer;flex-shrink:0;font-size:12px;">'
+        + (entry.basic ? '&#10003;' : '') + '</div>';
+      html += '<span style="font-size:11px;font-weight:700;letter-spacing:1px;color:' + bTxt + ';text-transform:uppercase;width:70px;flex-shrink:0;">Basic</span>';
+      html += '<input type="date" id="badge-basic-' + b.id + '" value="' + entry.basicDate + '" '
+        + 'style="flex:1;background:#0a1628;color:#8898bb;border:1px solid #2a3a50;border-radius:7px;padding:4px 8px;font-size:11px;'
+        + (entry.basic ? '' : 'opacity:0.4;') + '"/>';
+      html += '</div>';
+
+      // Advanced row (only if hasAdvanced)
+      if (b.hasAdvanced) {
+        html += '<div style="display:flex;align-items:center;gap:10px;">';
+        html += '<div data-badge-id="' + b.id + '" data-tier="advanced" data-ic="' + ic + '" '
+          + 'style="width:22px;height:22px;border-radius:6px;border:2px solid ' + aBord + ';background:' + aBg + ';'
+          + 'display:flex;align-items:center;justify-content:center;cursor:pointer;flex-shrink:0;font-size:12px;">'
+          + (entry.advanced ? '&#10003;' : '') + '</div>';
+        html += '<span style="font-size:11px;font-weight:700;letter-spacing:1px;color:' + aTxt + ';text-transform:uppercase;width:70px;flex-shrink:0;">Advanced</span>';
+        html += '<input type="date" id="badge-adv-' + b.id + '" value="' + entry.advancedDate + '" '
+          + 'style="flex:1;background:#0a1628;color:#8898bb;border:1px solid #2a3a50;border-radius:7px;padding:4px 8px;font-size:11px;'
+          + (entry.advanced ? '' : 'opacity:0.4;') + '"/>';
+        html += '</div>';
+      }
+
+      html += '</div>';
     });
     html += '</div>';
   });
+
   container.innerHTML = html;
   container.querySelectorAll('[data-badge-id]').forEach(function(el) {
-    el.addEventListener('click', function() { toggleBadge(el.getAttribute('data-badge-id'), el.getAttribute('data-ic')); });
+    el.addEventListener('click', function() {
+      toggleBadge(el.getAttribute('data-badge-id'), el.getAttribute('data-ic'), el.getAttribute('data-tier'));
+    });
   });
 }
 
-function toggleBadge(badgeId, ic) {
+function toggleBadge(badgeId, ic, tier) {
   var saved = JSON.parse(localStorage.getItem('bb_badges_' + ic) || '{}');
-  var curr  = saved[badgeId] || { earned: false, date: '' };
-  saved[badgeId] = { earned: !curr.earned, date: curr.date };
+  var entry = migrateEntry(saved[badgeId]);
+  if (tier === 'advanced') entry.advanced = !entry.advanced;
+  else entry.basic = !entry.basic;
+  saved[badgeId] = entry;
   localStorage.setItem('bb_badges_' + ic, JSON.stringify(saved));
   loadBadges(ic);
 }
@@ -2254,8 +2293,12 @@ function saveBadges() {
   var defs  = getBadgeDefs();
   var saved = JSON.parse(localStorage.getItem('bb_badges_' + ic) || '{}');
   defs.forEach(function(b) {
-    var el = document.getElementById('badge-date-' + b.id);
-    if (el) { if (!saved[b.id]) saved[b.id] = { earned: false, date: '' }; saved[b.id].date = el.value; }
+    var entry = migrateEntry(saved[b.id]);
+    var bd = document.getElementById('badge-basic-' + b.id);
+    var ad = document.getElementById('badge-adv-'   + b.id);
+    if (bd) entry.basicDate    = bd.value;
+    if (ad) entry.advancedDate = ad.value;
+    saved[b.id] = entry;
   });
   localStorage.setItem('bb_badges_' + ic, JSON.stringify(saved));
   alert('\u2705 Badges saved!');
@@ -2273,28 +2316,46 @@ function renderAdminBadges() {
     var inputKey  = 'nb_' + cat.replace(/[^a-zA-Z0-9]/g,'_');
     var rows = catBadges.length
       ? catBadges.map(function(b) {
-          return '<div style="display:flex;align-items:center;gap:8px;padding:7px 0;border-bottom:1px solid rgba(255,255,255,0.05);">'
-            + '<div style="flex:1;font-size:13px;color:#ccc;">' + b.name + '</div>'
-            + '<button data-del-badge="' + b.id + '" style="background:none;border:none;color:#f66;font-size:14px;cursor:pointer;padding:2px 8px;">\u2715</button></div>';
+          var advLabel = b.hasAdvanced
+            ? '<span style="font-size:9px;font-weight:700;background:rgba(66,165,245,0.15);color:#42a5f5;border:1px solid rgba(66,165,245,0.3);padding:2px 7px;border-radius:20px;margin-left:6px;">Basic + Advanced</span>'
+            : '<span style="font-size:9px;color:#556;margin-left:6px;">Basic only</span>';
+          return '<div style="display:flex;align-items:center;gap:8px;padding:9px 0;border-bottom:1px solid rgba(255,255,255,0.05);">'
+            + '<div style="flex:1;"><span style="font-size:13px;color:#ccc;">' + b.name + '</span>' + advLabel + '</div>'
+            + '<label style="display:flex;align-items:center;gap:5px;cursor:pointer;font-size:11px;color:#8898bb;white-space:nowrap;">'
+              + '<input type="checkbox" data-toggle-adv="' + b.id + '" ' + (b.hasAdvanced ? 'checked' : '') + ' style="accent-color:#42a5f5;cursor:pointer;"/> Has Advanced</label>'
+            + '<button data-del-badge="' + b.id + '" style="background:none;border:none;color:#f66;font-size:14px;cursor:pointer;padding:2px 8px;">\u00d7</button>'
+            + '</div>';
         }).join('')
       : '<div style="font-size:12px;color:#556;padding:6px 0;">No badges yet \u2014 add one below.</div>';
+
     html += '<div style="background:#0a1628;border-radius:12px;padding:14px 16px;margin-bottom:12px;border:1px solid rgba(255,255,255,0.07);">'
       + '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;">'
-      + '<div style="font-family:\'Oswald\',sans-serif;font-size:15px;font-weight:700;color:var(--gold);">' + cat + '</div>'
-      + '<button data-del-cat="' + cat + '" style="background:#3a1a1a;border:1px solid #6a2a2a;color:#f66;padding:4px 12px;border-radius:7px;cursor:pointer;font-size:11px;font-weight:700;">\ud83d\uddd1\ufe0f Delete section</button>'
+        + '<div style="font-family:\'Oswald\',sans-serif;font-size:15px;font-weight:700;color:var(--gold);">' + cat + '</div>'
+        + '<button data-del-cat="' + cat + '" style="background:#3a1a1a;border:1px solid #6a2a2a;color:#f66;padding:4px 12px;border-radius:7px;cursor:pointer;font-size:11px;font-weight:700;">Delete section</button>'
       + '</div>' + rows
       + '<div style="display:flex;gap:8px;margin-top:10px;">'
-      + '<input type="text" id="' + inputKey + '" placeholder="New badge name..." style="flex:1;background:#122040;color:#fff;border:1.5px solid #2a3a50;border-radius:8px;padding:8px 10px;font-size:13px;outline:none;"/>'
-      + '<button data-add-badge="' + cat + '" style="background:rgba(200,150,30,0.15);border:1px solid rgba(200,150,30,0.35);color:var(--gold);padding:8px 14px;border-radius:8px;cursor:pointer;font-size:13px;font-weight:700;white-space:nowrap;">+ Add</button>'
+        + '<input type="text" id="' + inputKey + '" placeholder="New badge name..." style="flex:1;background:#122040;color:#fff;border:1.5px solid #2a3a50;border-radius:8px;padding:8px 10px;font-size:13px;outline:none;"/>'
+        + '<button data-add-badge="' + cat + '" style="background:rgba(200,150,30,0.15);border:1px solid rgba(200,150,30,0.35);color:var(--gold);padding:8px 14px;border-radius:8px;cursor:pointer;font-size:13px;font-weight:700;white-space:nowrap;">+ Add</button>'
       + '</div></div>';
   });
+
   html += '<div style="background:#0a1628;border-radius:12px;padding:14px 16px;border:1px dashed rgba(200,150,30,0.3);">'
     + '<div style="font-family:\'Oswald\',sans-serif;font-size:14px;font-weight:600;color:#8898bb;margin-bottom:10px;">\u2795 Add New Section</div>'
     + '<div style="display:flex;gap:8px;">'
-    + '<input type="text" id="new-cat-name" placeholder="Section name e.g. Leadership" style="flex:1;background:#122040;color:#fff;border:1.5px solid #2a3a50;border-radius:8px;padding:8px 10px;font-size:13px;outline:none;"/>'
-    + '<button id="btn-add-cat" style="background:var(--accent);border:none;color:var(--navy);padding:8px 18px;border-radius:8px;cursor:pointer;font-size:14px;font-weight:700;">+ Add</button>'
+      + '<input type="text" id="new-cat-name" placeholder="Section name e.g. Leadership" style="flex:1;background:#122040;color:#fff;border:1.5px solid #2a3a50;border-radius:8px;padding:8px 10px;font-size:13px;outline:none;"/>'
+      + '<button id="btn-add-cat" style="background:var(--accent);border:none;color:var(--navy);padding:8px 18px;border-radius:8px;cursor:pointer;font-size:14px;font-weight:700;">+ Add</button>'
     + '</div></div>';
+
   container.innerHTML = html;
+
+  container.querySelectorAll('[data-toggle-adv]').forEach(function(chk) {
+    chk.addEventListener('change', function() {
+      var id    = chk.getAttribute('data-toggle-adv');
+      var defs  = getBadgeDefs();
+      var badge = defs.find(function(b) { return b.id === id; });
+      if (badge) { badge.hasAdvanced = chk.checked; saveBadgeDefs(defs); renderAdminBadges(); }
+    });
+  });
   container.querySelectorAll('[data-del-cat]').forEach(function(btn) {
     btn.addEventListener('click', function() {
       var cat = btn.getAttribute('data-del-cat');
@@ -2314,13 +2375,13 @@ function renderAdminBadges() {
   });
   container.querySelectorAll('[data-add-badge]').forEach(function(btn) {
     btn.addEventListener('click', function() {
-      var cat    = btn.getAttribute('data-add-badge');
-      var key    = 'nb_' + cat.replace(/[^a-zA-Z0-9]/g,'_');
-      var input  = document.getElementById(key);
-      var name   = input ? input.value.trim() : '';
+      var cat   = btn.getAttribute('data-add-badge');
+      var key   = 'nb_' + cat.replace(/[^a-zA-Z0-9]/g,'_');
+      var input = document.getElementById(key);
+      var name  = input ? input.value.trim() : '';
       if (!name) { alert('Please enter a badge name.'); return; }
-      var defs   = getBadgeDefs().filter(function(b) { return !(b.cat === cat && b.name === '(Add badges below)'); });
-      defs.push({ id: 'b_' + Date.now(), name: name, cat: cat });
+      var defs  = getBadgeDefs().filter(function(b) { return !(b.cat === cat && b.name === '(Add badges below)'); });
+      defs.push({ id: 'b_' + Date.now(), name: name, cat: cat, hasAdvanced: false });
       saveBadgeDefs(defs);
       if (input) input.value = '';
       renderAdminBadges();
@@ -2333,12 +2394,13 @@ function renderAdminBadges() {
     if (!name) { alert('Please enter a section name.'); return; }
     var defs  = getBadgeDefs();
     if (defs.some(function(b) { return b.cat === name; })) { alert('Section already exists.'); return; }
-    defs.push({ id: 'b_' + Date.now(), name: '(Add badges below)', cat: name });
+    defs.push({ id: 'b_' + Date.now(), name: '(Add badges below)', cat: name, hasAdvanced: false });
     saveBadgeDefs(defs);
     if (input) input.value = '';
     renderAdminBadges();
   });
 }
+
 
 // ── Admin ──────────────────────────────────────────────────────────────────
 var ADMIN_SECTIONS = ['members','orders','uniform','tasks','announcements','badges','gallery'];
