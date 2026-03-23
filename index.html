@@ -2231,9 +2231,9 @@ function loadBadges(ic) {
       var bBg   = entry.basic    ? 'rgba(200,150,30,0.18)' : 'transparent';
       var bBord = entry.basic    ? 'var(--gold)'           : '#2a3a50';
       var bTxt  = entry.basic    ? '#e8b830'               : '#556';
-      var aBg   = entry.advanced ? 'rgba(66,165,245,0.15)' : 'transparent';
-      var aBord = entry.advanced ? '#42a5f5'               : '#2a3a50';
-      var aTxt  = entry.advanced ? '#42a5f5'               : '#556';
+      var aBg   = entry.advanced ? 'rgba(239,83,80,0.15)'  : 'transparent';
+      var aBord = entry.advanced ? '#ef5350'               : '#2a3a50';
+      var aTxt  = entry.advanced ? '#ef5350'               : '#556';
 
       html += '<div style="background:#0d1e36;border-radius:10px;padding:12px 14px;margin-bottom:8px;">';
       html += '<div style="font-size:13px;font-weight:600;color:#fff;margin-bottom:10px;">' + b.name + '</div>';
@@ -2317,12 +2317,12 @@ function renderAdminBadges() {
     var rows = catBadges.length
       ? catBadges.map(function(b) {
           var advLabel = b.hasAdvanced
-            ? '<span style="font-size:9px;font-weight:700;background:rgba(66,165,245,0.15);color:#42a5f5;border:1px solid rgba(66,165,245,0.3);padding:2px 7px;border-radius:20px;margin-left:6px;">Basic + Advanced</span>'
+            ? '<span style="font-size:9px;font-weight:700;background:rgba(239,83,80,0.15);color:#ef5350;border:1px solid rgba(239,83,80,0.3);padding:2px 7px;border-radius:20px;margin-left:6px;">Basic + Advanced</span>'
             : '<span style="font-size:9px;color:#556;margin-left:6px;">Basic only</span>';
           return '<div style="display:flex;align-items:center;gap:8px;padding:9px 0;border-bottom:1px solid rgba(255,255,255,0.05);">'
             + '<div style="flex:1;"><span style="font-size:13px;color:#ccc;">' + b.name + '</span>' + advLabel + '</div>'
             + '<label style="display:flex;align-items:center;gap:5px;cursor:pointer;font-size:11px;color:#8898bb;white-space:nowrap;">'
-              + '<input type="checkbox" data-toggle-adv="' + b.id + '" ' + (b.hasAdvanced ? 'checked' : '') + ' style="accent-color:#42a5f5;cursor:pointer;"/> Has Advanced</label>'
+              + '<input type="checkbox" data-toggle-adv="' + b.id + '" ' + (b.hasAdvanced ? 'checked' : '') + ' style="accent-color:#ef5350;cursor:pointer;"/> Has Advanced</label>'
             + '<button data-del-badge="' + b.id + '" style="background:none;border:none;color:#f66;font-size:14px;cursor:pointer;padding:2px 8px;">\u00d7</button>'
             + '</div>';
         }).join('')
