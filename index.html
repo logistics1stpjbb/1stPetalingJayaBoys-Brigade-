@@ -3281,16 +3281,16 @@ async function renderAdminBadges() {
     });
   });
   container.querySelectorAll('[data-del-badge]').forEach(function(btn) {
-    btn.addEventListener('click', function() {
+    btn.addEventListener('click', async function() {
       var id    = btn.getAttribute('data-del-badge');
-      var badge = getBadgeDefs().find(function(b) { return b.id === id; });
+      var badge = (await getBadgeDefs()).find(function(b) { return b.id === id; });
       if (!badge || !confirm('Delete badge "' + badge.name + '"?')) return;
       saveBadgeDefs((await getBadgeDefs()).filter(function(b) { return b.id !== id; }));
       renderAdminBadges();
     });
   });
   container.querySelectorAll('[data-add-badge]').forEach(function(btn) {
-    btn.addEventListener('click', function() {
+    btn.addEventListener('click', async function() {
       var cat   = btn.getAttribute('data-add-badge');
       var key   = 'nb_' + cat.replace(/[^a-zA-Z0-9]/g,'_');
       var input = document.getElementById(key);
@@ -3304,7 +3304,7 @@ async function renderAdminBadges() {
     });
   });
   var addCatBtn = document.getElementById('btn-add-cat');
-  if (addCatBtn) addCatBtn.addEventListener('click', function() {
+  if (addCatBtn) addCatBtn.addEventListener('click', async function() {
     var input = document.getElementById('new-cat-name');
     var name  = input ? input.value.trim() : '';
     if (!name) { alert('Please enter a section name.'); return; }
