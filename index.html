@@ -1342,11 +1342,10 @@ function renderPresidentsTracker(ic) {
   }
 
   function countServiceBadges() {
+    // Count how many "1 Year Service" repeatable badge slots are ticked
     var count = 0;
     defs.forEach(function(b) {
-      if (b.repeatable || b.id.indexOf('svc_') === 0 ||
-          b.name.toLowerCase().indexOf('1 year service') !== -1 ||
-          b.name.toLowerCase().indexOf('1-year service') !== -1) {
+      if (b.repeatable || b.id.indexOf('svc_') === 0) {
         var e = migrateE(saved[b.id]);
         if (e.basic || e.advanced) count++;
       }
@@ -1402,7 +1401,22 @@ function renderPresidentsTracker(ic) {
     return { label: g.label, sub: g.sub, color: g.color, items: g.items, awarded: awarded, advanced: advanced };
   });
 
+  // Service years — count ticked svc_ badges
   var serviceYears = countServiceBadges();
+
+  // Build service year dots for display
+  var maxSvcSlots = defs.filter(function(b) { return b.repeatable || b.id.indexOf('svc_') === 0; }).length;
+  var svcDots = '';
+  for (var yi = 1; yi <= Math.max(maxSvcSlots, 3); yi++) {
+    var filled = yi <= serviceYears;
+    svcDots += '<div style="display:flex;flex-direction:column;align-items:center;gap:3px;">'
+      + '<div style="width:28px;height:28px;border-radius:50%;'
+      + (filled ? 'background:var(--gold);' : 'background:#1a2a40;border:2px solid #2a3a50;')
+      + 'display:flex;align-items:center;justify-content:center;font-size:10px;font-weight:700;color:'
+      + (filled ? 'var(--navy)' : '#556') + ';">' + (filled ? yi : '') + '</div>'
+      + '<div style="font-size:9px;color:' + (filled ? '#e8b830' : '#556') + ';">Yr ' + yi + '</div>'
+      + '</div>';
+  }
 
   // ── Requirements ─────────────────────────────────────────────────────
   var reqs = [
@@ -1513,15 +1527,13 @@ function renderPresidentsTracker(ic) {
   });
   html += '</div>';
 
-  // Service years
+  // Service years panel
   html += '<div style="background:rgba(255,255,255,0.03);border-radius:10px;padding:10px 12px;margin-bottom:' + (allDone ? '12px' : '0') + ';">';
-  html += '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px;">';
-  html += '<div style="font-size:12px;font-weight:600;color:' + (serviceYears >= 3 ? '#fff' : '#8898bb') + ';">Service Years <span style="font-size:10px;color:#556;">(need 3)</span></div>';
-  html += '<div style="font-family:\'Oswald\',sans-serif;font-size:16px;font-weight:700;color:' + (serviceYears >= 3 ? 'var(--gold)' : '#fff') + ';">' + serviceYears + '</div>';
+  html += '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px;">';
+  html += '<div style="font-size:12px;font-weight:600;color:' + (serviceYears >= 3 ? '#fff' : '#8898bb') + ';">Service Years <span style="font-size:10px;color:#556;">(need 3 for President\'s)</span></div>';
+  html += '<div style="font-family:\'Oswald\',sans-serif;font-size:18px;font-weight:700;color:' + (serviceYears >= 3 ? 'var(--gold)' : '#fff') + ';">' + serviceYears + ' yr' + (serviceYears !== 1 ? 's' : '') + '</div>';
   html += '</div>';
-  html += '<div style="background:#0a1628;border-radius:20px;height:6px;overflow:hidden;">';
-  html += '<div style="height:100%;width:' + Math.min(100, Math.round(serviceYears/3*100)) + '%;border-radius:20px;background:' + (serviceYears >= 3 ? 'var(--gold)' : '#2a4a70') + ';"></div>';
-  html += '</div>';
+  html += '<div style="display:flex;gap:8px;flex-wrap:wrap;">' + svcDots + '</div>';
   html += '</div>';
 
   // Completion banner
@@ -2224,6 +2236,7 @@ async function renderDashboard() {
     localStorage.setItem('bb_member_rank', m.rank || '');
     set('m-squad-val',    m.squad ? 'Squad ' + m.squad : '\u2014');
     set('m-since-val',    m.joined_at ? new Date(m.joined_at).toLocaleDateString('en-MY', { day:'numeric', month:'short', year:'numeric' }) : '\u2014');
+    localStorage.setItem('bb_member_joined', m.joined_at || '');
     var pfp = localStorage.getItem('bb_pfp_' + ic);
     if (pfp) {
       var img = document.getElementById('m-pfp-img');
@@ -2298,6 +2311,7 @@ async function loadMemberOrders() {
 function logoutMember() {
   localStorage.removeItem('bb_current');
   localStorage.removeItem('bb_member_rank');
+  localStorage.removeItem('bb_member_joined');
   document.getElementById('tab-tasks').style.display   = 'none';
   var bt = document.getElementById('tab-badges'); if (bt) bt.style.display = 'none';
   document.getElementById('m-auth').style.display     = 'block';
@@ -2578,11 +2592,16 @@ function renderAdminAnnList() {
 // ── Badges ─────────────────────────────────────────────────────────────────
 var DEFAULT_BB_BADGES = [
   { id:'bb1',  name:'BB Enrolment',       cat:'Core',       hasAdvanced:false },
-  { id:'svc_1', name:'1 Year Service',    cat:'Service',    hasAdvanced:false, repeatable:true },
-  { id:'svc_2', name:'1 Year Service',    cat:'Service',    hasAdvanced:false, repeatable:true },
-  { id:'svc_3', name:'1 Year Service',    cat:'Service',    hasAdvanced:false, repeatable:true },
-  { id:'svc_4', name:'1 Year Service',    cat:'Service',    hasAdvanced:false, repeatable:true },
-  { id:'svc_5', name:'1 Year Service',    cat:'Service',    hasAdvanced:false, repeatable:true },
+  { id:'svc_1',  name:'1 Year Service', cat:'Service Years', hasAdvanced:false, repeatable:true },
+  { id:'svc_2',  name:'1 Year Service', cat:'Service Years', hasAdvanced:false, repeatable:true },
+  { id:'svc_3',  name:'1 Year Service', cat:'Service Years', hasAdvanced:false, repeatable:true },
+  { id:'svc_4',  name:'1 Year Service', cat:'Service Years', hasAdvanced:false, repeatable:true },
+  { id:'svc_5',  name:'1 Year Service', cat:'Service Years', hasAdvanced:false, repeatable:true },
+  { id:'svc_6',  name:'1 Year Service', cat:'Service Years', hasAdvanced:false, repeatable:true },
+  { id:'svc_7',  name:'1 Year Service', cat:'Service Years', hasAdvanced:false, repeatable:true },
+  { id:'svc_8',  name:'1 Year Service', cat:'Service Years', hasAdvanced:false, repeatable:true },
+  { id:'svc_9',  name:'1 Year Service', cat:'Service Years', hasAdvanced:false, repeatable:true },
+  { id:'svc_10', name:'1 Year Service', cat:'Service Years', hasAdvanced:false, repeatable:true },
   { id:'bb2',  name:"BB Founder's Award", cat:'Core',       hasAdvanced:false },
   { id:'bb3',  name:"President's Award",  cat:'Core',       hasAdvanced:false },
   { id:'bb4',  name:'First Aid',          cat:'Skills',     hasAdvanced:true  },
@@ -2629,8 +2648,19 @@ function loadBadges(ic) {
       var entry = migrateEntry(saved[b.id]);
       // For repeatable badges, show "Year N"
       var displayName = b.repeatable
-        ? b.name + ' <span style="font-size:11px;color:#8898bb;font-weight:400;">(Year ' + (bi + 1) + ')</span>'
+        ? '1 Year Service <span style="font-size:11px;color:#8898bb;font-weight:400;">— Year ' + (bi + 1) + '</span>'
         : b.name;
+
+      // For repeatable badges, only show if this is ticked OR it's the next one to earn
+      if (b.repeatable) {
+        var prevTicked = bi === 0 ? true : (function() {
+          var prevBadge = catBadges[bi - 1];
+          var prevEntry = migrateEntry(saved[prevBadge.id]);
+          return prevEntry.basic || prevEntry.advanced;
+        })();
+        var thisTicked = entry.basic || entry.advanced;
+        if (!thisTicked && !prevTicked) return; // hide future years
+      }
 
       var bBg   = entry.basic    ? 'rgba(200,150,30,0.18)' : 'transparent';
       var bBord = entry.basic    ? 'var(--gold)'           : '#2a3a50';
