@@ -513,6 +513,15 @@
         <button class="submit-btn gold" onclick="saveBadges()" style="margin-top:8px;">💾 Save Badges</button>
       </div>
 
+      <!-- My Orders -->
+      <div class="dark-card" style="margin-bottom:14px;">
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px;">
+          <div style="font-family:'Oswald',sans-serif;font-size:20px;font-weight:700;color:#fff;">📦 My Orders</div>
+          <button onclick="loadMemberOrders()" style="background:rgba(200,150,30,0.1);border:1px solid rgba(200,150,30,0.3);color:var(--gold);padding:6px 12px;border-radius:8px;cursor:pointer;font-family:'Oswald',sans-serif;font-size:12px;font-weight:700;">↻ Refresh</button>
+        </div>
+        <div id="member-orders-list"><div style="color:#556;font-size:13px;text-align:center;padding:16px;">Loading orders...</div></div>
+      </div>
+
       <button class="submit-btn danger" style="margin-bottom:0;" onclick="logoutMember()">🚪 Logout</button>
     </div>
 
@@ -1318,6 +1327,7 @@ async function submitOrder() {
     var on = document.getElementById('order-notes'); if (on) on.value = '';
     clearTngScreenshot();
     updateTotal();
+    loadMemberOrders();
   } catch(e) {
     alert('Failed to submit: ' + e.message);
     if (btn) { btn.innerHTML = '\u2705 Confirm &amp; Submit'; btn.disabled = false; }
@@ -1802,7 +1812,67 @@ async function renderDashboard() {
       if (ph)  ph.style.display = 'none';
     }
     loadBadges(ic);
+    loadMemberOrders();
   } catch(e) { console.error(e); }
+}
+
+async function loadMemberOrders() {
+  var ic        = localStorage.getItem('bb_current');
+  var container = document.getElementById('member-orders-list');
+  if (!ic || !container) return;
+  container.innerHTML = '<div style="color:#556;font-size:13px;text-align:center;padding:16px;"><span class="spinner"></span> Loading...</div>';
+  try {
+    var orders = await supa.get('bb_orders?ic=eq.' + encodeURIComponent(ic) + '&order=created_at.desc');
+    if (!orders.length) {
+      container.innerHTML = '<div style="color:#556;font-size:13px;text-align:center;padding:16px;">No orders yet.</div>';
+      return;
+    }
+    var SC = { pending:'#e8b830', processing:'#42a5f5', ready:'#66bb6a', collected:'#888', cancelled:'#ef5350' };
+    var SL = { pending:'Pending', processing:'Processing', ready:'Ready for Collection', collected:'Collected', cancelled:'Cancelled' };
+    var html = '';
+    orders.forEach(function(o) {
+      var status  = o.status || 'pending';
+      var sc      = SC[status] || '#888';
+      var sl      = SL[status] || status;
+      var created = o.created_at ? new Date(o.created_at).toLocaleDateString('en-MY', { day:'numeric', month:'short', year:'numeric' }) : '';
+      // Parse items
+      var itemLines = '';
+      try {
+        var items = JSON.parse(o.items || '{}');
+        if (items.form_name) {
+          itemLines = '<div style="font-size:12px;color:#8898bb;">' + items.form_name + '</div>';
+        } else {
+          Object.entries(items).forEach(function(kv) {
+            var prod = UNIFORM_ITEMS.find(function(i) { return i.key === kv[0]; });
+            var v    = kv[1];
+            var subtotal = v.price && v.qty ? ' — RM ' + (v.price * v.qty).toFixed(2) : '';
+            itemLines += '<div style="display:flex;justify-content:space-between;font-size:12px;color:#8898bb;padding:3px 0;">'
+              + '<span>' + (prod ? prod.name : kv[0]) + (v.size ? ' (' + v.size + ')' : '') + '</span>'
+              + '<span>x' + v.qty + subtotal + '</span></div>';
+          });
+        }
+      } catch(e) {}
+      // Screenshot status
+      var ssHtml = o.payment_screenshot
+        ? '<div style="display:flex;align-items:center;gap:6px;margin-top:8px;font-size:11px;color:#66bb6a;">&#10003; Payment screenshot uploaded</div>'
+        : '<div style="display:flex;align-items:center;gap:6px;margin-top:8px;font-size:11px;color:#e8b830;">&#9888; No payment screenshot</div>';
+      html += '<div style="background:#122040;border-radius:12px;padding:14px;margin-bottom:10px;border:1px solid rgba(255,255,255,0.06);">'
+        + '<div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:8px;">'
+        + '<div>'
+        + '<div style="font-family:\'Oswald\',sans-serif;font-size:14px;font-weight:700;color:#fff;">' + o.order_number + '</div>'
+        + '<div style="font-size:11px;color:#556;margin-top:1px;">' + created + '</div>'
+        + '</div>'
+        + '<div style="font-size:11px;font-weight:700;padding:4px 10px;border-radius:20px;background:' + sc + '22;color:' + sc + ';border:1px solid ' + sc + '44;font-family:\'Oswald\',sans-serif;text-align:center;">' + sl + '</div>'
+        + '</div>'
+        + '<div style="border-top:1px solid rgba(255,255,255,0.05);padding-top:8px;">' + itemLines + '</div>'
+        + ssHtml
+        + (o.notes ? '<div style="font-size:11px;color:#556;margin-top:6px;">Note: ' + o.notes + '</div>' : '')
+        + '</div>';
+    });
+    container.innerHTML = html;
+  } catch(e) {
+    container.innerHTML = '<div style="color:#f66;font-size:13px;text-align:center;padding:16px;">Failed to load orders.</div>';
+  }
 }
 
 function logoutMember() {
