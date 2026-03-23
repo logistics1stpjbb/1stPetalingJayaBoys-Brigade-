@@ -648,13 +648,25 @@
           <div class="adm-sec-arrow">›</div>
         </div>
 
-        <!-- Section: Forms & Orders -->
+        <!-- Section: Forms -->
         <div class="adm-section-btn" id="sec-btn-orders" onclick="switchAdminSection('orders')">
           <div style="display:flex;align-items:center;gap:12px;">
             <div class="adm-sec-icon" style="background:rgba(66,165,245,0.15);color:#42a5f5;">📋</div>
             <div>
-              <div class="adm-sec-title">Forms &amp; Orders</div>
-              <div class="adm-sec-sub">Manage forms, products &amp; member submissions</div>
+              <div class="adm-sec-title">Forms</div>
+              <div class="adm-sec-sub">Create forms &amp; view member responses</div>
+            </div>
+          </div>
+          <div class="adm-sec-arrow">›</div>
+        </div>
+
+        <!-- Section: Uniform Orders -->
+        <div class="adm-section-btn" id="sec-btn-uniform" onclick="switchAdminSection('uniform')">
+          <div style="display:flex;align-items:center;gap:12px;">
+            <div class="adm-sec-icon" style="background:rgba(200,150,30,0.15);color:var(--gold);">👔</div>
+            <div>
+              <div class="adm-sec-title">Uniform Orders</div>
+              <div class="adm-sec-sub">Products, sizes, prices &amp; order submissions</div>
             </div>
           </div>
           <div class="adm-sec-arrow">›</div>
@@ -781,32 +793,28 @@
         </div>
       </div>
 
-      <!-- ── FORMS & ORDERS SECTION ────────────────────── -->
+      <!-- ── FORMS SECTION ───────────────────────────── -->
       <div id="adm-section-orders" style="display:none;">
         <div class="adm-section-header">
           <div class="adm-sec-icon" style="background:rgba(66,165,245,0.15);color:#42a5f5;">📋</div>
           <div>
-            <div class="adm-section-title">Forms &amp; Orders</div>
-            <div class="adm-section-desc">Create forms, manage products and view submissions</div>
+            <div class="adm-section-title">Forms</div>
+            <div class="adm-section-desc">Create external links or built-in forms, and view who responded</div>
           </div>
         </div>
 
-        <!-- Sub-tabs -->
+        <!-- Sub-tabs: builder | responses -->
         <div style="display:flex;gap:6px;margin-bottom:18px;background:#0a1628;border-radius:10px;padding:5px;border:1px solid rgba(255,255,255,0.06);">
-          <button class="adm-subtab active-subtab" id="subtab-formbuilder" onclick="switchOrderSubtab('formbuilder')">📝 Forms</button>
-          <button class="adm-subtab" id="subtab-uniform"     onclick="switchOrderSubtab('uniform')">👔 Uniform</button>
-          <button class="adm-subtab" id="subtab-products"    onclick="switchOrderSubtab('products')">🛒 Products</button>
-          <button class="adm-subtab" id="subtab-orders"      onclick="switchOrderSubtab('orders')">📦 Submissions</button>
+          <button class="adm-subtab active-subtab" id="subtab-formbuilder" onclick="switchFormSubtab('formbuilder')">📝 Manage Forms</button>
+          <button class="adm-subtab" id="subtab-formresponses" onclick="switchFormSubtab('formresponses')">📨 Responses</button>
         </div>
 
-        <!-- ── Form Builder sub-panel ── -->
+        <!-- Form builder sub-panel -->
         <div id="subpanel-formbuilder">
           <div style="background:#0a1628;border-radius:14px;padding:18px;margin-bottom:14px;border:1px solid rgba(255,255,255,0.08);">
             <div style="font-family:'Oswald',sans-serif;font-size:16px;font-weight:600;color:var(--gold);margin-bottom:14px;" id="fb-form-title">➕ Add New Form</div>
             <div class="form-group"><label class="form-label" style="color:#8898bb;">Form Name</label><input class="form-input" id="fb-name" type="text" placeholder="e.g. Annual Camp Registration" style="background:#122040;color:#fff;border-color:#2a3a50;"/></div>
             <div class="form-group"><label class="form-label" style="color:#8898bb;">Description (optional)</label><input class="form-input" id="fb-desc" type="text" placeholder="Brief info about this form" style="background:#122040;color:#fff;border-color:#2a3a50;"/></div>
-
-            <!-- Type selector -->
             <div class="form-group">
               <label class="form-label" style="color:#8898bb;">Form Type</label>
               <div style="display:flex;gap:8px;">
@@ -814,47 +822,52 @@
                 <button id="ftype-builtin" onclick="setFormType('builtin')" class="ftype-btn"              style="flex:1;">⚙️ Built-in Form<br><span style="font-size:10px;font-weight:400;opacity:0.7;">Created here</span></button>
               </div>
             </div>
-
-            <!-- Link type fields -->
             <div id="fb-link-fields">
               <div class="form-group"><label class="form-label" style="color:#8898bb;">Form URL</label><input class="form-input" id="fb-url" type="url" placeholder="https://forms.google.com/..." style="background:#122040;color:#fff;border-color:#2a3a50;"/></div>
             </div>
-
-            <!-- Built-in type fields -->
             <div id="fb-builtin-fields" style="display:none;">
-              <div style="font-size:12px;color:#8898bb;margin-bottom:10px;">Add fields to your form. Members will fill these in when they submit.</div>
+              <div style="font-size:12px;color:#8898bb;margin-bottom:10px;">Add fields — members fill these in when they submit.</div>
               <div id="fb-fields-list"></div>
               <button onclick="addFormField()" style="width:100%;padding:10px;background:rgba(200,150,30,0.1);border:1px dashed rgba(200,150,30,0.3);border-radius:10px;color:var(--gold);font-family:'Oswald',sans-serif;font-size:14px;font-weight:600;cursor:pointer;margin-bottom:12px;">➕ Add Field</button>
             </div>
-
             <input type="hidden" id="fb-edit-id"/>
             <div style="display:flex;gap:8px;">
               <button class="submit-btn gold" onclick="saveForm()" style="margin-top:4px;flex:1;">💾 Save Form</button>
               <button class="submit-btn danger" onclick="clearFormBuilder()" style="margin-top:4px;width:auto;padding:15px 18px;">✕</button>
             </div>
           </div>
-          <!-- Forms list -->
           <div id="admin-forms-list"></div>
         </div>
 
-        <!-- Uniform sub-panel -->
-        <div id="subpanel-uniform" style="display:none;">
-          <div style="background:#0a1628;border-radius:14px;padding:18px;margin-bottom:14px;border:1px solid rgba(200,150,30,0.15);">
-            <div style="font-family:'Oswald',sans-serif;font-size:16px;font-weight:600;color:var(--gold);margin-bottom:8px;">👔 Uniform Order Submissions</div>
-            <div style="font-size:12px;color:#8898bb;line-height:1.6;margin-bottom:16px;">Uniform orders submitted by members appear in <strong style="color:#ccc;">Submissions</strong>. Use <strong style="color:#ccc;">Products</strong> to manage what items are available and their prices.</div>
-            <div style="display:flex;gap:10px;">
-              <button onclick="switchOrderSubtab('products')" class="submit-btn" style="flex:1;margin-top:0;font-size:14px;">🛒 Manage Products</button>
-              <button onclick="switchOrderSubtab('orders')" class="submit-btn gold" style="flex:1;margin-top:0;font-size:14px;">📦 View Submissions</button>
-            </div>
+        <!-- Form responses sub-panel -->
+        <div id="subpanel-formresponses" style="display:none;">
+          <div style="display:flex;gap:8px;margin-bottom:14px;flex-wrap:wrap;">
+            <select id="form-responses-filter" onchange="renderFormResponses()" style="background:#0a1628;color:#fff;border:2px solid #2a3a50;border-radius:10px;padding:10px 12px;font-family:'Roboto',sans-serif;font-size:13px;flex:1;">
+              <option value="">All forms</option>
+            </select>
           </div>
-          <div style="background:#0a1628;border-radius:14px;padding:18px;border:1px solid rgba(255,255,255,0.06);">
-            <div style="font-family:'Oswald',sans-serif;font-size:14px;font-weight:600;color:#8898bb;margin-bottom:12px;letter-spacing:1px;text-transform:uppercase;">Current Products</div>
-            <div id="uniform-products-preview"></div>
+          <div id="admin-form-responses-list"></div>
+        </div>
+      </div>
+
+      <!-- ── UNIFORM ORDERS SECTION ─────────────────── -->
+      <div id="adm-section-uniform" style="display:none;">
+        <div class="adm-section-header">
+          <div class="adm-sec-icon" style="background:rgba(200,150,30,0.15);color:var(--gold);">👔</div>
+          <div>
+            <div class="adm-section-title">Uniform Orders</div>
+            <div class="adm-section-desc">Manage products and view member uniform orders</div>
           </div>
         </div>
 
+        <!-- Sub-tabs: products | orders -->
+        <div style="display:flex;gap:6px;margin-bottom:18px;background:#0a1628;border-radius:10px;padding:5px;border:1px solid rgba(255,255,255,0.06);">
+          <button class="adm-subtab active-subtab" id="subtab-products" onclick="switchUniformSubtab('products')">🛒 Products</button>
+          <button class="adm-subtab" id="subtab-orders"   onclick="switchUniformSubtab('orders')">📦 Orders</button>
+        </div>
+
         <!-- Products sub-panel -->
-        <div id="subpanel-products" style="display:none;">
+        <div id="subpanel-products">
           <div style="background:#0a1628;border-radius:14px;padding:18px;margin-bottom:14px;border:1px solid rgba(255,255,255,0.08);">
             <div style="font-family:'Oswald',sans-serif;font-size:16px;font-weight:600;color:var(--gold);margin-bottom:14px;" id="prod-form-title">➕ Add New Product</div>
             <div class="form-group"><label class="form-label" style="color:#8898bb;">Product Name</label><input class="form-input" id="prod-name" type="text" placeholder="e.g. BB Uniform Shirt" style="background:#122040;color:#fff;border-color:#2a3a50;"/></div>
@@ -881,13 +894,10 @@
           <div id="admin-products-list"></div>
         </div>
 
-        <!-- Submissions sub-panel -->
+        <!-- Uniform orders sub-panel -->
         <div id="subpanel-orders" style="display:none;">
-          <div style="display:flex;gap:8px;margin-bottom:14px;flex-wrap:wrap;">
-            <input class="form-input" id="admin-order-search" type="text" placeholder="Search by order no or member name..." oninput="renderAdminOrders()" style="background:#0a1628;color:#fff;border-color:#2a3a50;flex:1;min-width:200px;"/>
-            <select id="admin-order-form-filter" onchange="renderAdminOrders()" style="background:#0a1628;color:#fff;border:2px solid #2a3a50;border-radius:10px;padding:10px 12px;font-family:'Roboto',sans-serif;font-size:13px;">
-              <option value="">All forms</option>
-            </select>
+          <div style="display:flex;gap:8px;margin-bottom:14px;">
+            <input class="form-input" id="admin-order-search" type="text" placeholder="Search by order no or member name..." oninput="renderAdminOrders()" style="background:#0a1628;color:#fff;border-color:#2a3a50;"/>
           </div>
           <div id="admin-orders-list"></div>
         </div>
@@ -1397,15 +1407,18 @@ function renderAdminForms() {
   loadCustomForms();
   var container = document.getElementById('admin-forms-list');
   if (!container) return;
-  var filter = document.getElementById('admin-order-form-filter');
+  // Populate filter in responses tab
+  var filter = document.getElementById('form-responses-filter');
   if (filter) {
     var opts = '<option value="">All forms</option>';
     _customForms.forEach(function(f) { opts += '<option value="' + f.id + '">' + f.name + '</option>'; });
+    // Add built-in leave form
+    opts += '<option value="__leave__">Leave Application</option>';
     filter.innerHTML = opts;
   }
   if (!_customForms.length) { container.innerHTML = '<div style="color:#8898bb;text-align:center;padding:20px;font-size:13px;">No forms yet.</div>'; return; }
-  var icons = { link: '\ud83d\udd17', builtin: '\u2699\ufe0f', uniform: '\ud83d\udc54' };
-  var typeLabel = { link: 'External Link', builtin: 'Built-in Form', uniform: 'Uniform Order' };
+  var icons = { link: '\ud83d\udd17', builtin: '\u2699\ufe0f' };
+  var typeLabel = { link: 'External Link', builtin: 'Built-in Form' };
   var html = '';
   _customForms.forEach(function(f) {
     html += '<div style="background:#0a1628;border-radius:12px;padding:14px 16px;margin-bottom:10px;border:1px solid rgba(255,255,255,0.06);display:flex;align-items:center;gap:12px;">'
@@ -1423,6 +1436,86 @@ function renderAdminForms() {
   container.querySelectorAll('[data-del-form]').forEach(function(btn) {
     btn.addEventListener('click', function() { deleteForm(btn.getAttribute('data-del-form')); });
   });
+}
+
+async function renderFormResponses() {
+  var filterEl   = document.getElementById('form-responses-filter');
+  var formFilter = filterEl ? filterEl.value : '';
+  var list       = document.getElementById('admin-form-responses-list');
+  if (!list) return;
+  list.innerHTML = '<div style="color:#888;text-align:center;padding:20px;"><span class="spinner"></span> Loading...</div>';
+  try {
+    var orders = await supa.get('bb_orders?select=*&order=created_at.desc');
+    // Only show built-in form submissions (not uniform orders)
+    var filtered = orders.filter(function(o) {
+      try {
+        var items = JSON.parse(o.items || '{}');
+        return items.form_name !== undefined;
+      } catch(e) { return false; }
+    });
+    if (formFilter) {
+      filtered = filtered.filter(function(o) {
+        try {
+          var items = JSON.parse(o.items || '{}');
+          // Match by form name or id stored in notes
+          return (o.notes || '') === formFilter ||
+                 (items.form_name && (items.form_name === formFilter ||
+                  _customForms.find(function(f) { return f.id === formFilter && f.name === items.form_name; }))) ||
+                 formFilter === '__leave__' && items.form_name === 'Leave Application';
+        } catch(e) { return false; }
+      });
+    }
+    if (!filtered.length) {
+      list.innerHTML = '<div style="color:#666;text-align:center;padding:20px;">No responses yet.</div>';
+      return;
+    }
+    var html = '';
+    filtered.forEach(function(o) {
+      var formName = '';
+      var answers  = {};
+      try {
+        var items = JSON.parse(o.items || '{}');
+        formName = items.form_name || '';
+        answers  = items.answers   || {};
+      } catch(e) {}
+      var created = o.created_at ? new Date(o.created_at).toLocaleDateString('en-MY', { day:'numeric', month:'short', year:'numeric' }) : '';
+      var answersHtml = '';
+      Object.entries(answers).forEach(function(kv) {
+        answersHtml += '<div style="display:flex;gap:8px;padding:5px 0;border-bottom:1px solid rgba(255,255,255,0.04);">'
+          + '<div style="font-size:11px;color:#8898bb;min-width:120px;flex-shrink:0;">' + kv[0] + '</div>'
+          + '<div style="font-size:12px;color:#fff;flex:1;">' + (kv[1] || '<span style="color:#556;font-style:italic;">—</span>') + '</div>'
+          + '</div>';
+      });
+      html += '<div style="background:#0a1628;border-radius:12px;padding:14px 16px;margin-bottom:12px;border:1px solid rgba(255,255,255,0.06);">'
+        // Header: who + when
+        + '<div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:10px;">'
+        + '<div>'
+        + '<div style="font-family:\'Oswald\',sans-serif;font-size:15px;font-weight:700;color:#fff;">' + (o.member_name || o.ic) + '</div>'
+        + '<div style="font-size:11px;color:#8898bb;margin-top:2px;">' + (o.rank ? o.rank + ' \xb7 ' : '') + (o.squad ? 'Squad ' + o.squad : '') + '</div>'
+        + '</div>'
+        + '<div style="text-align:right;">'
+        + '<div style="font-family:\'Oswald\',sans-serif;font-size:12px;font-weight:600;color:#42a5f5;background:rgba(66,165,245,0.1);padding:3px 10px;border-radius:20px;margin-bottom:4px;">' + formName + '</div>'
+        + '<div style="font-size:10px;color:#556;">' + created + '</div>'
+        + '</div></div>'
+        // Answers
+        + '<div style="background:#122040;border-radius:8px;padding:10px 12px;">'
+        + (answersHtml || '<div style="font-size:12px;color:#556;font-style:italic;">No answers recorded.</div>')
+        + '</div>'
+        + '<div style="margin-top:8px;text-align:right;">'
+        + '<button data-del-resp="' + o.order_number + '" style="background:none;border:none;color:#f66;font-size:11px;cursor:pointer;font-weight:700;">\ud83d\uddd1\ufe0f Delete response</button>'
+        + '</div>'
+        + '</div>';
+    });
+    list.innerHTML = html;
+    list.querySelectorAll('[data-del-resp]').forEach(function(btn) {
+      btn.addEventListener('click', function() {
+        if (!confirm('Delete this response?')) return;
+        supa.delete('bb_orders?order_number=eq.' + encodeURIComponent(btn.getAttribute('data-del-resp')))
+          .then(function() { renderFormResponses(); })
+          .catch(function(e) { alert('Failed: ' + e.message); });
+      });
+    });
+  } catch(e) { list.innerHTML = '<div style="color:#f66;text-align:center;padding:20px;">Failed to load.</div>'; }
 }
 
 // ── Forms hub (member side) ───────────────────────────────────────────────
@@ -2098,12 +2191,11 @@ function renderAdminBadges() {
 }
 
 // ── Admin ──────────────────────────────────────────────────────────────────
-var ADMIN_SECTIONS = ['members','orders','tasks','announcements','badges','gallery'];
+var ADMIN_SECTIONS = ['members','orders','uniform','tasks','announcements','badges','gallery'];
 
 function openAdmin() {
   document.getElementById('admin-overlay').style.display = 'block';
   document.body.style.overflow = 'hidden';
-  // Always require password — clear saved session each time
   localStorage.removeItem('bb_admin');
   document.getElementById('admin-login-box').style.display = 'block';
   document.getElementById('admin-panel').style.display     = 'none';
@@ -2152,7 +2244,8 @@ function switchAdminSection(section) {
   var target = document.getElementById('adm-section-' + section);
   if (target) target.style.display = 'block';
   if (section === 'members')       renderAdminList();
-  if (section === 'orders')        switchOrderSubtab('formbuilder');
+  if (section === 'orders')        switchFormSubtab('formbuilder');
+  if (section === 'uniform')       switchUniformSubtab('products');
   if (section === 'tasks')         switchDeptTab('all');
   if (section === 'announcements') renderAdminAnnList();
   if (section === 'badges')        renderAdminBadges();
@@ -2161,18 +2254,29 @@ function switchAdminSection(section) {
 
 function switchAdminTab(tab) { switchAdminSection(tab); }
 
-function switchOrderSubtab(sub) {
-  ['formbuilder','uniform','products','orders'].forEach(function(s) {
+function switchFormSubtab(sub) {
+  ['formbuilder','formresponses'].forEach(function(s) {
     var p = document.getElementById('subpanel-' + s);
     var b = document.getElementById('subtab-' + s);
     if (p) p.style.display = s === sub ? 'block' : 'none';
     if (b) b.classList.toggle('active-subtab', s === sub);
   });
-  if (sub === 'formbuilder') renderAdminForms();
-  if (sub === 'uniform')     renderUniformProductsPreview();
-  if (sub === 'products')    renderAdminProducts();
-  if (sub === 'orders')      renderAdminOrders();
+  if (sub === 'formbuilder')   renderAdminForms();
+  if (sub === 'formresponses') renderFormResponses();
 }
+
+function switchUniformSubtab(sub) {
+  ['products','orders'].forEach(function(s) {
+    var p = document.getElementById('subpanel-' + s);
+    var b = document.getElementById('subtab-' + s);
+    if (p) p.style.display = s === sub ? 'block' : 'none';
+    if (b) b.classList.toggle('active-subtab', s === sub);
+  });
+  if (sub === 'products') renderAdminProducts();
+  if (sub === 'orders')   renderAdminOrders();
+}
+
+function switchOrderSubtab(sub) { switchFormSubtab(sub); }
 
 function switchDeptTab(dept) {
   ['all','logistics','secretariat','media'].forEach(function(d) {
@@ -2304,10 +2408,16 @@ async function renderAdminOrders() {
   list.innerHTML = '<div style="color:#888;text-align:center;padding:20px;"><span class="spinner"></span> Loading...</div>';
   try {
     var orders   = await supa.get('bb_orders?select=*&order=created_at.desc');
+    // Only show uniform orders (not built-in form responses)
     var filtered = orders.filter(function(o) {
+      try {
+        var items = JSON.parse(o.items || '{}');
+        return items.form_name === undefined; // uniform orders have no form_name
+      } catch(e) { return true; }
+    });
+    filtered = filtered.filter(function(o) {
       return (o.order_number||'').toLowerCase().includes(search) || (o.member_name||'').toLowerCase().includes(search);
     });
-    if (formFilter) filtered = filtered.filter(function(o) { return (o.notes||'').includes(formFilter) || (o.form_id||'') === formFilter; });
     if (!filtered.length) { list.innerHTML = '<div style="color:#666;text-align:center;padding:20px;">No submissions found.</div>'; return; }
     var SC = { pending:'#e8b830', processing:'#42a5f5', ready:'#66bb6a', collected:'#888', cancelled:'#ef5350' };
     var SL = ['pending','processing','ready','collected','cancelled'];
