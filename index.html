@@ -1349,22 +1349,14 @@ function renderPresidentsTracker(ic) {
     return { basic:r.basic||false, basicDate:r.basicDate||'', advanced:r.advanced||false, advancedDate:r.advancedDate||'' };
   }
 
-  function badgeEntry(nameMatch) {
-    var b = defs.find(function(x) { return x.name.toLowerCase().indexOf(nameMatch.toLowerCase()) !== -1; });
-    if (!b) return null;
-    return { badge: b, entry: migrateE(saved[b.id]) };
-  }
-
+  // Count repeatable badge instances (service years)
   function countServiceBadges() {
-    // Count total instances of ALL repeatable badges from the member's saved data
     var count = 0;
     defs.forEach(function(b) {
       if (!b.repeatable) return;
       var repData = saved[b.id + '_rep'];
-      if (repData && repData.count) {
-        count += repData.count;
-      } else {
-        // Legacy: check old basic tick
+      if (repData && repData.count) count += repData.count;
+      else {
         var old = migrateE(saved[b.id]);
         if (old.basic || old.advanced) count++;
       }
@@ -1372,44 +1364,40 @@ function renderPresidentsTracker(ic) {
     return count;
   }
 
-  // ── Group A: Drill & Leadership ───────────────────────────────────────
-  var groupA = [
-    badgeEntry('Marching'),
-    badgeEntry('Best Driller'),
-    badgeEntry('Leadership'),
-  ].filter(Boolean);
+  // ── Dynamically find group categories ────────────────────────────────
+  // Look for categories whose name contains "group a", "group b" etc (case-insensitive)
+  // Also accept exact cat names like "Group A Awards", "Group A", etc.
+  var cats = [];
+  defs.forEach(function(b) { if (cats.indexOf(b.cat) === -1) cats.push(b.cat); });
 
-  // ── Group B: Outdoor & Sports ─────────────────────────────────────────
-  var groupB = [
-    badgeEntry('Best Camper'),
-    badgeEntry('Orienteering'),
-    badgeEntry('Swimming'),
-  ].filter(Boolean);
+  function findGroupCat(letter) {
+    return cats.find(function(c) {
+      return c.toLowerCase().replace(/[^a-z]/g,'').indexOf('group' + letter.toLowerCase()) !== -1;
+    }) || null;
+  }
 
-  // ── Group C: Skills & Safety ──────────────────────────────────────────
-  var groupC = [
-    badgeEntry('First Aid'),
-    badgeEntry('Fire Safety'),
-  ].filter(Boolean);
+  var groupLetters = ['a','b','c','d'];
+  var groups = [];
+  groupLetters.forEach(function(letter) {
+    var catName = findGroupCat(letter);
+    if (!catName) return;
+    var items = defs
+      .filter(function(b) { return b.cat === catName && b.name !== '(Add badges below)' && !b.repeatable; })
+      .map(function(b) {
+        var entry = migrateE(saved[b.id]);
+        return { badge: b, entry: entry };
+      });
+    if (items.length) {
+      var colorMap = { a:'#42a5f5', b:'#66bb6a', c:'#e8b830', d:'#ce93d8' };
+      groups.push({ label: 'Group ' + letter.toUpperCase(), catName: catName, items: items, color: colorMap[letter] });
+    }
+  });
 
-  // ── Group D: Service & Arts ───────────────────────────────────────────
-  var groupD = [
-    badgeEntry('Community Service'),
-    badgeEntry('Music & Worship'),
-  ].filter(Boolean);
-
-  var groups = [
-    { label: 'Group A', sub: 'Drill & Leadership', items: groupA, color: '#42a5f5' },
-    { label: 'Group B', sub: 'Outdoor & Sports',   items: groupB, color: '#66bb6a' },
-    { label: 'Group C', sub: 'Skills & Safety',    items: groupC, color: '#e8b830' },
-    { label: 'Group D', sub: 'Service & Arts',     items: groupD, color: '#ce93d8' },
-  ];
-
-  // Count awards per group (badge counts if basic OR advanced earned)
-  // Also count advanced separately
-  var totalAwarded = 0;
+  // ── Count totals across all groups ───────────────────────────────────
+  var totalAwarded  = 0;
+  var totalBasicOnly = 0; // earned basic but not advanced (or no advanced available)
   var totalAdvanced = 0;
-  var atLeastOnePerGroup = true;
+  var atLeastOnePerGroup = groups.length > 0; // only check groups we found
 
   var groupResults = groups.map(function(g) {
     var awarded  = g.items.filter(function(i) { return i.entry.basic || i.entry.advanced; }).length;
@@ -1417,67 +1405,55 @@ function renderPresidentsTracker(ic) {
     if (awarded === 0) atLeastOnePerGroup = false;
     totalAwarded  += awarded;
     totalAdvanced += advanced;
-    return { label: g.label, sub: g.sub, color: g.color, items: g.items, awarded: awarded, advanced: advanced };
+    return { label: g.label, catName: g.catName, color: g.color, items: g.items, awarded: awarded, advanced: advanced };
   });
 
-  // Service years — count ticked svc_ badges
-  var serviceYears = countServiceBadges();
+  // Basic = earned but not advanced (includes badges without advanced tier)
+  totalBasicOnly = totalAwarded - totalAdvanced;
 
-  // Build service year dots for display
-  var maxSvcSlots = defs.filter(function(b) { return b.repeatable || b.id.indexOf('svc_') === 0; }).length;
-  var svcDots = '';
-  for (var yi = 1; yi <= Math.max(maxSvcSlots, 3); yi++) {
-    var filled = yi <= serviceYears;
-    svcDots += '<div style="display:flex;flex-direction:column;align-items:center;gap:3px;">'
-      + '<div style="width:28px;height:28px;border-radius:50%;'
-      + (filled ? 'background:var(--gold);' : 'background:#1a2a40;border:2px solid #2a3a50;')
-      + 'display:flex;align-items:center;justify-content:center;font-size:10px;font-weight:700;color:'
-      + (filled ? 'var(--navy)' : '#556') + ';">' + (filled ? yi : '') + '</div>'
-      + '<div style="font-size:9px;color:' + (filled ? '#e8b830' : '#556') + ';">Yr ' + yi + '</div>'
-      + '</div>';
-  }
+  var serviceYears = countServiceBadges();
 
   // ── Requirements ─────────────────────────────────────────────────────
   var reqs = [
     {
       id: 'service',
       label: '3 Years of Service',
-      detail: serviceYears + ' / 3 years completed',
+      detail: serviceYears + ' / 3 years',
       done: serviceYears >= 3,
       pct: Math.min(100, Math.round((serviceYears / 3) * 100))
     },
     {
       id: 'total6',
-      label: 'At least 6 awards total (Groups A-D)',
+      label: 'At least 6 awards total (all groups)',
       detail: totalAwarded + ' / 6 awards',
       done: totalAwarded >= 6,
       pct: Math.min(100, Math.round((totalAwarded / 6) * 100))
     },
     {
       id: 'onepergroup',
-      label: 'At least 1 award from each group (A, B, C, D)',
-      detail: groupResults.map(function(g) { return g.label + ':' + g.awarded; }).join('  '),
-      done: atLeastOnePerGroup,
-      pct: atLeastOnePerGroup ? 100 : Math.round((groupResults.filter(function(g){return g.awarded>0;}).length / 4)*100)
+      label: 'At least 1 award from each group',
+      detail: groups.length === 0 ? 'No groups found' : groupResults.map(function(g) { return g.label + ': ' + g.awarded; }).join(' \u00b7 '),
+      done: atLeastOnePerGroup && groups.length >= 4,
+      pct: groups.length === 0 ? 0 : Math.round((groupResults.filter(function(g){return g.awarded>0;}).length / Math.max(groups.length,1))*100)
     },
     {
       id: 'basic2',
       label: 'At least 2 awards at Basic level',
-      detail: Math.max(0, totalAwarded - totalAdvanced) + ' / 2 Basic awards',
-      done: (totalAwarded - totalAdvanced) >= 2,
-      pct: Math.min(100, Math.round((Math.max(0, totalAwarded - totalAdvanced) / 2) * 100))
+      detail: totalBasicOnly + ' / 2 Basic',
+      done: totalBasicOnly >= 2,
+      pct: Math.min(100, Math.round((totalBasicOnly / 2) * 100))
     },
     {
       id: 'adv4',
       label: 'At least 4 awards at Advanced level',
-      detail: totalAdvanced + ' / 4 Advanced awards',
+      detail: totalAdvanced + ' / 4 Advanced',
       done: totalAdvanced >= 4,
       pct: Math.min(100, Math.round((totalAdvanced / 4) * 100))
     }
   ];
 
-  var metCount = reqs.filter(function(r) { return r.done; }).length;
-  var allDone  = metCount === reqs.length;
+  var metCount   = reqs.filter(function(r) { return r.done; }).length;
+  var allDone    = metCount === reqs.length;
   var overallPct = Math.round((metCount / reqs.length) * 100);
 
   // ── Build HTML ────────────────────────────────────────────────────────
@@ -1485,83 +1461,99 @@ function renderPresidentsTracker(ic) {
     + (allDone ? 'var(--gold)' : 'rgba(200,150,30,0.25)') + ';border-radius:14px;padding:16px 18px;margin-bottom:16px;">';
 
   // Header
-  html += '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px;">';
-  html += '<div style="display:flex;align-items:center;gap:10px;">';
-  html += '<div style="font-size:28px;">' + (allDone ? '&#127942;' : '&#127894;') + '</div>';
-  html += '<div>';
-  html += '<div style="font-family:\'Oswald\',sans-serif;font-size:16px;font-weight:700;color:var(--gold);">President\'s Award</div>';
-  html += '<div style="font-size:11px;color:#8898bb;margin-top:1px;">' + metCount + ' of ' + reqs.length + ' requirements met</div>';
-  html += '</div></div>';
-  html += '<div style="font-family:\'Oswald\',sans-serif;font-size:24px;font-weight:700;color:' + (allDone ? 'var(--gold)' : '#fff') + ';">' + overallPct + '%</div>';
-  html += '</div>';
+  html += '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px;">'
+    + '<div style="display:flex;align-items:center;gap:10px;">'
+    + '<div style="font-size:28px;">' + (allDone ? '&#127942;' : '&#127894;') + '</div>'
+    + '<div>'
+    + '<div style="font-family:\'Oswald\',sans-serif;font-size:16px;font-weight:700;color:var(--gold);">President\'s Award</div>'
+    + '<div style="font-size:11px;color:#8898bb;margin-top:1px;">' + metCount + ' of ' + reqs.length + ' requirements met</div>'
+    + '</div></div>'
+    + '<div style="font-family:\'Oswald\',sans-serif;font-size:24px;font-weight:700;color:' + (allDone ? 'var(--gold)' : '#fff') + ';">' + overallPct + '%</div>'
+    + '</div>';
 
   // Overall progress bar
-  html += '<div style="background:#0a1628;border-radius:20px;height:8px;overflow:hidden;margin-bottom:16px;">';
-  html += '<div style="height:100%;width:' + overallPct + '%;border-radius:20px;background:linear-gradient(90deg,var(--accent),var(--gold));"></div>';
-  html += '</div>';
+  html += '<div style="background:#0a1628;border-radius:20px;height:8px;overflow:hidden;margin-bottom:16px;">'
+    + '<div style="height:100%;width:' + overallPct + '%;border-radius:20px;background:linear-gradient(90deg,var(--accent),var(--gold));transition:width 0.4s;"></div>'
+    + '</div>';
 
   // Requirements list
   html += '<div style="display:flex;flex-direction:column;gap:8px;margin-bottom:14px;">';
   reqs.forEach(function(r) {
-    var tickBg   = r.done ? 'var(--gold)' : '#1a2a40';
-    var tickCol  = r.done ? 'var(--navy)' : '#556';
-    var border   = r.done ? '' : 'border:2px solid #2a3a50;';
-    html += '<div style="background:rgba(255,255,255,0.03);border-radius:10px;padding:10px 12px;">';
-    html += '<div style="display:flex;align-items:center;gap:10px;margin-bottom:' + (r.pct < 100 ? '8px' : '0') + ';">';
-    html += '<div style="width:22px;height:22px;border-radius:50%;flex-shrink:0;display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:700;background:' + tickBg + ';color:' + tickCol + ';' + border + '">' + (r.done ? '&#10003;' : '') + '</div>';
-    html += '<div style="flex:1;">';
-    html += '<div style="font-size:12px;font-weight:600;color:' + (r.done ? '#fff' : '#8898bb') + ';">' + r.label + '</div>';
-    html += '<div style="font-size:10px;color:#556;margin-top:1px;">' + r.detail + '</div>';
-    html += '</div>';
-    if (r.done) html += '<span style="font-size:10px;color:var(--gold);font-weight:700;white-space:nowrap;">&#10003; Done</span>';
-    html += '</div>';
+    var tickBg  = r.done ? 'var(--gold)' : '#1a2a40';
+    var tickCol = r.done ? 'var(--navy)' : '#556';
+    var border  = r.done ? '' : 'border:2px solid #2a3a50;';
+    html += '<div style="background:rgba(255,255,255,0.03);border-radius:10px;padding:10px 12px;">'
+      + '<div style="display:flex;align-items:center;gap:10px;margin-bottom:' + (r.pct < 100 ? '8px' : '0') + ';">'
+      + '<div style="width:22px;height:22px;border-radius:50%;flex-shrink:0;display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:700;background:' + tickBg + ';color:' + tickCol + ';' + border + '">' + (r.done ? '&#10003;' : '') + '</div>'
+      + '<div style="flex:1;">'
+      + '<div style="font-size:12px;font-weight:600;color:' + (r.done ? '#fff' : '#8898bb') + ';">' + r.label + '</div>'
+      + '<div style="font-size:10px;color:#556;margin-top:1px;">' + r.detail + '</div>'
+      + '</div>'
+      + (r.done ? '<span style="font-size:10px;color:var(--gold);font-weight:700;white-space:nowrap;">&#10003; Done</span>' : '')
+      + '</div>';
     if (r.pct < 100) {
-      html += '<div style="background:#0a1628;border-radius:20px;height:4px;overflow:hidden;">';
-      html += '<div style="height:100%;width:' + r.pct + '%;border-radius:20px;background:' + (r.done ? 'var(--gold)' : '#2a4a70') + ';"></div>';
-      html += '</div>';
+      html += '<div style="background:#0a1628;border-radius:20px;height:4px;overflow:hidden;">'
+        + '<div style="height:100%;width:' + r.pct + '%;border-radius:20px;background:' + (r.pct > 0 ? '#2a6aaa' : '#1a2a40') + ';transition:width 0.4s;"></div>'
+        + '</div>';
     }
     html += '</div>';
   });
   html += '</div>';
 
-  // Group breakdown
-  html += '<div style="font-size:10px;font-weight:700;letter-spacing:2px;color:#556;text-transform:uppercase;margin-bottom:8px;">Award Groups</div>';
-  html += '<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:12px;">';
-  groupResults.forEach(function(g) {
-    var badgeLines = g.items.map(function(i) {
-      var e = i.entry;
-      var both = e.basic && e.advanced;
-      var basicDot  = e.basic    ? '<span style="color:#e8b830;font-size:11px;">&#9679;</span>' : '<span style="color:#2a3a50;font-size:11px;">&#9675;</span>';
-      var advDot    = i.badge.hasAdvanced ? (e.advanced ? '<span style="color:#ef5350;font-size:11px;">&#9679;</span>' : '<span style="color:#2a3a50;font-size:11px;">&#9675;</span>') : '';
-      return '<div style="display:flex;align-items:center;gap:4px;margin-top:3px;"><span style="font-size:11px;color:#8898bb;flex:1;">' + i.badge.name + '</span>' + basicDot + advDot + '</div>';
-    }).join('');
-    html += '<div style="background:rgba(255,255,255,0.03);border-radius:8px;padding:8px 10px;border-left:3px solid ' + g.color + ';">';
-    html += '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:4px;">';
-    html += '<div style="font-family:\'Oswald\',sans-serif;font-size:13px;font-weight:700;color:' + g.color + ';">' + g.label + '</div>';
-    html += '<div style="font-size:10px;color:#8898bb;">' + g.awarded + ' awarded</div>';
+  // Group breakdown (only show if we found groups)
+  if (groupResults.length > 0) {
+    html += '<div style="font-size:10px;font-weight:700;letter-spacing:2px;color:#556;text-transform:uppercase;margin-bottom:8px;">Award Groups</div>';
+    html += '<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:12px;">';
+    groupResults.forEach(function(g) {
+      var badgeLines = g.items.map(function(i) {
+        var e = i.entry;
+        var earned  = e.basic || e.advanced;
+        var basicDot = earned ? '<span style="color:#e8b830;font-size:11px;">&#9679;</span>' : '<span style="color:#2a3a50;font-size:11px;">&#9675;</span>';
+        var advDot   = i.badge.hasAdvanced ? (e.advanced ? '<span style="color:#ef5350;font-size:11px;">&#9679;</span>' : '<span style="color:#2a3a50;font-size:11px;">&#9675;</span>') : '';
+        return '<div style="display:flex;align-items:center;gap:4px;margin-top:3px;">'
+          + '<span style="font-size:11px;color:' + (earned ? '#ccc' : '#8898bb') + ';flex:1;">' + i.badge.name + '</span>'
+          + basicDot + advDot + '</div>';
+      }).join('');
+      html += '<div style="background:rgba(255,255,255,0.03);border-radius:8px;padding:8px 10px;border-left:3px solid ' + g.color + ';">'
+        + '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:2px;">'
+        + '<div style="font-family:\'Oswald\',sans-serif;font-size:13px;font-weight:700;color:' + g.color + ';">' + g.label + '</div>'
+        + '<div style="font-size:10px;color:#8898bb;">' + g.awarded + ' earned</div>'
+        + '</div>'
+        + '<div style="font-size:10px;color:#556;margin-bottom:6px;">' + g.catName + '</div>'
+        + badgeLines + '</div>';
+    });
     html += '</div>';
-    html += '<div style="font-size:10px;color:#556;margin-bottom:6px;">' + g.sub + '</div>';
-    html += badgeLines;
-    html += '</div>';
-  });
-  html += '</div>';
+  }
 
-  // Service years panel
-  html += '<div style="background:rgba(255,255,255,0.03);border-radius:10px;padding:10px 12px;margin-bottom:' + (allDone ? '12px' : '0') + ';">';
-  html += '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px;">';
-  html += '<div style="font-size:12px;font-weight:600;color:' + (serviceYears >= 3 ? '#fff' : '#8898bb') + ';">Service Years <span style="font-size:10px;color:#556;">(need 3 for President\'s)</span></div>';
-  html += '<div style="font-family:\'Oswald\',sans-serif;font-size:18px;font-weight:700;color:' + (serviceYears >= 3 ? 'var(--gold)' : '#fff') + ';">' + serviceYears + ' year' + (serviceYears !== 1 ? 's' : '') + '</div>';
-  html += '</div>';
-  html += '<div style="display:flex;gap:8px;flex-wrap:wrap;">' + svcDots + '</div>';
-  html += '</div>';
+  // Service years
+  var svcDots = '';
+  var maxDots = Math.max(serviceYears, 3);
+  for (var yi = 1; yi <= maxDots; yi++) {
+    var filled = yi <= serviceYears;
+    svcDots += '<div style="display:flex;flex-direction:column;align-items:center;gap:3px;">'
+      + '<div style="width:28px;height:28px;border-radius:50%;'
+      + (filled ? 'background:var(--gold);' : 'background:#1a2a40;border:2px solid #2a3a50;')
+      + 'display:flex;align-items:center;justify-content:center;font-size:10px;font-weight:700;color:'
+      + (filled ? 'var(--navy)' : '#556') + ';">' + (filled ? yi : '') + '</div>'
+      + '<div style="font-size:9px;color:' + (filled ? '#e8b830' : '#556') + ';">Year ' + yi + '</div>'
+      + '</div>';
+  }
+
+  html += '<div style="background:rgba(255,255,255,0.03);border-radius:10px;padding:10px 12px;margin-bottom:' + (allDone ? '12px' : '0') + ';">'
+    + '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px;">'
+    + '<div style="font-size:12px;font-weight:600;color:' + (serviceYears >= 3 ? '#fff' : '#8898bb') + ';">Service Years <span style="font-size:10px;color:#556;">(need 3)</span></div>'
+    + '<div style="font-family:\'Oswald\',sans-serif;font-size:18px;font-weight:700;color:' + (serviceYears >= 3 ? 'var(--gold)' : '#fff') + ';">' + serviceYears + ' year' + (serviceYears !== 1 ? 's' : '') + '</div>'
+    + '</div>'
+    + '<div style="display:flex;gap:6px;flex-wrap:wrap;">' + svcDots + '</div>'
+    + '</div>';
 
   // Completion banner
   if (allDone) {
-    html += '<div style="background:linear-gradient(135deg,rgba(200,150,30,0.2),rgba(232,184,48,0.1));border:1px solid var(--gold);border-radius:10px;padding:14px;text-align:center;margin-top:0;">';
-    html += '<div style="font-size:24px;margin-bottom:6px;">&#127942;</div>';
-    html += '<div style="font-family:\'Oswald\',sans-serif;font-size:18px;font-weight:700;color:var(--gold);">All Requirements Met!</div>';
-    html += '<div style="font-size:12px;color:#c8a870;margin-top:6px;line-height:1.6;">Congratulations! You are eligible for the President\'s Award.<br>See your officer to confirm and collect.</div>';
-    html += '</div>';
+    html += '<div style="background:linear-gradient(135deg,rgba(200,150,30,0.2),rgba(232,184,48,0.1));border:1px solid var(--gold);border-radius:10px;padding:14px;text-align:center;margin-top:12px;">'
+      + '<div style="font-size:24px;margin-bottom:6px;">&#127942;</div>'
+      + '<div style="font-family:\'Oswald\',sans-serif;font-size:18px;font-weight:700;color:var(--gold);">All Requirements Met!</div>'
+      + '<div style="font-size:12px;color:#c8a870;margin-top:6px;line-height:1.6;">Congratulations! You are eligible for the President\'s Award.<br>See your officer to confirm and collect.</div>'
+      + '</div>';
   }
 
   html += '</div>';
