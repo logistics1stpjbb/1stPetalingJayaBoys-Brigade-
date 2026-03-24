@@ -401,7 +401,7 @@
 
       <!-- REGISTER -->
       <div id="auth-register" style="display:none;">
-        <div class="form-group"><label class="form-label">Full Name</label><input class="form-input" id="reg-fullname" type="text" placeholder="e.g. Joshua Ethan Yogendran"/></div>
+        <div class="form-group"><label class="form-label">Full Name</label><input class="form-input" id="reg-fullname" type="text" placeholder="e.g. Muhammad Asyraf bin Razali"/></div>
         <div class="form-group"><label class="form-label">IC Number (MyKad)</label><input class="form-input" id="reg-ic" type="text" placeholder="e.g. 050123-10-1234"/></div>
         <div class="form-group"><label class="form-label">Date of Birth</label><input class="form-input" id="reg-dob" type="date"/></div>
         <div class="form-row">
@@ -1188,10 +1188,15 @@ const supa = {
   }
 };
 
-// ── In-memory session (replaces localStorage for auth state) ──────────────
-var _session = { ic: null, rank: '', joined: '' };
-function sessionSet(k, v) { _session[k] = v; }
-function sessionGet(k)    { return (_session[k] !== undefined && _session[k] !== null) ? _session[k] : null; }
+// ── Session (persists across reloads via sessionStorage, clears on tab close)
+var _session = (function() {
+  try { return JSON.parse(sessionStorage.getItem('bb_session') || '{}'); } catch(e) { return {}; }
+})();
+function sessionSet(k, v) {
+  _session[k] = v;
+  try { sessionStorage.setItem('bb_session', JSON.stringify(_session)); } catch(e) {}
+}
+function sessionGet(k) { return (_session[k] !== undefined && _session[k] !== null) ? _session[k] : null; }
 
 const ADMIN_PASSWORD = 'bb2024admin';
 
@@ -3236,39 +3241,39 @@ async function renderAdminBadges() {
       var file = input.files[0];
       if (!file) return;
       var reader = new FileReader();
-      reader.onload = function(e) {
-        var defs  = getBadgeDefs();
+      reader.onload = async function(e) {
+        var defs  = await getBadgeDefs();
         var badge = defs.find(function(b) { return b.id === id; });
-        if (badge) { badge.image = e.target.result; saveBadgeDefs(defs); renderAdminBadges(); }
+        if (badge) { badge.image = e.target.result; await saveBadgeDefs(defs); renderAdminBadges(); }
       };
       reader.readAsDataURL(file);
     });
   });
   container.querySelectorAll('[data-clear-img]').forEach(function(btn) {
-    btn.addEventListener('click', function() {
+    btn.addEventListener('click', async function() {
       var id    = btn.getAttribute('data-clear-img');
-      var defs  = getBadgeDefs();
+      var defs  = await getBadgeDefs();
       var badge = defs.find(function(b) { return b.id === id; });
-      if (badge) { delete badge.image; saveBadgeDefs(defs); renderAdminBadges(); }
+      if (badge) { delete badge.image; await saveBadgeDefs(defs); renderAdminBadges(); }
     });
   });
   container.querySelectorAll('[data-toggle-rep]').forEach(function(chk) {
-    chk.addEventListener('change', function() {
+    chk.addEventListener('change', async function() {
       var id    = chk.getAttribute('data-toggle-rep');
-      var defs  = getBadgeDefs();
+      var defs  = await getBadgeDefs();
       var badge = defs.find(function(b) { return b.id === id; });
-      if (badge) { badge.repeatable = chk.checked; saveBadgeDefs(defs); renderAdminBadges(); }
+      if (badge) { badge.repeatable = chk.checked; await saveBadgeDefs(defs); renderAdminBadges(); }
     });
   });
   container.querySelectorAll('[data-tier-sel]').forEach(function(sel) {
-    sel.addEventListener('change', function() {
+    sel.addEventListener('change', async function() {
       var id    = sel.getAttribute('data-tier-sel');
-      var defs  = getBadgeDefs();
+      var defs  = await getBadgeDefs();
       var badge = defs.find(function(b) { return b.id === id; });
       if (!badge) return;
       badge.tier        = sel.value;
       badge.hasAdvanced = sel.value === 'both';
-      saveBadgeDefs(defs);
+      await saveBadgeDefs(defs);
       renderAdminBadges();
     });
   });
@@ -3300,6 +3305,7 @@ async function renderAdminBadges() {
       var defs  = (await getBadgeDefs()).filter(function(b) { return !(b.cat === cat && b.name === '(Add badges below)'); });
       defs.push({ id: 'b_' + Date.now(), name: name, cat: cat, hasAdvanced: false, tier: 'basic', repeatable: false });
       await saveBadgeDefs(defs);
+      alert('✅ Badge added! Members will see it when they next open their badges.');
       if (input) input.value = '';
       renderAdminBadges();
     });
