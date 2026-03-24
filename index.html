@@ -167,6 +167,16 @@
 
   /* TASKS */
   .task-col { background:var(--navy2); border-radius:14px; padding:14px; flex:1; min-width:0; border:1px solid rgba(255,255,255,0.05); }
+  /* Mobile: hide all columns by default, show active one */
+  @media (max-width: 600px) {
+    #tasks-columns { flex-direction:column !important; gap:0 !important; }
+    .task-col { display:none; border-radius:12px; }
+    .task-col.mobile-active { display:block; }
+    .task-col-tabs { display:flex !important; }
+  }
+  .task-col-tabs { display:none; background:var(--navy2); border-radius:12px; padding:4px; margin-bottom:10px; gap:4px; }
+  .task-col-tab { flex:1; padding:9px 4px; border:none; border-radius:9px; background:transparent; font-family:'Oswald',sans-serif; font-size:12px; font-weight:700; letter-spacing:1px; text-transform:uppercase; color:#4a5a72; cursor:pointer; transition:all 0.2s; }
+  .task-col-tab.active { background:var(--navy); color:#fff; box-shadow:0 2px 8px rgba(0,0,0,0.3); }
   .task-col-title { font-family:'Oswald',sans-serif; font-size:13px; font-weight:700; letter-spacing:2px; text-transform:uppercase; margin-bottom:12px; display:flex; align-items:center; gap:8px; }
   .task-card { background:var(--navy); border-radius:10px; padding:12px 14px; margin-bottom:8px; border:1px solid rgba(255,255,255,0.065); cursor:pointer; transition:all 0.2s; }
   .task-card:hover { border-color:rgba(200,150,30,0.35); transform:translateY(-1px); box-shadow:0 4px 14px rgba(0,0,0,0.35); }
@@ -581,10 +591,23 @@
         <div id="tasks-dept-badge"></div>
       </div>
 
+      <!-- Mobile tab switcher (hidden on desktop via CSS) -->
+      <div class="task-col-tabs" id="task-col-tabs">
+        <button class="task-col-tab active" onclick="switchTaskTab('todo',this)" style="color:#8898bb;">
+          ⬤ To Do <span id="tab-count-todo"></span>
+        </button>
+        <button class="task-col-tab" onclick="switchTaskTab('inprogress',this)" style="">
+          ⬤ In Progress <span id="tab-count-inprogress"></span>
+        </button>
+        <button class="task-col-tab" onclick="switchTaskTab('done',this)" style="">
+          ⬤ Done <span id="tab-count-done"></span>
+        </button>
+      </div>
+
       <!-- Kanban columns -->
       <div style="display:flex;gap:10px;align-items:flex-start;" id="tasks-columns">
         <!-- Todo -->
-        <div class="task-col">
+        <div class="task-col mobile-active" id="taskcol-todo">
           <div class="task-col-title" style="color:#8898bb;">
             <span style="width:8px;height:8px;border-radius:50%;background:#8898bb;display:inline-block;"></span>
             To Do <span id="count-todo" style="font-size:11px;color:#556;font-weight:400;"></span>
@@ -592,7 +615,7 @@
           <div id="col-todo"></div>
         </div>
         <!-- In Progress -->
-        <div class="task-col">
+        <div class="task-col" id="taskcol-inprogress">
           <div class="task-col-title" style="color:#42a5f5;">
             <span style="width:8px;height:8px;border-radius:50%;background:#42a5f5;display:inline-block;"></span>
             In Progress <span id="count-inprogress" style="font-size:11px;color:#556;font-weight:400;"></span>
@@ -600,7 +623,7 @@
           <div id="col-inprogress"></div>
         </div>
         <!-- Done -->
-        <div class="task-col">
+        <div class="task-col" id="taskcol-done">
           <div class="task-col-title" style="color:#66bb6a;">
             <span style="width:8px;height:8px;border-radius:50%;background:#66bb6a;display:inline-block;"></span>
             Done <span id="count-done" style="font-size:11px;color:#556;font-weight:400;"></span>
@@ -2576,6 +2599,15 @@ var DEPT_CONFIG = {
   media:       { label: 'Media',       color: '#ffb74d', cls: 'dept-media'       }
 };
 
+function switchTaskTab(tab, btn) {
+  ['todo','inprogress','done'].forEach(function(t) {
+    var col = document.getElementById('taskcol-' + t);
+    if (col) col.classList.toggle('mobile-active', t === tab);
+  });
+  document.querySelectorAll('.task-col-tab').forEach(function(b) { b.classList.remove('active'); });
+  if (btn) btn.classList.add('active');
+}
+
 async function checkTasksAccess() {
   var ic = sessionGet('ic');
   var tab = document.getElementById('tab-tasks');
@@ -2617,7 +2649,9 @@ async function renderTasksBoard(dept) {
   ['todo','inprogress','done'].forEach(function(status) {
     var el  = document.getElementById('col-' + status);
     var cnt = document.getElementById('count-' + status);
+    var tcnt = document.getElementById('tab-count-' + status);
     if (cnt) cnt.textContent = cols[status].length ? '(' + cols[status].length + ')' : '';
+    if (tcnt) tcnt.textContent = cols[status].length ? '(' + cols[status].length + ')' : '';
     if (!el) return;
     if (!cols[status].length) { el.innerHTML = '<div style="color:#556;font-size:12px;text-align:center;padding:16px 0;">No tasks</div>'; return; }
     var html = '';
@@ -2634,10 +2668,10 @@ async function renderTasksBoard(dept) {
       var assignHtml = t.assignee_name ? '<span class="task-assignee">\ud83d\udc64 ' + t.assignee_name + '</span>' : '';
       var sc = { todo:'#8898bb', inprogress:'#42a5f5', done:'#66bb6a' };
       var sl = { todo:'To Do', inprogress:'In Progress', done:'Done' };
-      var stBtns = '<div style="display:flex;gap:4px;margin-top:10px;flex-wrap:wrap;">';
+      var stBtns = '<div style="display:flex;gap:6px;margin-top:10px;">';
       ['todo','inprogress','done'].forEach(function(s) {
         var active = t.status === s;
-        stBtns += '<button data-task-id="' + t.id + '" data-task-status="' + s + '" data-dept="' + dept + '" style="padding:3px 10px;border:1.5px solid ' + (active ? sc[s] : '#2a3a50') + ';border-radius:14px;background:' + (active ? sc[s] + '22' : 'transparent') + ';color:' + (active ? sc[s] : '#556') + ';font-size:10px;font-weight:700;cursor:pointer;font-family:\'Oswald\',sans-serif;">' + sl[s] + '</button>';
+        stBtns += '<button data-task-id="' + t.id + '" data-task-status="' + s + '" data-dept="' + dept + '" style="flex:1;padding:7px 4px;border:1.5px solid ' + (active ? sc[s] : '#2a3a50') + ';border-radius:10px;background:' + (active ? sc[s] + '22' : 'transparent') + ';color:' + (active ? sc[s] : '#556') + ';font-size:10px;font-weight:700;cursor:pointer;font-family:\'Oswald\',sans-serif;text-align:center;">' + sl[s] + '</button>';
       });
       stBtns += '</div>';
       html += '<div class="task-card" data-task-open="' + t.id + '">'
