@@ -401,7 +401,7 @@
 
       <!-- REGISTER -->
       <div id="auth-register" style="display:none;">
-        <div class="form-group"><label class="form-label">Full Name</label><input class="form-input" id="reg-fullname" type="text" placeholder="e.g. Lee Chong Wei"/></div>
+        <div class="form-group"><label class="form-label">Full Name</label><input class="form-input" id="reg-fullname" type="text" placeholder="e.g. Muhammad Asyraf bin Razali"/></div>
         <div class="form-group"><label class="form-label">IC Number (MyKad)</label><input class="form-input" id="reg-ic" type="text" placeholder="e.g. 050123-10-1234"/></div>
         <div class="form-group"><label class="form-label">Date of Birth</label><input class="form-input" id="reg-dob" type="date"/></div>
         <div class="form-row">
@@ -949,7 +949,15 @@
         </div>
 
         <!-- Uniform orders sub-panel -->
-        <div id="subpanel-orders" style="display:none;">
+        <div id="subpanel-payment" style="display:none;">
+              <div style="background:#0a1628;border-radius:12px;padding:18px;border:1px solid rgba(255,255,255,0.07);">
+                <div style="font-family:'Oswald',sans-serif;font-size:16px;font-weight:700;color:#fff;margin-bottom:6px;">💳 Payment Instructions</div>
+                <div style="font-size:12px;color:#8898bb;margin-bottom:14px;line-height:1.6;">This message is shown to members on the order review page (e.g. TNG number, bank details, QR code info).</div>
+                <textarea id="payment-info-editor" style="width:100%;min-height:140px;background:#122040;color:#e0e8ff;border:1.5px solid #2a3a50;border-radius:10px;padding:12px 14px;font-family:'Roboto',sans-serif;font-size:13px;line-height:1.75;outline:none;resize:vertical;box-sizing:border-box;" placeholder="e.g. Please transfer to TNG: 012-345 6789 (Ali bin Abu). Send screenshot below."></textarea>
+                <button onclick="adminSavePaymentInfo()" class="submit-btn gold" style="margin-top:12px;">💾 Save Payment Info</button>
+              </div>
+            </div>
+            <div id="subpanel-orders" style="display:none;">
           <div style="display:flex;gap:8px;margin-bottom:14px;">
             <input class="form-input" id="admin-order-search" type="text" placeholder="Search by order no or member name..." oninput="renderAdminOrders()" style="background:#0a1628;color:#fff;border-color:#2a3a50;"/>
           </div>
@@ -1272,6 +1280,22 @@ async function saveUniformItems() {
     await supa.req('POST', 'bb_config?on_conflict=key', { key: 'bb_uniform_items', value: JSON.stringify(UNIFORM_ITEMS) });
   } catch(e) {
     try { await supa.patch('bb_config?key=eq.bb_uniform_items', { value: JSON.stringify(UNIFORM_ITEMS) }); } catch(e2) { console.error('saveUniformItems:', e2); }
+  }
+}
+
+// ── Payment info ──────────────────────────────────────────────────────────
+var _paymentInfo = '';
+async function loadPaymentInfo() {
+  try {
+    var rows = await supa.get('bb_config?key=eq.bb_payment_info&select=value');
+    if (rows && rows.length) _paymentInfo = rows[0].value || '';
+  } catch(e) { _paymentInfo = ''; }
+}
+async function savePaymentInfo(text) {
+  try {
+    await supa.req('POST', 'bb_config?on_conflict=key', { key: 'bb_payment_info', value: text });
+  } catch(e) {
+    try { await supa.patch('bb_config?key=eq.bb_payment_info', { value: text }); } catch(e2) {}
   }
 }
 
@@ -1830,6 +1854,13 @@ function goToOrderReview() {
   if (notes.trim()) html += '<div class="review-row"><span class="review-label">Notes</span><span class="review-value">' + notes.trim() + '</span></div>';
   var rc = document.getElementById('review-content');
   if (rc) rc.innerHTML = html;
+  // Show payment instructions if set
+  var pib = document.getElementById('payment-info-box');
+  var pit = document.getElementById('payment-info-text');
+  if (pib && pit && _paymentInfo && _paymentInfo.trim()) {
+    pit.textContent = _paymentInfo;
+    pib.style.display = 'block';
+  } else if (pib) { pib.style.display = 'none'; }
   var sf = document.getElementById('step-form');   if (sf) sf.style.display = 'none';
   var sr = document.getElementById('step-review'); if (sr) sr.style.display = 'block';
   window.scrollTo({ top: 0, behavior: 'smooth' });
@@ -2302,6 +2333,10 @@ function renderUniformOrderInline() {
     + '<div id="step-review" style="display:none;"><div class="dark-card">'
     + '<div class="page-title">Review</div><div class="page-subtitle">Your Order</div><div class="page-desc">Confirm before submitting \ud83d\udc47</div>'
     + '<div style="background:#fff;border-radius:14px;padding:20px;margin-bottom:18px;" id="review-content"></div>'
+    + '<div id="payment-info-box" style="display:none;background:rgba(200,150,30,0.08);border:1.5px solid rgba(200,150,30,0.3);border-radius:14px;padding:16px;margin-bottom:16px;">'
+    + '<div style="font-family:\'Oswald\',sans-serif;font-size:14px;font-weight:600;color:var(--gold);margin-bottom:8px;">💳 Payment Instructions</div>'
+    + '<div id="payment-info-text" style="font-size:13px;color:#c8d8f0;line-height:1.75;white-space:pre-wrap;"></div>'
+    + '</div>'
     + '<div style="background:#0a1628;border:2px dashed rgba(200,150,30,0.4);border-radius:14px;padding:16px;margin-bottom:16px;">'
     + '<div style="font-family:\'Oswald\',sans-serif;font-size:14px;font-weight:600;color:var(--gold);margin-bottom:6px;">&#128247; TNG Payment Screenshot</div>'
     + '<div style="font-size:12px;color:#8898bb;margin-bottom:12px;">Please make payment via TNG and upload your payment screenshot before confirming.</div>'
@@ -2705,15 +2740,17 @@ function renderGallery() {
   }
   if (noPhotos) noPhotos.style.display = 'none';
   var pubHtml = '', admHtml = '';
-  galleryImages.forEach(function(img, i) {
-    pubHtml += '<div class="gallery-img-wrap"><img src="' + img + '" alt="Photo ' + (i+1) + '"/></div>';
-    admHtml += '<div class="gallery-img-wrap"><img src="' + img + '" alt="Photo ' + (i+1) + '"/><button class="del-btn" data-gi="' + i + '">\u2715</button></div>';
+  galleryImages.forEach(function(item, i) {
+    var url = (typeof item === 'string') ? item : item.url;
+    var id  = (typeof item === 'object' && item.id) ? item.id : '';
+    pubHtml += '<div class="gallery-img-wrap"><img src="' + url + '" alt="Photo ' + (i+1) + '" loading="lazy" onerror="this.parentElement.style.display=\'none\'"/></div>';
+    admHtml += '<div class="gallery-img-wrap"><img src="' + url + '" alt="Photo ' + (i+1) + '" loading="lazy" onerror="this.parentElement.style.display=\'none\'"/><button class="del-btn" data-gi="' + i + '" data-gid="' + id + '">\u2715</button></div>';
   });
   if (grid)      grid.innerHTML = pubHtml;
   if (adminGrid) {
     adminGrid.innerHTML = admHtml;
     adminGrid.querySelectorAll('[data-gi]').forEach(function(btn) {
-      btn.addEventListener('click', function() { deleteGalleryImage(parseInt(btn.getAttribute('data-gi'))); });
+      btn.addEventListener('click', function() { deleteGalleryImage(parseInt(btn.getAttribute('data-gi')), btn.getAttribute('data-gid')); });
     });
   }
 }
@@ -2771,9 +2808,7 @@ function renderAnnouncements() {
   var html = '';
   announcements.slice().reverse().forEach(function(a, ri) {
     var realIdx = announcements.length - 1 - ri;
-    var bodyHtml = (a.body && a.body.indexOf('<') !== -1)
-      ? a.body
-      : (a.body || '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/\n/g,'<br>');
+    var bodyHtml = a.body || '';
     var reactions = a.reactions || {};
 
     // Build reaction buttons
@@ -3400,8 +3435,22 @@ function switchFormSubtab(sub) {
   if (sub === 'formresponses') renderFormResponses();
 }
 
+async function loadAndRenderPaymentEditor() {
+  await loadPaymentInfo();
+  var el = document.getElementById('payment-info-editor');
+  if (el) el.value = _paymentInfo || '';
+}
+async function adminSavePaymentInfo() {
+  var el = document.getElementById('payment-info-editor');
+  var text = el ? el.value.trim() : '';
+  await savePaymentInfo(text);
+  _paymentInfo = text;
+  alert('✅ Payment info saved! Members will see it on the order review page.');
+}
+
 function switchUniformSubtab(sub) {
-  ['products','orders'].forEach(function(s) {
+  if (sub === 'payment') loadAndRenderPaymentEditor();
+  ['products','orders','payment'].forEach(function(s) {
     var p = document.getElementById('subpanel-' + s);
     var b = document.getElementById('subtab-' + s);
     if (p) p.style.display = s === sub ? 'block' : 'none';
@@ -3815,7 +3864,7 @@ async function saveTask() {
   var selected    = assigneeSel ? Array.from(assigneeSel.selectedOptions).filter(function(o) { return o.value; }) : [];
   var assigneeIc  = selected.map(function(o) { return o.value; }).join(',');
   var assigneeName = selected.map(function(o) { return o.text; }).join(', ');
-  var payload = { title: title, description: desc, department: dept, priority: priority, due_date: due || null, assignee_ic: assigneeIc || null, assignee_name: assigneeName || null };
+  var payload = { title: title, description: desc, department: dept, priority: priority, due_date: due || null, assignee_name: assigneeName || null };
   if (!editId) payload.created_at = new Date().toISOString();
   if (!editId) payload.status = 'todo';
   try {
@@ -4123,6 +4172,7 @@ document.head.appendChild(reStyle);
 // ── Init ───────────────────────────────────────────────────────────────────
 window.addEventListener('load', function() {
   loadPrices();
+  loadPaymentInfo();
   loadGallery();
   loadAnnouncements();
   loadCustomForms();
