@@ -1343,9 +1343,8 @@
     var data    = JSON.parse(e.postData.contents);
     var ss      = SpreadsheetApp.openById(data.sheetId);
     var records = data.records || [];
-    var weekNum = parseInt(data.weekLabel) || 1; // column group number
+    var weekDate = data.weekDate || ''; // e.g. "3rd January 2026"
 
-    // Squad sheets: "Squad Alpha", "Squad Papa", "Squad Zulu", "Squad Hotel"
     var squadSheets = {
       'Alpha': ss.getSheetByName('Squad Alpha'),
       'Papa':  ss.getSheetByName('Squad Papa'),
@@ -1353,74 +1352,127 @@
       'Hotel': ss.getSheetByName('Squad Hotel')
     };
 
-    // Column layout per week block (row 8 = headers, members from row 9)
-    // Each week block: BAND_OPEN, BAND_DISMISS, BAND_LEAVE,
-    //                  PARADE_OPEN, PARADE_DISMISS, UNIFORM, PARADE_LEAVE, REMARKS
-    // First week starts at col N (14). Each week = 5 cols (parade-only)
-    // or 8 cols (band+parade). We look for the member's NAME in col D (4).
-    // Use weekLabel to match the date header in row 6.
+    // Cache: for each sheet, scan row 6 once to find the week's start column,
+    // then scan row 8 within that block to map header → column number.
+    // This handles variable block widths (some weeks have band, some don't).
+    var sheetCache = {};
 
+    function getSheetInfo(sh) {
+      var shName = sh.getName();
+      if (sheetCache[shName]) return sheetCache[shName];
+
+      var lastCol  = sh.getLastColumn();
+      var lastRow  = sh.getLastRow();
+
+      // --- Read all of row 6 in one call (fast) ---
+      var row6 = sh.getRange(6, 1, 1, lastCol).getValues()[0];
+
+      // --- Read all of row 8 in one call (fast) ---
+      var row8 = sh.getRange(8, 1, 1, lastCol).getValues()[0];
+
+      // --- Read name column (col D = index 3) for all member rows ---
+      var nameCol = sh.getRange(9, 4, Math.max(1, lastRow - 8), 1).getValues();
+
+      sheetCache[shName] = { row6: row6, row8: row8, nameCol: nameCol, lastCol: lastCol, lastRow: lastRow };
+      return sheetCache[shName];
+    }
+
+    // Find the column (1-based) where this week's date appears in row 6.
+    // Row 6 cells can span merged cells — the value sits in the leftmost cell of the merge.
+    // We match the date string loosely (contains check, case-insensitive).
+    function findWeekStartCol(info, dateStr) {
+      if (!dateStr) return -1;
+      var needle = dateStr.toLowerCase().trim();
+      for (var i = 0; i < info.row6.length; i++) {
+        var cell = (info.row6[i] || '').toString().toLowerCase().trim();
+        if (cell && cell.indexOf(needle) !== -1) return i + 1; // 1-based
+      }
+      return -1;
+    }
+
+    // From weekStartCol, scan row 8 forward until we hit a non-empty row-6 cell
+    // in a different week (or end of sheet). Map header text → column number.
+    function buildColMap(info, weekStartCol) {
+      var colMap = {};
+      var lastCol = info.lastCol;
+      for (var c = weekStartCol; c <= lastCol; c++) {
+        var idx = c - 1; // 0-based index into row arrays
+
+        // Stop if we've moved into the next week's block
+        // (row 6 has a non-empty value that isn't our week)
+        if (c > weekStartCol && info.row6[idx] && info.row6[idx].toString().trim() !== '') break;
+
+        var h = (info.row8[idx] || '').toString().toUpperCase().trim();
+        if (!h) continue;
+
+        if (h.indexOf('BAND')   !== -1 && h.indexOf('OPENING')   !== -1) colMap.bandOpen     = c;
+        if (h.indexOf('BAND')   !== -1 && h.indexOf('DISMISSAL')  !== -1) colMap.bandDismiss  = c;
+        if (h.indexOf('BAND')   !== -1 && h.indexOf('LEAVE')      !== -1) colMap.bandLeave    = c;
+        if (h.indexOf('PARADE') !== -1 && h.indexOf('OPENING')   !== -1) colMap.paradeOpen    = c;
+        if (h.indexOf('PARADE') !== -1 && h.indexOf('DISMISSAL')  !== -1) colMap.paradeDismiss = c;
+        if (h === 'UNIFORM' || h.indexOf('UNIFORM') !== -1)               colMap.uniform       = c;
+        if (h.indexOf('LEAVE')  !== -1 && h.indexOf('PARADE')    !== -1)  colMap.paradeLeave   = c;
+        if (h === 'REMARKS' || h.indexOf('REMARK')  !== -1)               colMap.remarks       = c;
+
+        // Also capture VALID LEAVE that's not explicitly tagged band/parade
+        // by position: if bandOpen found but paradeOpen not yet, it's band leave
+        if (h.indexOf('VALID LEAVE') !== -1 || (h.indexOf('LEAVE') !== -1 && h.indexOf('=') !== -1)) {
+          if (colMap.paradeOpen && !colMap.paradeLeave) colMap.paradeLeave = c;
+          else if (!colMap.bandLeave && colMap.bandOpen) colMap.bandLeave = c;
+        }
+      }
+      return colMap;
+    }
+
+    // Find member row by name in col D (cached nameCol array)
+    function findMemberRow(info, memberName) {
+      var needle = memberName.toString().trim().toLowerCase();
+      for (var i = 0; i < info.nameCol.length; i++) {
+        var cell = (info.nameCol[i][0] || '').toString().trim().toLowerCase();
+        if (cell === needle) return 9 + i; // row number (1-based), data starts at row 9
+      }
+      return -1;
+    }
+
+    // Write a value only if the column was found and value is meaningful
+    function writeCell(sh, row, col, val) {
+      if (!col || col < 1) return;
+      if (val === '' || val === undefined || val === null) return;
+      sh.getRange(row, col).setValue(val);
+    }
+
+    // ── Main loop ─────────────────────────────────────────────────────────
     records.forEach(function(r) {
-      var squad = r.squad || '';
-      var sh    = squadSheets[squad];
+      var sh = squadSheets[r.squad || ''];
       if (!sh) return;
 
-      // Find the member row by name (col D = column 4)
-      var lastRow = sh.getLastRow();
-      var memberRow = -1;
-      for (var row = 9; row <= lastRow; row++) {
-        var cellName = sh.getRange(row, 4).getValue();
-        if (cellName && cellName.toString().trim().toLowerCase() === r.name.toString().trim().toLowerCase()) {
-          memberRow = row; break;
-        }
-      }
-      if (memberRow === -1) return; // member not found in sheet
+      var info = getSheetInfo(sh);
 
-      // Find the column group for this week by matching date in row 6
-      var lastCol = sh.getLastColumn();
-      var weekStartCol = -1;
-      for (var col = 14; col <= lastCol; col++) {
-        var hdr = sh.getRange(6, col).getValue();
-        if (hdr && hdr.toString().indexOf(r.weekLabel) !== -1) {
-          weekStartCol = col; break;
-        }
-        // Also try matching by date string
-        if (hdr && r.weekDate && hdr.toString().indexOf(r.weekDate) !== -1) {
-          weekStartCol = col; break;
-        }
+      // 1. Find the week's start column by date lookup in row 6
+      var weekStartCol = findWeekStartCol(info, weekDate);
+      if (weekStartCol === -1) {
+        // Fallback: try matching the weekLabel (e.g. "3 Jan 2026")
+        weekStartCol = findWeekStartCol(info, data.weekLabel || '');
       }
-      if (weekStartCol === -1) return; // week column group not found
+      if (weekStartCol === -1) return; // date not found in sheet
 
-      // Read the header row (row 8) to find which sub-columns are which
-      // Look for BAND(OPEN), BAND(DISMISS), VALID LEAVE BAND,
-      //          PARADE(OPEN), PARADE(DISMISS), UNIFORM, VALID LEAVE PARADE, REMARKS
-      // starting from weekStartCol
-      var colMap = {};
-      for (var c = weekStartCol; c <= Math.min(weekStartCol + 10, lastCol); c++) {
-        var h = (sh.getRange(8, c).getValue() || '').toString().toUpperCase().trim();
-        if (h.indexOf('BAND') !== -1 && h.indexOf('OPENING') !== -1) colMap.bandOpen    = c;
-        if (h.indexOf('BAND') !== -1 && h.indexOf('DISMISSAL') !== -1) colMap.bandDismiss = c;
-        if (h.indexOf('BAND') !== -1 && h.indexOf('LEAVE') !== -1) colMap.bandLeave   = c;
-        if (h.indexOf('PARADE') !== -1 && h.indexOf('OPENING') !== -1) colMap.paradeOpen   = c;
-        if (h.indexOf('PARADE') !== -1 && h.indexOf('DISMISSAL') !== -1) colMap.paradeDismiss= c;
-        if (h === 'UNIFORM') colMap.uniform     = c;
-        if (h.indexOf('LEAVE') !== -1 && h.indexOf('PARADE') !== -1) colMap.paradeLeave  = c;
-        if (h === 'REMARKS') colMap.remarks     = c;
-      }
+      // 2. Map row 8 headers within this week's block
+      var colMap = buildColMap(info, weekStartCol);
 
-      // Write values (only write if column was found)
-      function writeCell(col, val) {
-        if (col && val !== '' && val !== undefined && val !== null)
-          sh.getRange(memberRow, col).setValue(val);
-      }
-      writeCell(colMap.bandOpen,      r.bandOpen);
-      writeCell(colMap.bandDismiss,   r.bandDismiss);
-      writeCell(colMap.bandLeave,     r.bandLeave);
-      writeCell(colMap.paradeOpen,    r.paradeOpen);
-      writeCell(colMap.paradeDismiss, r.paradeDismiss);
-      writeCell(colMap.uniform,       r.uniform);
-      writeCell(colMap.paradeLeave,   r.paradeLeave);
-      if (colMap.remarks && r.remarks) sh.getRange(memberRow, colMap.remarks).setValue(r.remarks);
+      // 3. Find the member's row by name
+      var memberRow = findMemberRow(info, r.name);
+      if (memberRow === -1) return;
+
+      // 4. Write each field
+      writeCell(sh, memberRow, colMap.bandOpen,      r.bandOpen);
+      writeCell(sh, memberRow, colMap.bandDismiss,   r.bandDismiss);
+      writeCell(sh, memberRow, colMap.bandLeave,     r.bandLeave);
+      writeCell(sh, memberRow, colMap.paradeOpen,    r.paradeOpen);
+      writeCell(sh, memberRow, colMap.paradeDismiss, r.paradeDismiss);
+      writeCell(sh, memberRow, colMap.uniform,       r.uniform);
+      writeCell(sh, memberRow, colMap.paradeLeave,   r.paradeLeave);
+      if (colMap.remarks && r.remarks && r.remarks.toString().trim())
+        sh.getRange(memberRow, colMap.remarks).setValue(r.remarks);
     });
 
     return ContentService
