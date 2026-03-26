@@ -1391,21 +1391,49 @@ function doPost(e) {
       return c;
     }
 
+    // ── Name matching: website may have full name, sheet may have shorter name ──
+    // "Joshua Ethan Yogendran" matches "Joshua Ethan"
+    // "Jason Koh Chien Jed"   matches "Jason Koh"
+    // Strategy: sheet name starts the website name, OR website name starts the sheet name.
+    // We always prefer an exact match first, then fall back to prefix matching.
+    function namesMatch(sheetName, websiteName) {
+      var s = sheetName.trim().toLowerCase();
+      var w = websiteName.trim().toLowerCase();
+      if (s === w) return true;                          // exact
+      if (w.indexOf(s) === 0 && w[s.length] === ' ') return true;  // sheet is prefix of web
+      if (s.indexOf(w) === 0 && s[w.length] === ' ') return true;  // web is prefix of sheet
+      return false;
+    }
+
+    // ── fix2: normalise a value — if it was never set, write 0; if set, keep it ──
+    // The portal sends '' when untouched. We treat '' as 0 so cells are never blank.
+    function v(val) {
+      if (val === 1) return 1;
+      if (val === 0) return 0;
+      return 0;   // '' / undefined / null → 0
+    }
+
     // ── Band sheet helpers ────────────────────────────────────────────────
     function findBandRow(c, name) {
-      var n = name.trim().toLowerCase();
+      var exact = -1, prefix = -1;
       for (var i = 0; i < c.nameA.length; i++) {
-        if ((c.nameA[i][0]||'').toString().trim().toLowerCase() === n) return 4+i; // 1-based
+        var cell = (c.nameA[i][0]||'').toString();
+        if (namesMatch(cell, name)) {
+          if (cell.trim().toLowerCase() === name.trim().toLowerCase()) return 4+i; // exact → done
+          if (prefix === -1) prefix = 4+i;
+        }
       }
-      return -1;
+      return prefix; // best prefix match, or -1
     }
     function findBandWeekCol(c, dateShort, label) {
-      // Row2 has dates like "11/4", "07/03". Match dateShort first, then label.
+      // Row2 has dates like "11/4", "07/03". Scan every column (merged cells mean the
+      // value only sits in the first column of a merged group, so don't skip by 3).
       var needles = [dateShort, label].filter(Boolean).map(function(s){ return s.toLowerCase().trim(); });
-      for (var i = 5; i < c.row2.length; i += 3) {  // data starts col F (index 5)
+      for (var i = 5; i < c.row2.length; i++) {
         var cell = (c.row2[i]||'').toString().toLowerCase().trim();
+        if (!cell) continue;
         for (var n = 0; n < needles.length; n++) {
-          if (cell && (cell === needles[n] || cell.indexOf(needles[n]) !== -1)) return i+1; // 1-based
+          if (cell === needles[n] || cell.indexOf(needles[n]) !== -1) return i+1; // 1-based
         }
       }
       return -1;
@@ -1413,11 +1441,15 @@ function doPost(e) {
 
     // ── Squad sheet helpers ───────────────────────────────────────────────
     function findSquadRow(c, name) {
-      var n = name.trim().toLowerCase();
+      var prefix = -1;
       for (var i = 0; i < c.nameD.length; i++) {
-        if ((c.nameD[i][0]||'').toString().trim().toLowerCase() === n) return 9+i;
+        var cell = (c.nameD[i][0]||'').toString();
+        if (namesMatch(cell, name)) {
+          if (cell.trim().toLowerCase() === name.trim().toLowerCase()) return 9+i;
+          if (prefix === -1) prefix = 9+i;
+        }
       }
-      return -1;
+      return prefix;
     }
     function findSquadWeekCol(c, dateLong, label) {
       // Row6 has dates like "11th April 2026". Match dateLong first, then label.
@@ -1450,10 +1482,10 @@ function doPost(e) {
     }
 
     // ── Batch write accumulator ───────────────────────────────────────────
-    // Collect all writes as {sheet, row, col, val} then group by sheet and write rows at once
-    var writes = {};  // key="sheetName:row" → {sh, row, colVals:{col:val}}
+    var writes = {};
     function queueWrite(sh, row, col, val) {
-      if (!sh || !col || row < 1 || val === '' || val === undefined || val === null) return;
+      // Allow 0 — only skip if column not found or row invalid
+      if (!sh || !col || col < 1 || row < 1) return;
       var key = sh.getName() + ':' + row;
       if (!writes[key]) writes[key] = { sh: sh, row: row, cols: {} };
       writes[key].cols[col] = val;
@@ -1488,13 +1520,13 @@ function doPost(e) {
 
     // ── Process each record ───────────────────────────────────────────────
     records.forEach(function(r) {
-      // 1. Band sheet  (Opening=bCol+1, Closing=bCol+2, Valid Leave=bCol+0 per 3-col block)
+      // 1. Band sheet  (col layout: weekCol=Valid Leave, weekCol+1=Opening, weekCol+2=Closing)
       if (bandSheet && bandWeekCol > 0) {
         var bRow = findBandRow(bandC, r.name);
         if (bRow > 0) {
-          queueWrite(bandSheet, bRow, bandWeekCol,     r.bandLeave);   // Valid Leave
-          queueWrite(bandSheet, bRow, bandWeekCol + 1, r.bandOpen);    // Opening
-          queueWrite(bandSheet, bRow, bandWeekCol + 2, r.bandDismiss); // Closing
+          queueWrite(bandSheet, bRow, bandWeekCol,     v(r.bandLeave));   // Valid Leave
+          queueWrite(bandSheet, bRow, bandWeekCol + 1, v(r.bandOpen));    // Opening
+          queueWrite(bandSheet, bRow, bandWeekCol + 2, v(r.bandDismiss)); // Closing
         }
       }
       // 2. Squad sheet
@@ -1504,13 +1536,13 @@ function doPost(e) {
         var sqRow = findSquadRow(sqMap.c, r.name);
         if (sqRow > 0) {
           var m = sqMap.cols;
-          queueWrite(sqMap.sh, sqRow, m.bandOpen,      r.bandOpen);
-          queueWrite(sqMap.sh, sqRow, m.bandDismiss,   r.bandDismiss);
-          queueWrite(sqMap.sh, sqRow, m.bandLeave,     r.bandLeave);
-          queueWrite(sqMap.sh, sqRow, m.paradeOpen,    r.paradeOpen);
-          queueWrite(sqMap.sh, sqRow, m.paradeDismiss, r.paradeDismiss);
-          queueWrite(sqMap.sh, sqRow, m.uniform,       r.uniform);
-          queueWrite(sqMap.sh, sqRow, m.paradeLeave,   r.paradeLeave);
+          queueWrite(sqMap.sh, sqRow, m.bandOpen,      v(r.bandOpen));
+          queueWrite(sqMap.sh, sqRow, m.bandDismiss,   v(r.bandDismiss));
+          queueWrite(sqMap.sh, sqRow, m.bandLeave,     v(r.bandLeave));
+          queueWrite(sqMap.sh, sqRow, m.paradeOpen,    v(r.paradeOpen));
+          queueWrite(sqMap.sh, sqRow, m.paradeDismiss, v(r.paradeDismiss));
+          queueWrite(sqMap.sh, sqRow, m.uniform,       v(r.uniform));
+          queueWrite(sqMap.sh, sqRow, m.paradeLeave,   v(r.paradeLeave));
           if (m.remarks && r.remarks && r.remarks.toString().trim())
             queueWrite(sqMap.sh, sqRow, m.remarks, r.remarks);
         }
