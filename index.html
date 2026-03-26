@@ -1426,14 +1426,32 @@ function doPost(e) {
       return prefix; // best prefix match, or -1
     }
     function findBandWeekCol(c, dateShort, label) {
-      // Row2 has dates like "11/4", "07/03". Scan every column (merged cells mean the
-      // value only sits in the first column of a merged group, so don't skip by 3).
-      var needles = [dateShort, label].filter(Boolean).map(function(s){ return s.toLowerCase().trim(); });
+      // Row2 has dates like "07/03", "14/3", "11/4" (inconsistent leading zeros).
+      // Build many possible needle formats from the ISO date embedded in dateShort.
+      // dateShort from fmtDateShort is e.g. "11/4" — also try "11/04", "07/3", "7/3" etc.
+      function makeNeedles(ds) {
+        if (!ds) return [];
+        var parts = ds.split('/');
+        if (parts.length !== 2) return [ds.toLowerCase()];
+        var d = parseInt(parts[0],10), m = parseInt(parts[1],10);
+        var out = [];
+        // All combos of zero-padded day/month
+        [[d,m],[String(d).padStart(2,'0'),m],[d,String(m).padStart(2,'0')],[String(d).padStart(2,'0'),String(m).padStart(2,'0')]].forEach(function(p){
+          out.push(p[0]+'/'+p[1]);
+        });
+        return out.map(function(s){return s.toLowerCase();});
+      }
+      var needles = makeNeedles(dateShort).concat([label].filter(Boolean).map(function(s){return s.toLowerCase().trim();}));
+      // Deduplicate
+      needles = needles.filter(function(v,i,a){return a.indexOf(v)===i;});
       for (var i = 5; i < c.row2.length; i++) {
         var cell = (c.row2[i]||'').toString().toLowerCase().trim();
         if (!cell) continue;
+        // Strip spaces from cell for comparison
+        var cellStripped = cell.replace(/\s/g,'');
         for (var n = 0; n < needles.length; n++) {
-          if (cell === needles[n] || cell.indexOf(needles[n]) !== -1) return i+1; // 1-based
+          var needle = needles[n].replace(/\s/g,'');
+          if (cellStripped === needle || cellStripped.indexOf(needle) !== -1 || needle.indexOf(cellStripped) !== -1) return i+1;
         }
       }
       return -1;
