@@ -1314,9 +1314,10 @@
 
         <!-- Roles sub-panel -->
         <div id="subpanel-att-roles">
-          <div style="background:rgba(200,150,30,0.07);border:1px solid rgba(200,150,30,0.2);border-radius:10px;padding:10px 14px;margin-bottom:14px;font-size:12px;color:#c8a870;line-height:1.6;">
-            🎵 <strong>Instrument Leaders</strong> see the morning band session only.<br>
-            🪖 <strong>Squad Leaders</strong> see both sessions and can record uniform points.
+          <div style="background:rgba(200,150,30,0.07);border:1px solid rgba(200,150,30,0.2);border-radius:10px;padding:10px 14px;margin-bottom:14px;font-size:12px;color:#c8a870;line-height:1.7;">
+            🎼 <strong>Section Leaders</strong> (Brass / Woodwind / Percussion) — see the <strong>morning band session only</strong> for their section members.<br>
+            🪖 <strong>Squad Leaders</strong> — see <strong>both sessions</strong> (morning band for their squad + afternoon parade) and record uniform points and remarks.<br>
+            Set each member's <strong>Band Section</strong> so they appear under the right section leader. Set the <strong>Group name</strong> to match exactly (e.g. "Brass", "Alpha").
           </div>
           <input class="form-input" id="adm-att-search" type="text" placeholder="Search member..." oninput="renderAttRoles()" style="background:#0a1628;color:#fff;border-color:#2a3a50;margin-bottom:12px;"/>
           <div id="adm-att-roles-list"><div style="text-align:center;padding:20px;color:#556;font-size:13px;">Loading...</div></div>
@@ -1337,8 +1338,148 @@
               <input class="form-input" id="att-script-url-input" type="url" placeholder="https://script.google.com/macros/s/.../exec" style="background:#122040;color:#fff;border-color:#2a3a50;"/>
             </div>
             <div style="background:#0a1628;border-radius:10px;padding:14px;margin-bottom:14px;border:1px solid rgba(255,255,255,0.07);">
-              <div style="font-size:11px;font-weight:700;color:#8898bb;letter-spacing:1px;text-transform:uppercase;margin-bottom:8px;">Apps Script Code — paste into script.google.com → Deploy as Web App</div>
-              <pre style="font-size:10px;color:#66bb6a;white-space:pre-wrap;line-height:1.6;font-family:monospace;margin:0;">function doPost(e) {
+              <div style="font-size:11px;font-weight:700;color:#8898bb;letter-spacing:1px;text-transform:uppercase;margin-bottom:8px;">Apps Script Code — paste into script.google.com → Deploy as Web App (Anyone)</div>
+              <pre style="font-size:10px;color:#66bb6a;white-space:pre-wrap;line-height:1.6;font-family:monospace;margin:0;">// Band Attendance 2026 structure:
+//   Row 1: month headers
+//   Row 2: date headers  (e.g. "07/03", "14/3")
+//   Row 3: sub-headers   (Valid Leave = 1 | Opening | Closing) — repeating every 3 cols
+//   Col A: Member Name, Col B: Section, Col C: Squad
+//   Col D: Band points (formula), Col E: Band attendance % (formula)
+//   Data starts col F (index 6)
+//
+// Squad sheets (Squad Alpha / Papa / Zulu / Hotel) structure:
+//   Row 6: date headers, Row 8: column headers (BAND OPENING, BAND DISMISSAL, etc.)
+//   Col D: Member Name (index 4). Data starts around col N (14).
+
+function doPost(e) {
+  try {
+    var data      = JSON.parse(e.postData.contents);
+    var ss        = SpreadsheetApp.openById(data.sheetId);
+    var records   = data.records  || [];
+    var weekLabel = data.weekLabel || '';
+    var weekDate  = data.weekDate  || '';
+
+    var bandSheet = ss.getSheetByName('Band Attendance 2026');
+    var squadSheets = {
+      'Alpha': ss.getSheetByName('Squad Alpha'),
+      'Papa' : ss.getSheetByName('Squad Papa'),
+      'Zulu' : ss.getSheetByName('Squad Zulu'),
+      'Hotel': ss.getSheetByName('Squad Hotel')
+    };
+
+    // ── Band sheet helpers ─────────────────────────────────────
+    // Find member row by name in col A (column 1)
+    function findBandRow(name) {
+      if (!bandSheet) return -1;
+      var last = bandSheet.getLastRow();
+      for (var r = 4; r <= last; r++) {
+        var v = bandSheet.getRange(r, 1).getValue();
+        if (v && v.toString().trim().toLowerCase() === name.trim().toLowerCase()) return r;
+      }
+      return -1;
+    }
+
+    // Find the starting column for a week by matching row 2 date
+    // Each week block = 3 columns: [Valid Leave, Opening, Closing]
+    // Data starts at col F = index 6
+    function findBandWeekCol(label, date) {
+      if (!bandSheet) return -1;
+      var last = bandSheet.getLastColumn();
+      for (var c = 6; c <= last; c += 3) {
+        var hdr = (bandSheet.getRange(2, c).getValue() || '').toString().trim();
+        if ((label && hdr.indexOf(label) !== -1) ||
+            (date  && hdr.indexOf(date)  !== -1) ||
+            (date  && hdr === date)) return c;
+      }
+      return -1;
+    }
+
+    // ── Squad sheet helpers ────────────────────────────────────
+    function findSquadRow(sheet, name) {
+      var last = sheet.getLastRow();
+      for (var r = 9; r <= last; r++) {
+        var v = sheet.getRange(r, 4).getValue();
+        if (v && v.toString().trim().toLowerCase() === name.trim().toLowerCase()) return r;
+      }
+      return -1;
+    }
+
+    function findSquadWeekCol(sheet, label, date) {
+      var last = sheet.getLastColumn();
+      for (var c = 14; c <= last; c++) {
+        var hdr = (sheet.getRange(6, c).getValue() || '').toString();
+        if ((label && hdr.indexOf(label) !== -1) || (date && hdr.indexOf(date) !== -1)) return c;
+      }
+      return -1;
+    }
+
+    function mapSquadHeaders(sheet, startCol) {
+      var last = sheet.getLastColumn();
+      var m = {};
+      for (var c = startCol; c <= Math.min(startCol + 12, last); c++) {
+        var h = (sheet.getRange(8, c).getValue() || '').toString().toUpperCase().trim();
+        if      (h.indexOf('BAND') !== -1 && h.indexOf('OPENING')   !== -1) m.bandOpen    = c;
+        else if (h.indexOf('BAND') !== -1 && h.indexOf('DISMISSAL') !== -1) m.bandDismiss = c;
+        else if (h.indexOf('BAND') !== -1 && h.indexOf('LEAVE')     !== -1) m.bandLeave   = c;
+        else if (h.indexOf('PARADE') !== -1 && h.indexOf('OPENING')   !== -1) m.paradeOpen    = c;
+        else if (h.indexOf('PARADE') !== -1 && h.indexOf('DISMISSAL') !== -1) m.paradeDismiss = c;
+        else if (h === 'UNIFORM')                                              m.uniform       = c;
+        else if (h.indexOf('LEAVE') !== -1 && h.indexOf('PARADE')    !== -1) m.paradeLeave   = c;
+        else if (h === 'REMARKS')                                              m.remarks       = c;
+      }
+      return m;
+    }
+
+    function set(sheet, row, col, val) {
+      if (col && val !== '' && val !== undefined && val !== null)
+        sheet.getRange(row, col).setValue(val);
+    }
+
+    // ── Process each record ────────────────────────────────────
+    records.forEach(function(r) {
+
+      // 1. Write band data → Band Attendance 2026
+      //    Col layout per week: [weekCol+0]=Valid Leave, [weekCol+1]=Opening, [weekCol+2]=Closing
+      if (bandSheet && (r.bandOpen !== '' || r.bandDismiss !== '' || r.bandLeave !== '')) {
+        var bRow = findBandRow(r.name);
+        var bCol = findBandWeekCol(r.weekLabel, r.weekDate);
+        if (bRow !== -1 && bCol !== -1) {
+          set(bandSheet, bRow, bCol,     r.bandLeave);    // Valid Leave = 1
+          set(bandSheet, bRow, bCol + 1, r.bandOpen);     // Opening
+          set(bandSheet, bRow, bCol + 2, r.bandDismiss);  // Closing
+        }
+      }
+
+      // 2. Write band + parade data → Squad sheet
+      var sqSheet = squadSheets[r.squad];
+      if (sqSheet) {
+        var sqRow = findSquadRow(sqSheet, r.name);
+        var sqCol = findSquadWeekCol(sqSheet, r.weekLabel, r.weekDate);
+        if (sqRow !== -1 && sqCol !== -1) {
+          var hdr = mapSquadHeaders(sqSheet, sqCol);
+          set(sqSheet, sqRow, hdr.bandOpen,      r.bandOpen);
+          set(sqSheet, sqRow, hdr.bandDismiss,   r.bandDismiss);
+          set(sqSheet, sqRow, hdr.bandLeave,     r.bandLeave);
+          set(sqSheet, sqRow, hdr.paradeOpen,    r.paradeOpen);
+          set(sqSheet, sqRow, hdr.paradeDismiss, r.paradeDismiss);
+          set(sqSheet, sqRow, hdr.uniform,       r.uniform);
+          set(sqSheet, sqRow, hdr.paradeLeave,   r.paradeLeave);
+          if (hdr.remarks && r.remarks) sqSheet.getRange(sqRow, hdr.remarks).setValue(r.remarks);
+        }
+      }
+    });
+
+    return ContentService
+      .createTextOutput(JSON.stringify({ok: true}))
+      .setMimeType(ContentService.MimeType.JSON);
+
+  } catch(err) {
+    return ContentService
+      .createTextOutput(JSON.stringify({ok: false, error: err.message}))
+      .setMimeType(ContentService.MimeType.JSON);
+  }
+}</pre>
+            </div>
   try {
     var data    = JSON.parse(e.postData.contents);
     var ss      = SpreadsheetApp.openById(data.sheetId);
@@ -4609,30 +4750,34 @@ document.addEventListener('DOMContentLoaded', function() {
 });
 
 // ════════════════════════════════════════════════════════════════════════════
-// ATTENDANCE SYSTEM v3
+// ATTENDANCE SYSTEM v4
+// Roles: section_leader (band only), squad_leader (parade + band squad cols)
+// Sections: Brass, Woodwind, Percussion
+// Band  sheet: "Band Attendance 2026" — members found by name, section col
+// Squad sheets: "Squad Alpha/Papa/Zulu/Hotel" — members found by name
+// Scoring:
+//   Band:   max 2 pts (1 opening + 1 dismissal). Valid leave = 1 pt only.
+//   Parade: max 8 pts (1 opening + 1 dismissal + 0-6 uniform). Valid leave = 1 pt only.
 // ════════════════════════════════════════════════════════════════════════════
-//
-// BAND  (morning): max 2 pts → 1 opening + 1 dismissal
-//                  absent + valid leave → 1 pt (leave), no opening/dismissal
-//
-// PARADE (afternoon): max 8 pts → 1 opening + 1 dismissal + 0-6 uniform
-//                     absent + valid leave → 1 pt (leave), NO uniform pts
 
 var _attWeeks        = [];
 var _attCurrentWeek  = null;
-var _attRecords      = {};   // ic → {bandOpen,bandDismiss,bandLeave, paradeOpen,paradeDismiss,paradeLeave,uniform,remarks}
-var _attMembers      = [];
+var _attRecords      = {};
+var _attMembers      = [];   // all members from supabase, with .section field
 var _attSheetId      = '';
 var _attScriptUrl    = '';
-var _attUserRole     = null;
-var _attUserGroup    = '';
+var _attUserRole     = null; // 'section_leader' | 'squad_leader'
+var _attUserGroup    = '';   // section name (Brass/Woodwind/Percussion) OR squad name
 var _attParadeConfig = {};
 
-var ATT_WEEKS_KEY  = 'bb_att_weeks';
-var ATT_ROLES_KEY  = 'bb_att_roles';
-var ATT_DATA_KEY   = 'bb_att_data';
-var ATT_SHEET_KEY  = 'bb_att_sheet';
-var ATT_PARADE_KEY = 'bb_att_parade_config';
+var ATT_WEEKS_KEY    = 'bb_att_weeks';
+var ATT_ROLES_KEY    = 'bb_att_roles';   // {ic: {role, group}}
+var ATT_DATA_KEY     = 'bb_att_data';
+var ATT_SHEET_KEY    = 'bb_att_sheet';
+var ATT_PARADE_KEY   = 'bb_att_parade_config';
+var ATT_SECTIONS_KEY = 'bb_att_sections'; // {ic: 'Brass'|'Woodwind'|'Percussion'}
+
+var BAND_SECTIONS = ['Brass', 'Woodwind', 'Percussion'];
 
 // ── Helpers ───────────────────────────────────────────────────────────────
 async function attGetConfig(key) {
@@ -4652,15 +4797,13 @@ async function attSaveConfig(key, value) {
 
 // ── Point calculators ─────────────────────────────────────────────────────
 function calcBandPts(rec) {
-  // If on valid leave: 1 pt, nothing else counts
   if (rec.bandLeave === 1) return 1;
   return (rec.bandOpen === 1 ? 1 : 0) + (rec.bandDismiss === 1 ? 1 : 0);
 }
 function calcParadePts(rec) {
-  // If on valid leave: 1 pt, no uniform
   if (rec.paradeLeave === 1) return 1;
   var att = (rec.paradeOpen === 1 ? 1 : 0) + (rec.paradeDismiss === 1 ? 1 : 0);
-  var uni = (att > 0) ? Math.min(6, Math.max(0, rec.uniform || 0)) : 0;
+  var uni = att > 0 ? Math.min(6, Math.max(0, rec.uniform || 0)) : 0;
   return att + uni;
 }
 
@@ -4696,14 +4839,17 @@ async function checkAttendanceAccess() {
   if (gate)  gate.style.display  = 'none';
   if (panel) panel.style.display = 'block';
 
+  // Role label
+  var roleName = { section_leader: 'Section Leader', squad_leader: 'Squad Leader' };
   var lbl = document.getElementById('att-role-label');
   var dsc = document.getElementById('att-role-desc');
-  if (lbl) lbl.textContent = _attUserRole === 'instrument_leader' ? 'Instrument Leader' : 'Squad Leader';
+  if (lbl) lbl.textContent = roleName[_attUserRole] || _attUserRole;
   if (dsc) dsc.textContent = _attUserGroup ? 'Group: ' + _attUserGroup : '';
 
+  // Section leaders see band only; squad leaders see both
   var morning   = document.getElementById('att-morning-section');
   var afternoon = document.getElementById('att-afternoon-section');
-  if (_attUserRole === 'instrument_leader') {
+  if (_attUserRole === 'section_leader') {
     if (morning)   morning.style.display   = 'block';
     if (afternoon) afternoon.style.display = 'none';
   } else {
@@ -4715,11 +4861,17 @@ async function checkAttendanceAccess() {
   _attSheetId   = cfg.sheetId   || '';
   _attScriptUrl = cfg.scriptUrl || '';
   var disp = document.getElementById('att-sheet-id-display');
-  if (disp) disp.textContent = _attSheetId ? 'Sheet: ' + _attSheetId.slice(0,24) + '...' : 'Not configured — see admin';
+  if (disp) disp.textContent = _attSheetId ? 'Sheet connected' : 'Not configured — see admin';
 
   _attParadeConfig = await attGetConfig(ATT_PARADE_KEY) || {};
   await loadAttWeeks();
-  try { _attMembers = await supa.get('bb_members?select=ic,name,squad,rank&order=name.asc') || []; } catch(e) { _attMembers = []; }
+
+  // Load members + their sections
+  try {
+    _attMembers = await supa.get('bb_members?select=ic,name,squad,rank&order=name.asc') || [];
+  } catch(e) { _attMembers = []; }
+  var sections = await attGetConfig(ATT_SECTIONS_KEY) || {};
+  _attMembers.forEach(function(m) { m.section = sections[m.ic] || ''; });
 }
 
 // ── Weeks ─────────────────────────────────────────────────────────────────
@@ -4727,10 +4879,8 @@ async function loadAttWeeks() {
   _attWeeks = await attGetConfig(ATT_WEEKS_KEY) || [];
   renderAttWeekChips();
 }
-
 function renderAttWeekChips() {
-  var c = document.getElementById('att-week-chips');
-  if (!c) return;
+  var c = document.getElementById('att-week-chips'); if (!c) return;
   if (!_attWeeks.length) {
     c.innerHTML = '<div style="color:#556;font-size:12px;padding:8px;">No weeks set — admin must add parade dates.</div>';
     return;
@@ -4741,7 +4891,6 @@ function renderAttWeekChips() {
       + w.label + '<br><span style="font-size:10px;font-weight:400;opacity:0.7;">' + (w.date || '') + '</span></button>';
   }).join('');
 }
-
 async function selectAttWeek(idx) {
   _attCurrentWeek = _attWeeks[idx];
   renderAttWeekChips();
@@ -4755,17 +4904,13 @@ async function selectAttWeek(idx) {
   updateAttSummary('morning');
   updateAttSummary('afternoon');
 }
-
 function renderAttParadeInfo() {
-  var el = document.getElementById('att-parade-info');
-  if (!el || !_attCurrentWeek) return;
-  var cfg     = _attParadeConfig[_attCurrentWeek.label] || {};
-  var uniform = cfg.uniformType || 'Not set';
-  var notes   = cfg.notes || '';
+  var el = document.getElementById('att-parade-info'); if (!el || !_attCurrentWeek) return;
+  var cfg = _attParadeConfig[_attCurrentWeek.label] || {};
   el.innerHTML = '<div style="background:rgba(200,150,30,0.08);border:1px solid rgba(200,150,30,0.25);border-radius:10px;padding:10px 14px;margin-bottom:14px;">'
     + '<div style="font-size:11px;font-weight:700;color:var(--gold);letter-spacing:1px;text-transform:uppercase;margin-bottom:4px;">📋 This Week\'s Parade</div>'
-    + '<div style="font-size:13px;color:#fff;font-weight:600;">Uniform: ' + uniform + '</div>'
-    + (notes ? '<div style="font-size:12px;color:#8898bb;margin-top:3px;">' + notes + '</div>' : '')
+    + '<div style="font-size:13px;color:#fff;font-weight:600;">Uniform: ' + (cfg.uniformType || 'Not set') + '</div>'
+    + (cfg.notes ? '<div style="font-size:12px;color:#8898bb;margin-top:3px;">' + cfg.notes + '</div>' : '')
     + '</div>';
 }
 
@@ -4774,137 +4919,102 @@ function getFilteredMembers(session) {
   return _attMembers.filter(function(m) {
     var grp = (_attUserGroup || '').toLowerCase();
     if (!grp) return true;
-    if (session === 'morning'   && _attUserRole === 'instrument_leader') return (m.squad || '').toLowerCase() === grp;
-    if (session === 'afternoon' && _attUserRole === 'squad_leader')      return (m.squad || '').toLowerCase() === grp;
+    if (session === 'morning' && _attUserRole === 'section_leader') {
+      return (m.section || '').toLowerCase() === grp;
+    }
+    if (session === 'morning' && _attUserRole === 'squad_leader') {
+      return (m.squad || '').toLowerCase() === grp;
+    }
+    if (session === 'afternoon' && _attUserRole === 'squad_leader') {
+      return (m.squad || '').toLowerCase() === grp;
+    }
     return true;
   });
 }
 
 // ── Render lists ──────────────────────────────────────────────────────────
 function renderAttMorningList() {
-  var c = document.getElementById('att-morning-list');
-  if (!c) return;
+  var c = document.getElementById('att-morning-list'); if (!c) return;
   if (!_attCurrentWeek) { c.innerHTML = '<div style="text-align:center;padding:20px;color:#556;font-size:13px;">Select a week above.</div>'; return; }
   var members = getFilteredMembers('morning');
-  if (!members.length) { c.innerHTML = '<div style="text-align:center;padding:20px;color:#556;font-size:13px;">No members found for your group.</div>'; return; }
+  if (!members.length) { c.innerHTML = '<div style="text-align:center;padding:20px;color:#556;font-size:13px;">No members in your group.</div>'; return; }
   c.innerHTML = members.map(function(m) { return buildBandRow(m, _attRecords[m.ic] || {}); }).join('');
   attachBandListeners();
 }
-
 function renderAttAfternoonList() {
-  var c = document.getElementById('att-afternoon-list');
-  if (!c) return;
+  var c = document.getElementById('att-afternoon-list'); if (!c) return;
   if (!_attCurrentWeek) { c.innerHTML = '<div style="text-align:center;padding:20px;color:#556;font-size:13px;">Select a week above.</div>'; return; }
   var members = getFilteredMembers('afternoon');
-  if (!members.length) { c.innerHTML = '<div style="text-align:center;padding:20px;color:#556;font-size:13px;">No members found for your squad.</div>'; return; }
+  if (!members.length) { c.innerHTML = '<div style="text-align:center;padding:20px;color:#556;font-size:13px;">No members in your squad.</div>'; return; }
   c.innerHTML = members.map(function(m) { return buildParadeRow(m, _attRecords[m.ic] || {}); }).join('');
   attachParadeListeners();
 }
 
-// ── Band row builder ──────────────────────────────────────────────────────
-// Points: max 2 (opening + dismissal). Valid leave = 1 pt, replaces both.
+// ── Row builders ──────────────────────────────────────────────────────────
+function makePtBtn(ic, field, val, disabled) {
+  return '<div class="att-toggle"' + (disabled ? ' style="opacity:0.35;pointer-events:none;"' : '') + '>'
+    + '<button class="att-btn' + (val === 1 ? ' present' : '') + '" data-ic="' + ic + '" data-field="' + field + '" data-val="1"' + (disabled ? ' disabled' : '') + '>✓</button>'
+    + '<button class="att-btn' + (val === 0 && val !== '' ? ' absent' : '') + '" data-ic="' + ic + '" data-field="' + field + '" data-val="0"' + (disabled ? ' disabled' : '') + '>✗</button>'
+    + '</div>';
+}
+function makeLeaveBtn(ic, field, val) {
+  return '<div class="att-toggle">'
+    + '<button class="att-btn' + (val === 1 ? ' present' : '') + '" data-ic="' + ic + '" data-field="' + field + '" data-val="1">Yes</button>'
+    + '<button class="att-btn' + (val === 0 && val !== '' ? ' absent' : '') + '" data-ic="' + ic + '" data-field="' + field + '" data-val="0">No</button>'
+    + '</div>';
+}
+
 function buildBandRow(m, rec) {
-  var onLeave = rec.bandLeave === 1;
-  var pts     = calcBandPts(rec);
-  var ptsColor = pts === 2 ? '#66bb6a' : pts === 1 ? '#e8b830' : '#ef5350';
-
-  // If on leave, opening/dismissal are locked out
-  var btnOpen    = makePtBtn(m.ic, 'bandOpen',    rec.bandOpen,    onLeave);
-  var btnDismiss = makePtBtn(m.ic, 'bandDismiss', rec.bandDismiss, onLeave);
-  var btnLeave   = makeLeaveBtn(m.ic, 'bandLeave', rec.bandLeave);
-
+  var onLeave  = rec.bandLeave === 1;
+  var pts      = calcBandPts(rec);
+  var ptColor  = pts === 2 ? '#66bb6a' : pts === 1 ? '#e8b830' : '#ef5350';
+  var subText  = (m.rank || '') + (m.section ? ' · ' + m.section : '') + (m.squad ? ' · ' + m.squad : '');
   return '<div class="att-member-row" style="align-items:flex-start;gap:8px;padding:12px 0;">'
-    // Left: name + pts chip
     + '<div style="flex:1;min-width:0;">'
     +   '<div class="att-member-name">' + m.name + '</div>'
-    +   '<div class="att-member-sub">' + (m.rank||'') + (m.squad ? ' · ' + m.squad : '') + '</div>'
-    +   '<div style="margin-top:5px;display:inline-block;background:' + ptsColor + '22;border:1px solid ' + ptsColor + '55;border-radius:20px;padding:2px 10px;">'
-    +     '<span style="font-family:\'Oswald\',sans-serif;font-size:13px;font-weight:700;color:' + ptsColor + ';">' + pts + ' / 2 pts</span>'
+    +   '<div class="att-member-sub">' + subText + '</div>'
+    +   '<div style="margin-top:5px;display:inline-block;background:' + ptColor + '22;border:1px solid ' + ptColor + '55;border-radius:20px;padding:2px 10px;">'
+    +     '<span style="font-family:\'Oswald\',sans-serif;font-size:13px;font-weight:700;color:' + ptColor + ';">' + pts + ' / 2 pts</span>'
     +   '</div>'
     + '</div>'
-    // Right: controls
     + '<div style="display:flex;flex-direction:column;gap:5px;align-items:flex-end;flex-shrink:0;">'
-    +   '<div style="display:flex;align-items:center;gap:6px;">'
-    +     '<span style="font-size:10px;color:#8898bb;white-space:nowrap;">Opening</span>' + btnOpen
-    +   '</div>'
-    +   '<div style="display:flex;align-items:center;gap:6px;">'
-    +     '<span style="font-size:10px;color:#8898bb;white-space:nowrap;">Dismissal</span>' + btnDismiss
-    +   '</div>'
-    +   '<div style="display:flex;align-items:center;gap:6px;">'
-    +     '<span style="font-size:10px;color:#e8b830;white-space:nowrap;">Valid Leave</span>' + btnLeave
-    +   '</div>'
+    +   '<div style="display:flex;align-items:center;gap:6px;"><span style="font-size:10px;color:#8898bb;white-space:nowrap;">Opening</span>' + makePtBtn(m.ic,'bandOpen',rec.bandOpen,onLeave) + '</div>'
+    +   '<div style="display:flex;align-items:center;gap:6px;"><span style="font-size:10px;color:#8898bb;white-space:nowrap;">Dismissal</span>' + makePtBtn(m.ic,'bandDismiss',rec.bandDismiss,onLeave) + '</div>'
+    +   '<div style="display:flex;align-items:center;gap:6px;"><span style="font-size:10px;color:#e8b830;white-space:nowrap;">Valid Leave</span>' + makeLeaveBtn(m.ic,'bandLeave',rec.bandLeave) + '</div>'
     + '</div>'
     + '</div>';
 }
 
-// ── Parade row builder ────────────────────────────────────────────────────
-// Points: max 8 (1 opening + 1 dismissal + 0-6 uniform). Valid leave = 1 pt only, no uniform.
 function buildParadeRow(m, rec) {
   var onLeave  = rec.paradeLeave === 1;
-  var pts      = calcParadePts(rec);
-  var ptsColor = pts >= 7 ? '#66bb6a' : pts >= 4 ? '#e8b830' : '#ef5350';
   var present  = rec.paradeOpen === 1 || rec.paradeDismiss === 1;
-
-  var btnOpen    = makePtBtn(m.ic, 'paradeOpen',    rec.paradeOpen,    onLeave);
-  var btnDismiss = makePtBtn(m.ic, 'paradeDismiss', rec.paradeDismiss, onLeave);
-  var btnLeave   = makeLeaveBtn(m.ic, 'paradeLeave', rec.paradeLeave);
-
-  // Uniform: 0-6, only enabled if present (not on leave, not fully absent)
-  var uniVal     = (!onLeave && present) ? Math.min(6, Math.max(0, rec.uniform || 0)) : 0;
-  var uniDisabled= (onLeave || !present) ? ' disabled style="opacity:0.35;pointer-events:none;width:52px;" ' : ' style="width:52px;" ';
-  var uniInput   = '<input class="att-pts-input" type="number" min="0" max="6" value="' + uniVal + '" '
-    + 'data-ic="' + m.ic + '" data-field="uniform"' + uniDisabled + '/>';
-
-  var rmk = (rec.remarks || '').replace(/"/g, '&quot;');
-
+  var pts      = calcParadePts(rec);
+  var ptColor  = pts >= 7 ? '#66bb6a' : pts >= 4 ? '#e8b830' : '#ef5350';
+  var uniVal   = (!onLeave && present) ? Math.min(6, Math.max(0, rec.uniform || 0)) : 0;
+  var uniDis   = onLeave || !present;
+  var rmk      = (rec.remarks || '').replace(/"/g, '&quot;');
   return '<div class="att-member-row" style="align-items:flex-start;gap:8px;padding:12px 0;flex-wrap:wrap;">'
-    // Left: name + pts + remarks
     + '<div style="flex:1;min-width:140px;">'
     +   '<div class="att-member-name">' + m.name + '</div>'
-    +   '<div class="att-member-sub">' + (m.rank||'') + (m.squad ? ' · ' + m.squad : '') + '</div>'
-    +   '<div style="margin-top:5px;display:inline-block;background:' + ptsColor + '22;border:1px solid ' + ptsColor + '55;border-radius:20px;padding:2px 10px;">'
-    +     '<span style="font-family:\'Oswald\',sans-serif;font-size:13px;font-weight:700;color:' + ptsColor + ';">' + pts + ' / 8 pts</span>'
+    +   '<div class="att-member-sub">' + (m.rank||'') + (m.squad?' · '+m.squad:'') + '</div>'
+    +   '<div style="margin-top:5px;display:inline-block;background:' + ptColor + '22;border:1px solid ' + ptColor + '55;border-radius:20px;padding:2px 10px;">'
+    +     '<span style="font-family:\'Oswald\',sans-serif;font-size:13px;font-weight:700;color:' + ptColor + ';">' + pts + ' / 8 pts</span>'
     +   '</div>'
     +   '<div style="margin-top:7px;">'
-    +     '<input type="text" class="att-remarks-input" data-ic="' + m.ic + '" value="' + rmk + '" '
-    +     'placeholder="Remarks (optional)..." '
+    +     '<input type="text" class="att-remarks-input" data-ic="' + m.ic + '" value="' + rmk + '" placeholder="Remarks..." '
     +     'style="width:100%;background:#0a1628;border:1px solid #2a3a50;border-radius:6px;color:#e0e8ff;padding:5px 9px;font-size:11px;font-family:\'Roboto\',sans-serif;box-sizing:border-box;"/>'
     +   '</div>'
     + '</div>'
-    // Right: controls
     + '<div style="display:flex;flex-direction:column;gap:5px;align-items:flex-end;flex-shrink:0;">'
+    +   '<div style="display:flex;align-items:center;gap:6px;"><span style="font-size:10px;color:#8898bb;white-space:nowrap;">Opening</span>' + makePtBtn(m.ic,'paradeOpen',rec.paradeOpen,onLeave) + '</div>'
+    +   '<div style="display:flex;align-items:center;gap:6px;"><span style="font-size:10px;color:#8898bb;white-space:nowrap;">Dismissal</span>' + makePtBtn(m.ic,'paradeDismiss',rec.paradeDismiss,onLeave) + '</div>'
+    +   '<div style="display:flex;align-items:center;gap:6px;"><span style="font-size:10px;color:#e8b830;white-space:nowrap;">Valid Leave</span>' + makeLeaveBtn(m.ic,'paradeLeave',rec.paradeLeave) + '</div>'
     +   '<div style="display:flex;align-items:center;gap:6px;">'
-    +     '<span style="font-size:10px;color:#8898bb;white-space:nowrap;">Opening</span>' + btnOpen
-    +   '</div>'
-    +   '<div style="display:flex;align-items:center;gap:6px;">'
-    +     '<span style="font-size:10px;color:#8898bb;white-space:nowrap;">Dismissal</span>' + btnDismiss
-    +   '</div>'
-    +   '<div style="display:flex;align-items:center;gap:6px;">'
-    +     '<span style="font-size:10px;color:#e8b830;white-space:nowrap;">Valid Leave</span>' + btnLeave
-    +   '</div>'
-    +   '<div style="display:flex;align-items:center;gap:6px;">'
-    +     '<span style="font-size:10px;color:#42a5f5;white-space:nowrap;">Uniform (0-6)</span>' + uniInput
+    +     '<span style="font-size:10px;color:#42a5f5;white-space:nowrap;">Uniform (0-6)</span>'
+    +     '<input class="att-pts-input" type="number" min="0" max="6" value="' + uniVal + '" data-ic="' + m.ic + '" data-field="uniform"'
+    +     (uniDis ? ' disabled style="opacity:0.35;width:52px;"' : ' style="width:52px;"') + '/>'
     +   '</div>'
     + '</div>'
-    + '</div>';
-}
-
-// ── Button builders ───────────────────────────────────────────────────────
-function makePtBtn(ic, field, val, disabled) {
-  var on  = val === 1;
-  var off = val === 0;
-  var dis = disabled ? ' style="opacity:0.3;pointer-events:none;" ' : '';
-  return '<div class="att-toggle"' + (disabled ? ' style="opacity:0.35;pointer-events:none;"' : '') + '>'
-    + '<button class="att-btn' + (on ? ' present' : '') + '" data-ic="' + ic + '" data-field="' + field + '" data-val="1"' + (disabled?' disabled':'') + '>✓</button>'
-    + '<button class="att-btn' + (off ? ' absent'  : '') + '" data-ic="' + ic + '" data-field="' + field + '" data-val="0"' + (disabled?' disabled':'') + '>✗</button>'
-    + '</div>';
-}
-
-function makeLeaveBtn(ic, field, val) {
-  var on = val === 1;
-  return '<div class="att-toggle">'
-    + '<button class="att-btn' + (on ? ' present' : '') + '" data-ic="' + ic + '" data-field="' + field + '" data-val="1">Yes</button>'
-    + '<button class="att-btn' + (!on && val !== undefined && val !== '' ? ' absent' : '') + '" data-ic="' + ic + '" data-field="' + field + '" data-val="0">No</button>'
     + '</div>';
 }
 
@@ -4913,59 +5023,33 @@ function attachBandListeners() {
   var c = document.getElementById('att-morning-list'); if (!c) return;
   c.querySelectorAll('.att-btn[data-field]').forEach(function(btn) {
     btn.addEventListener('click', function() {
-      var ic    = btn.getAttribute('data-ic');
-      var field = btn.getAttribute('data-field');
-      var val   = parseInt(btn.getAttribute('data-val'));
+      var ic = btn.getAttribute('data-ic'), field = btn.getAttribute('data-field'), val = parseInt(btn.getAttribute('data-val'));
       if (!_attRecords[ic]) _attRecords[ic] = {};
-      // Toggle off if same value already set
-      _attRecords[ic][field] = (_attRecords[ic][field] === val) ? '' : val;
-      // If leave set to 1, clear opening/dismissal
-      if (field === 'bandLeave' && _attRecords[ic][field] === 1) {
-        _attRecords[ic].bandOpen    = '';
-        _attRecords[ic].bandDismiss = '';
-      }
-      // If opening or dismissal set, clear leave
-      if ((field === 'bandOpen' || field === 'bandDismiss') && val === 1) {
-        _attRecords[ic].bandLeave = 0;
-      }
-      renderAttMorningList();
-      updateAttSummary('morning');
+      _attRecords[ic][field] = _attRecords[ic][field] === val ? '' : val;
+      if (field === 'bandLeave' && _attRecords[ic][field] === 1) { _attRecords[ic].bandOpen = ''; _attRecords[ic].bandDismiss = ''; }
+      if ((field === 'bandOpen' || field === 'bandDismiss') && val === 1) _attRecords[ic].bandLeave = 0;
+      renderAttMorningList(); updateAttSummary('morning');
     });
   });
 }
-
 function attachParadeListeners() {
   var c = document.getElementById('att-afternoon-list'); if (!c) return;
   c.querySelectorAll('.att-btn[data-field]').forEach(function(btn) {
     btn.addEventListener('click', function() {
-      var ic    = btn.getAttribute('data-ic');
-      var field = btn.getAttribute('data-field');
-      var val   = parseInt(btn.getAttribute('data-val'));
+      var ic = btn.getAttribute('data-ic'), field = btn.getAttribute('data-field'), val = parseInt(btn.getAttribute('data-val'));
       if (!_attRecords[ic]) _attRecords[ic] = {};
-      _attRecords[ic][field] = (_attRecords[ic][field] === val) ? '' : val;
-      // If leave set to 1, clear opening/dismissal and uniform
-      if (field === 'paradeLeave' && _attRecords[ic][field] === 1) {
-        _attRecords[ic].paradeOpen    = '';
-        _attRecords[ic].paradeDismiss = '';
-        _attRecords[ic].uniform       = 0;
-      }
-      // If opening or dismissal set, clear leave
-      if ((field === 'paradeOpen' || field === 'paradeDismiss') && val === 1) {
-        _attRecords[ic].paradeLeave = 0;
-      }
-      renderAttAfternoonList();
-      updateAttSummary('afternoon');
+      _attRecords[ic][field] = _attRecords[ic][field] === val ? '' : val;
+      if (field === 'paradeLeave' && _attRecords[ic][field] === 1) { _attRecords[ic].paradeOpen = ''; _attRecords[ic].paradeDismiss = ''; _attRecords[ic].uniform = 0; }
+      if ((field === 'paradeOpen' || field === 'paradeDismiss') && val === 1) _attRecords[ic].paradeLeave = 0;
+      renderAttAfternoonList(); updateAttSummary('afternoon');
     });
   });
   c.querySelectorAll('.att-pts-input[data-field="uniform"]').forEach(function(inp) {
     inp.addEventListener('input', function() {
       var ic = inp.getAttribute('data-ic');
       if (!_attRecords[ic]) _attRecords[ic] = {};
-      var v = parseInt(inp.value);
-      if (isNaN(v) || v < 0) v = 0;
-      if (v > 6) v = 6;
-      inp.value = v;
-      _attRecords[ic].uniform = v;
+      var v = Math.min(6, Math.max(0, parseInt(inp.value) || 0));
+      inp.value = v; _attRecords[ic].uniform = v;
     });
   });
   c.querySelectorAll('.att-remarks-input').forEach(function(inp) {
@@ -4979,33 +5063,30 @@ function attachParadeListeners() {
 
 // ── Summary ───────────────────────────────────────────────────────────────
 function updateAttSummary(session) {
-  var elId = session === 'morning' ? 'att-morning-summary' : 'att-afternoon-summary';
-  var el   = document.getElementById(elId); if (!el) return;
+  var el = document.getElementById(session === 'morning' ? 'att-morning-summary' : 'att-afternoon-summary');
+  if (!el) return;
   var members = getFilteredMembers(session);
-  var present = 0, absent = 0, leave = 0, totalPts = 0, maxPts = session === 'morning' ? 2 : 8;
-
+  var present = 0, absent = 0, leave = 0, totalPts = 0;
+  var maxPts = session === 'morning' ? 2 : 8;
   members.forEach(function(m) {
     var rec = _attRecords[m.ic] || {};
     if (session === 'morning') {
-      var pts = calcBandPts(rec);
-      totalPts += pts;
-      if (rec.bandLeave === 1)                                  leave++;
-      else if (rec.bandOpen === 1 || rec.bandDismiss === 1)     present++;
-      else if (rec.bandOpen === 0 && rec.bandDismiss === 0)     absent++;
+      totalPts += calcBandPts(rec);
+      if (rec.bandLeave === 1) leave++;
+      else if (rec.bandOpen === 1 || rec.bandDismiss === 1) present++;
+      else if (rec.bandOpen === 0 && rec.bandDismiss === 0) absent++;
     } else {
-      var pts = calcParadePts(rec);
-      totalPts += pts;
-      if (rec.paradeLeave === 1)                                      leave++;
-      else if (rec.paradeOpen === 1 || rec.paradeDismiss === 1)       present++;
-      else if (rec.paradeOpen === 0 && rec.paradeDismiss === 0)       absent++;
+      totalPts += calcParadePts(rec);
+      if (rec.paradeLeave === 1) leave++;
+      else if (rec.paradeOpen === 1 || rec.paradeDismiss === 1) present++;
+      else if (rec.paradeOpen === 0 && rec.paradeDismiss === 0) absent++;
     }
   });
-
   el.innerHTML =
     '<div class="att-summary-chip" style="color:#66bb6a;border-color:rgba(102,187,106,0.3);">✅ Present: ' + present + '</div>' +
-    '<div class="att-summary-chip" style="color:#ef5350;border-color:rgba(239,83,80,0.3);">❌ Absent: '  + absent  + '</div>' +
-    '<div class="att-summary-chip" style="color:#e8b830;border-color:rgba(232,184,48,0.3);">🏥 Leave: '  + leave   + '</div>' +
-    '<div class="att-summary-chip" style="color:#42a5f5;border-color:rgba(66,165,245,0.3);">⭐ Pts: '     + totalPts + ' / ' + (members.length * maxPts) + '</div>';
+    '<div class="att-summary-chip" style="color:#ef5350;border-color:rgba(239,83,80,0.3);">❌ Absent: ' + absent + '</div>' +
+    '<div class="att-summary-chip" style="color:#e8b830;border-color:rgba(232,184,48,0.3);">🏥 Leave: ' + leave + '</div>' +
+    '<div class="att-summary-chip" style="color:#42a5f5;border-color:rgba(66,165,245,0.3);">⭐ Pts: ' + totalPts + ' / ' + (members.length * maxPts) + '</div>';
 }
 
 // ── Save ──────────────────────────────────────────────────────────────────
@@ -5015,7 +5096,7 @@ async function saveAttendance() {
   if (btn) { btn.innerHTML = '<span class="spinner"></span> Saving...'; btn.disabled = true; }
   try {
     var allData = await attGetConfig(ATT_DATA_KEY) || {};
-    allData[_attCurrentWeek.label] = {};
+    allData[_attCurrentWeek.label] = allData[_attCurrentWeek.label] || {};
     Object.keys(_attRecords).forEach(function(ic) { allData[_attCurrentWeek.label][ic] = _attRecords[ic]; });
     await attSaveConfig(ATT_DATA_KEY, allData);
     if (_attScriptUrl) { await syncToSheets(allData); }
@@ -5024,12 +5105,11 @@ async function saveAttendance() {
   finally { if (btn) { btn.innerHTML = '\ud83d\udcbe Save Attendance'; btn.disabled = false; } }
 }
 
-// ── Sync to Google Sheets ─────────────────────────────────────────────────
+// ── Sync to Sheets ────────────────────────────────────────────────────────
 async function syncToSheets(allDataOverride) {
-  if (!_attScriptUrl) { alert('Sheets not configured. Admin \u2192 Attendance \u2192 \ud83d\udcca Sheets.'); return; }
-  var btn  = document.getElementById('att-sync-btn');
-  var icon = document.getElementById('att-sync-icon');
-  if (btn)  btn.disabled = true;
+  if (!_attScriptUrl) { alert('Sheets not configured. Admin \u2192 Attendance & Roles \u2192 \ud83d\udcca Sheets.'); return; }
+  var btn = document.getElementById('att-sync-btn'), icon = document.getElementById('att-sync-icon');
+  if (btn) btn.disabled = true;
   if (icon) icon.textContent = '\u23f3';
   try {
     var allData   = allDataOverride || (await attGetConfig(ATT_DATA_KEY) || {});
@@ -5037,25 +5117,19 @@ async function syncToSheets(allDataOverride) {
     var weekDate  = _attCurrentWeek ? (_attCurrentWeek.date || '') : '';
     var weekCfg   = weekLabel ? (_attParadeConfig[weekLabel] || {}) : {};
     var records   = [];
-
     _attMembers.forEach(function(m) {
-      var rec = (weekLabel && allData[weekLabel]) ? (allData[weekLabel][m.ic] || {}) : {};
-      var onLeave  = rec.paradeLeave === 1;
-      var present  = rec.paradeOpen === 1 || rec.paradeDismiss === 1;
+      var rec     = (weekLabel && allData[weekLabel]) ? (allData[weekLabel][m.ic] || {}) : {};
+      var onLeave = rec.paradeLeave === 1;
+      var present = rec.paradeOpen === 1 || rec.paradeDismiss === 1;
       records.push({
-        name:          m.name,
-        ic:            m.ic,
-        squad:         m.squad || '',
-        rank:          m.rank  || '',
-        weekLabel:     weekLabel || '',
-        weekDate:      weekDate,
-        uniformType:   weekCfg.uniformType || '',
-        // Band
+        name: m.name, ic: m.ic, squad: m.squad || '', rank: m.rank || '',
+        section: m.section || '',
+        weekLabel: weekLabel || '', weekDate: weekDate,
+        uniformType: weekCfg.uniformType || '',
         bandOpen:      rec.bandOpen    !== '' && rec.bandOpen    !== undefined ? rec.bandOpen    : '',
         bandDismiss:   rec.bandDismiss !== '' && rec.bandDismiss !== undefined ? rec.bandDismiss : '',
         bandLeave:     rec.bandLeave   !== '' && rec.bandLeave   !== undefined ? rec.bandLeave   : '',
         bandPts:       calcBandPts(rec),
-        // Parade
         paradeOpen:    rec.paradeOpen    !== '' && rec.paradeOpen    !== undefined ? rec.paradeOpen    : '',
         paradeDismiss: rec.paradeDismiss !== '' && rec.paradeDismiss !== undefined ? rec.paradeDismiss : '',
         paradeLeave:   rec.paradeLeave   !== '' && rec.paradeLeave   !== undefined ? rec.paradeLeave   : '',
@@ -5064,10 +5138,8 @@ async function syncToSheets(allDataOverride) {
         remarks:       rec.remarks || ''
       });
     });
-
     await fetch(_attScriptUrl, {
-      method: 'POST',
-      headers: { 'Content-Type': 'text/plain' },
+      method: 'POST', headers: { 'Content-Type': 'text/plain' },
       body: JSON.stringify({ sheetId: _attSheetId, records: records, weekLabel: weekLabel, weekDate: weekDate }),
       mode: 'no-cors'
     });
@@ -5094,37 +5166,58 @@ function switchAttSubtab(sub) {
   if (sub === 'parade') renderAttParadeAdmin();
 }
 
-// ── Admin: Roles ──────────────────────────────────────────────────────────
+// ── Admin: Roles & Sections ───────────────────────────────────────────────
 async function renderAttRoles() {
   var c = document.getElementById('adm-att-roles-list'); if (!c) return;
   c.innerHTML = '<div style="text-align:center;padding:20px;"><span class="spinner"></span></div>';
   try {
-    var members = await supa.get('bb_members?select=ic,name,rank,squad&order=name.asc') || [];
-    var roles   = await attGetConfig(ATT_ROLES_KEY) || {};
-    var q = ((document.getElementById('adm-att-search') || {}).value || '').toLowerCase();
+    var members  = await supa.get('bb_members?select=ic,name,rank,squad&order=name.asc') || [];
+    var roles    = await attGetConfig(ATT_ROLES_KEY)    || {};
+    var sections = await attGetConfig(ATT_SECTIONS_KEY) || {};
+    var q = ((document.getElementById('adm-att-search')||{}).value||'').toLowerCase();
     var list = q ? members.filter(function(m){ return m.name.toLowerCase().indexOf(q)!==-1||(m.ic||'').indexOf(q)!==-1; }) : members;
     if (!list.length) { c.innerHTML = '<div style="text-align:center;padding:20px;color:#556;font-size:13px;">No members found.</div>'; return; }
     c.innerHTML = list.map(function(m) {
-      var info = roles[m.ic] || { role:'', group:'' };
+      var info = roles[m.ic]    || { role:'', group:'' };
+      var sec  = sections[m.ic] || '';
       var sid  = (m.ic||'').replace(/[^a-z0-9]/gi,'_');
       return '<div style="background:#0d1a2e;border:1px solid rgba(255,255,255,0.06);border-radius:12px;padding:14px 16px;margin-bottom:8px;">'
         + '<div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;">'
-        + '<div style="flex:1;min-width:130px;">'
-        + '<div style="font-family:\'Oswald\',sans-serif;font-size:15px;font-weight:600;color:#f0f4ff;">' + m.name + '</div>'
-        + '<div style="font-size:11px;color:#5a6a82;">' + (m.rank||'') + (m.squad?' \xb7 Squad '+m.squad:'') + '</div>'
+        + '<div style="flex:1;min-width:110px;">'
+        +   '<div style="font-family:\'Oswald\',sans-serif;font-size:15px;font-weight:600;color:#f0f4ff;">' + m.name + '</div>'
+        +   '<div style="font-size:11px;color:#5a6a82;">' + (m.rank||'') + (m.squad?' \xb7 Squad '+m.squad:'') + '</div>'
         + '</div>'
-        + '<select id="attrol-'+sid+'" onchange="setAttRole(\''+m.ic+'\',this.value,document.getElementById(\'attgrp-'+sid+'\').value)"'
-        + ' style="background:#122040;color:#fff;border:1.5px solid #2a3a50;border-radius:8px;padding:7px 10px;font-size:13px;">'
-        + '<option value=""'+(!info.role?' selected':'')+'>No Role</option>'
-        + '<option value="instrument_leader"'+(info.role==='instrument_leader'?' selected':'')+'>🎵 Instrument Leader</option>'
-        + '<option value="squad_leader"'+(info.role==='squad_leader'?' selected':'')+'>🪖 Squad Leader</option>'
+        // Band section assignment
+        + '<select id="attsec-'+sid+'" onchange="setAttSection(\''+m.ic+'\',this.value)"'
+        +   ' style="background:#122040;color:#fff;border:1.5px solid #2a3a50;border-radius:8px;padding:7px 9px;font-size:12px;" title="Band Section">'
+        +   '<option value=""'+(!sec?' selected':'')+'>No Section</option>'
+        +   BAND_SECTIONS.map(function(s){ return '<option value="'+s+'"'+(sec===s?' selected':'')+'>🎵 '+s+'</option>'; }).join('')
         + '</select>'
-        + '<input id="attgrp-'+sid+'" type="text" value="'+(info.group||'')+'" placeholder="Squad / Section"'
-        + ' onchange="setAttRole(\''+m.ic+'\',document.getElementById(\'attrol-'+sid+'\').value,this.value)"'
-        + ' style="width:120px;background:#122040;color:#fff;border:1.5px solid #2a3a50;border-radius:8px;padding:7px 10px;font-size:13px;"/>'
+        // Role assignment
+        + '<select id="attrol-'+sid+'" onchange="setAttRole(\''+m.ic+'\',this.value,document.getElementById(\'attgrp-'+sid+'\').value)"'
+        +   ' style="background:#122040;color:#fff;border:1.5px solid #2a3a50;border-radius:8px;padding:7px 9px;font-size:12px;" title="Attendance Role">'
+        +   '<option value=""'+(!info.role?' selected':'')+'>No Role</option>'
+        +   '<option value="section_leader"'+(info.role==='section_leader'?' selected':'')+'>🎼 Section Leader</option>'
+        +   '<option value="squad_leader"'+(info.role==='squad_leader'?' selected':'')+'>🪖 Squad Leader</option>'
+        + '</select>'
+        // Group (section name for section_leader, squad name for squad_leader)
+        + '<input id="attgrp-'+sid+'" type="text" value="'+(info.group||'')+'" placeholder="Group name"'
+        +   ' onchange="setAttRole(\''+m.ic+'\',document.getElementById(\'attrol-'+sid+'\').value,this.value)"'
+        +   ' style="width:100px;background:#122040;color:#fff;border:1.5px solid #2a3a50;border-radius:8px;padding:7px 9px;font-size:12px;" title="Section (for Section Leaders) or Squad (for Squad Leaders)"/>'
         + '</div></div>';
     }).join('');
-  } catch(e) { c.innerHTML = '<div style="color:#ef5350;padding:16px;">Error: ' + e.message + '</div>'; }
+  } catch(e) { c.innerHTML = '<div style="color:#ef5350;padding:16px;">Error: '+e.message+'</div>'; }
+}
+
+async function setAttSection(ic, section) {
+  try {
+    var sections = await attGetConfig(ATT_SECTIONS_KEY) || {};
+    if (!section) delete sections[ic]; else sections[ic] = section;
+    await attSaveConfig(ATT_SECTIONS_KEY, sections);
+    // Update in-memory
+    var m = _attMembers.find(function(x){ return x.ic === ic; });
+    if (m) m.section = section;
+  } catch(e) { alert('Failed: '+e.message); }
 }
 
 async function setAttRole(ic, role, group) {
@@ -5132,7 +5225,7 @@ async function setAttRole(ic, role, group) {
     var roles = await attGetConfig(ATT_ROLES_KEY) || {};
     if (!role) delete roles[ic]; else roles[ic] = { role: role, group: group || '' };
     await attSaveConfig(ATT_ROLES_KEY, roles);
-  } catch(e) { alert('Failed: ' + e.message); }
+  } catch(e) { alert('Failed: '+e.message); }
 }
 
 // ── Admin: Sheet config ───────────────────────────────────────────────────
@@ -5150,8 +5243,8 @@ async function saveAttSheetConfig() {
   var url = ((document.getElementById('att-script-url-input')||{}).value||'').trim();
   await attSaveConfig(ATT_SHEET_KEY, { sheetId: sid, scriptUrl: url });
   _attSheetId = sid; _attScriptUrl = url;
-  var disp = document.getElementById('att-sheet-id-display');
-  if (disp) disp.textContent = sid ? 'Sheet: ' + sid.slice(0,24) + '...' : 'Not configured';
+  var d = document.getElementById('att-sheet-id-display');
+  if (d) d.textContent = sid ? 'Sheet connected' : 'Not configured';
   alert('\u2705 Sheet config saved!');
 }
 
@@ -5159,38 +5252,33 @@ async function saveAttSheetConfig() {
 async function renderAttWeeksAdmin() {
   var c = document.getElementById('adm-att-weeks-list'); if (!c) return;
   var weeks = await attGetConfig(ATT_WEEKS_KEY) || [];
-  if (!weeks.length) { c.innerHTML = '<div style="text-align:center;padding:20px;color:#556;font-size:13px;">No weeks added yet.</div>'; return; }
+  if (!weeks.length) { c.innerHTML = '<div style="text-align:center;padding:20px;color:#556;font-size:13px;">No weeks yet.</div>'; return; }
   c.innerHTML = weeks.map(function(w, i) {
     return '<div style="background:#0d1a2e;border:1px solid rgba(255,255,255,0.06);border-radius:10px;padding:12px 16px;margin-bottom:8px;display:flex;align-items:center;gap:12px;">'
       + '<div style="flex:1;">'
       + '<div style="font-family:\'Oswald\',sans-serif;font-size:14px;font-weight:700;color:#fff;">' + w.label + '</div>'
-      + '<div style="font-size:11px;color:#5a6a82;">' + (w.date||'No date') + (w.colIndex ? ' \xb7 Col group: ' + w.colIndex : '') + '</div>'
+      + '<div style="font-size:11px;color:#5a6a82;">' + (w.date||'No date') + (w.colIndex?' \xb7 Col group: '+w.colIndex:'') + '</div>'
       + '</div>'
       + '<button onclick="deleteAttWeek('+i+')" style="background:#3a1a1a;border:1px solid #6a2a2a;color:#f66;padding:6px 12px;border-radius:8px;cursor:pointer;font-size:12px;font-weight:700;">\ud83d\uddd1\ufe0f</button>'
       + '</div>';
   }).join('');
 }
-
 async function addAttWeek() {
-  var label  = ((document.getElementById('att-week-label')||{}).value||'').trim();
-  var date   = ((document.getElementById('att-week-date') ||{}).value||'');
-  var colIdx = ((document.getElementById('att-week-col')  ||{}).value||'').trim();
+  var label = ((document.getElementById('att-week-label')||{}).value||'').trim();
+  var date  = ((document.getElementById('att-week-date') ||{}).value||'');
+  var col   = ((document.getElementById('att-week-col')  ||{}).value||'').trim();
   if (!label) { alert('Please enter a week label.'); return; }
   var weeks = await attGetConfig(ATT_WEEKS_KEY) || [];
   if (weeks.some(function(w){ return w.label===label; })) { alert('Label already exists.'); return; }
-  weeks.push({ label: label, date: date, colIndex: colIdx });
+  weeks.push({ label: label, date: date, colIndex: col });
   await attSaveConfig(ATT_WEEKS_KEY, weeks);
-  var li = document.getElementById('att-week-label'); if (li) li.value = '';
-  var di = document.getElementById('att-week-date');  if (di) di.value = '';
-  var ci = document.getElementById('att-week-col');   if (ci) ci.value = '';
+  ['att-week-label','att-week-date','att-week-col'].forEach(function(id){ var el=document.getElementById(id); if(el) el.value=''; });
   renderAttWeeksAdmin();
 }
-
 async function deleteAttWeek(idx) {
   var weeks = await attGetConfig(ATT_WEEKS_KEY) || [];
-  if (!weeks[idx]) return;
-  if (!confirm('Remove "' + weeks[idx].label + '"?')) return;
-  weeks.splice(idx, 1);
+  if (!weeks[idx] || !confirm('Remove "'+weeks[idx].label+'"?')) return;
+  weeks.splice(idx,1);
   await attSaveConfig(ATT_WEEKS_KEY, weeks);
   renderAttWeeksAdmin();
 }
@@ -5201,7 +5289,7 @@ async function renderAttParadeAdmin() {
   var weeks = await attGetConfig(ATT_WEEKS_KEY) || [];
   var pCfg  = await attGetConfig(ATT_PARADE_KEY) || {};
   _attParadeConfig = pCfg;
-  if (!weeks.length) { c.innerHTML = '<div style="text-align:center;padding:20px;color:#556;font-size:13px;">Add weeks first (Weeks tab).</div>'; return; }
+  if (!weeks.length) { c.innerHTML = '<div style="text-align:center;padding:20px;color:#556;font-size:13px;">Add weeks first.</div>'; return; }
   c.innerHTML = weeks.map(function(w) {
     var cfg = pCfg[w.label] || { uniformType:'', notes:'' };
     var wid = (w.label||'').replace(/[^a-z0-9]/gi,'_');
@@ -5212,12 +5300,9 @@ async function renderAttParadeAdmin() {
       + '<div class="form-row">'
       +   '<div class="form-group"><label class="form-label" style="color:#8898bb;">Uniform Type</label>'
       +     '<select id="attuni-'+wid+'" style="width:100%;background:#122040;color:#fff;border:1.5px solid #2a3a50;border-radius:8px;padding:8px 10px;font-size:13px;">'
-      +       '<option value=""'+(cfg.uniformType===''?' selected':'')+'>Not set</option>'
-      +       '<option value="Day Dress"'+(cfg.uniformType==='Day Dress'?' selected':'')+'>Day Dress</option>'
-      +       '<option value="Drill Kit"'+(cfg.uniformType==='Drill Kit'?' selected':'')+'>Drill Kit</option>'
-      +       '<option value="PT Kit"'+(cfg.uniformType==='PT Kit'?' selected':'')+'>PT Kit</option>'
-      +       '<option value="Casual"'+(cfg.uniformType==='Casual'?' selected':'')+'>Casual</option>'
-      +       '<option value="No Uniform"'+(cfg.uniformType==='No Uniform'?' selected':'')+'>No Uniform</option>'
+      +       ['','Day Dress','Drill Kit','PT Kit','Casual','No Uniform'].map(function(v){
+                return '<option value="'+v+'"'+(cfg.uniformType===v?' selected':'')+>'+(v||'Not set')+'</option>';
+              }).join('')
       +     '</select>'
       +   '</div>'
       +   '<div class="form-group"><label class="form-label" style="color:#8898bb;">Notes</label>'
@@ -5229,12 +5314,10 @@ async function renderAttParadeAdmin() {
       + '</div>';
   }).join('');
 }
-
 async function saveParadeCfg(weekLabel, wid) {
-  var uEl  = document.getElementById('attuni-'+wid);
-  var nEl  = document.getElementById('attnote-'+wid);
+  var uEl = document.getElementById('attuni-'+wid), nEl = document.getElementById('attnote-'+wid);
   var pCfg = await attGetConfig(ATT_PARADE_KEY) || {};
-  pCfg[weekLabel] = { uniformType: uEl ? uEl.value : '', notes: nEl ? nEl.value : '' };
+  pCfg[weekLabel] = { uniformType: uEl?uEl.value:'', notes: nEl?nEl.value:'' };
   await attSaveConfig(ATT_PARADE_KEY, pCfg);
   _attParadeConfig = pCfg;
   alert('\u2705 Saved for ' + weekLabel);
