@@ -5301,7 +5301,7 @@ async function renderAttParadeAdmin() {
       +   '<div class="form-group"><label class="form-label" style="color:#8898bb;">Uniform Type</label>'
       +     '<select id="attuni-'+wid+'" style="width:100%;background:#122040;color:#fff;border:1.5px solid #2a3a50;border-radius:8px;padding:8px 10px;font-size:13px;">'
       +       ['','Day Dress','Drill Kit','PT Kit','Casual','No Uniform'].map(function(v){
-                return '<option value="'+v+'"'+(cfg.uniformType===v?' selected':'')+>'+(v||'Not set')+'</option>';
+                return '<option value="'+v+'"'+(cfg.uniformType===v?' selected':'')+'>'+(v||'Not set')+'</option>';
               }).join('')
       +     '</select>'
       +   '</div>'
