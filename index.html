@@ -1505,12 +1505,11 @@ function doPost(e) {
       return false;
     }
 
-    // ── fix2: normalise a value — if it was never set, write 0; if set, keep it ──
-    // The portal sends '' when untouched. We treat '' as 0 so cells are never blank.
+    // ── Normalise a value — '' / undefined / null → 0; any number → that number ──
     function v(val) {
-      if (val === 1) return 1;
-      if (val === 0) return 0;
-      return 0;   // '' / undefined / null → 0
+      if (val === null || val === undefined || val === '') return 0;
+      var n = Number(val);
+      return isNaN(n) ? 0 : n;
     }
 
     // ── Band sheet helpers ────────────────────────────────────────────────
@@ -5105,7 +5104,7 @@ function buildParadeRow(m, rec) {
     +   '<div class="att-member-name">' + m.name + '</div>'
     +   '<div class="att-member-sub">' + (m.rank||'') + (m.squad?' · '+m.squad:'') + '</div>'
     +   '<div style="margin-top:5px;display:inline-block;background:' + ptColor + '22;border:1px solid ' + ptColor + '55;border-radius:20px;padding:2px 10px;">'
-    +     '<span style="font-family:\'Oswald\',sans-serif;font-size:13px;font-weight:700;color:' + ptColor + ';">' + pts + ' / 8 pts</span>'
+    +     '<span data-pts-badge style="font-family:\'Oswald\',sans-serif;font-size:13px;font-weight:700;color:' + ptColor + ';">' + pts + ' / 8 pts</span>'
     +   '</div>'
     +   '<div style="margin-top:7px;">'
     +     '<input type="text" class="att-remarks-input" data-ic="' + m.ic + '" value="' + rmk + '" placeholder="Remarks..." '
@@ -5130,11 +5129,30 @@ function attachBandListeners() {
   var c = document.getElementById('att-morning-list'); if (!c) return;
   c.querySelectorAll('.att-btn[data-field]').forEach(function(btn) {
     btn.addEventListener('click', function() {
-      var ic = btn.getAttribute('data-ic'), field = btn.getAttribute('data-field'), val = parseInt(btn.getAttribute('data-val'));
+      var ic    = btn.getAttribute('data-ic');
+      var field = btn.getAttribute('data-field');
+      var val   = parseInt(btn.getAttribute('data-val'));
       if (!_attRecords[ic]) _attRecords[ic] = {};
-      _attRecords[ic][field] = _attRecords[ic][field] === val ? '' : val;
-      if (field === 'bandLeave' && _attRecords[ic][field] === 1) { _attRecords[ic].bandOpen = ''; _attRecords[ic].bandDismiss = ''; }
-      if ((field === 'bandOpen' || field === 'bandDismiss') && val === 1) _attRecords[ic].bandLeave = 0;
+      var rec = _attRecords[ic];
+
+      // Toggle: clicking same value again clears it
+      var newVal = rec[field] === val ? '' : val;
+      rec[field] = newVal;
+
+      // Mutual exclusion — leave vs opening/dismissal
+      if (field === 'bandLeave') {
+        if (newVal === 1) {
+          // Leave on → clear opening & dismissal
+          rec.bandOpen    = '';
+          rec.bandDismiss = '';
+        }
+      } else if (field === 'bandOpen' || field === 'bandDismiss') {
+        if (newVal === 1) {
+          // Marking present → clear leave
+          rec.bandLeave = '';
+        }
+      }
+
       renderAttMorningList(); updateAttSummary('morning');
     });
   });
@@ -5143,11 +5161,36 @@ function attachParadeListeners() {
   var c = document.getElementById('att-afternoon-list'); if (!c) return;
   c.querySelectorAll('.att-btn[data-field]').forEach(function(btn) {
     btn.addEventListener('click', function() {
-      var ic = btn.getAttribute('data-ic'), field = btn.getAttribute('data-field'), val = parseInt(btn.getAttribute('data-val'));
+      var ic    = btn.getAttribute('data-ic');
+      var field = btn.getAttribute('data-field');
+      var val   = parseInt(btn.getAttribute('data-val'));
       if (!_attRecords[ic]) _attRecords[ic] = {};
-      _attRecords[ic][field] = _attRecords[ic][field] === val ? '' : val;
-      if (field === 'paradeLeave' && _attRecords[ic][field] === 1) { _attRecords[ic].paradeOpen = ''; _attRecords[ic].paradeDismiss = ''; _attRecords[ic].uniform = 0; }
-      if ((field === 'paradeOpen' || field === 'paradeDismiss') && val === 1) _attRecords[ic].paradeLeave = 0;
+      var rec = _attRecords[ic];
+
+      // Toggle: clicking same value again clears it
+      var newVal = rec[field] === val ? '' : val;
+      rec[field] = newVal;
+
+      // Mutual exclusion — leave vs opening/dismissal
+      if (field === 'paradeLeave') {
+        if (newVal === 1) {
+          // Leave on → clear opening, dismissal, uniform
+          rec.paradeOpen    = '';
+          rec.paradeDismiss = '';
+          rec.uniform       = 0;
+        }
+      } else if (field === 'paradeOpen' || field === 'paradeDismiss') {
+        if (newVal === 1) {
+          // Marking present → clear leave
+          rec.paradeLeave = '';
+        } else {
+          // Un-marking present — if both are now unset, reset uniform too
+          if (rec.paradeOpen !== 1 && rec.paradeDismiss !== 1) {
+            rec.uniform = 0;
+          }
+        }
+      }
+
       renderAttAfternoonList(); updateAttSummary('afternoon');
     });
   });
@@ -5156,7 +5199,23 @@ function attachParadeListeners() {
       var ic = inp.getAttribute('data-ic');
       if (!_attRecords[ic]) _attRecords[ic] = {};
       var v = Math.min(6, Math.max(0, parseInt(inp.value) || 0));
-      inp.value = v; _attRecords[ic].uniform = v;
+      inp.value = v;
+      _attRecords[ic].uniform = v;
+      // Update the pts badge for this member in-place (avoid full re-render which kills focus)
+      var row = inp.closest('.att-member-row');
+      if (row) {
+        var rec = _attRecords[ic] || {};
+        var pts = calcParadePts(rec);
+        var ptColor = pts >= 7 ? '#66bb6a' : pts >= 4 ? '#e8b830' : '#ef5350';
+        var badge = row.querySelector('[data-pts-badge]');
+        if (badge) {
+          badge.textContent = pts + ' / 8 pts';
+          badge.style.color = ptColor;
+          badge.parentElement.style.background = ptColor + '22';
+          badge.parentElement.style.borderColor = ptColor + '55';
+        }
+      }
+      updateAttSummary('afternoon');
     });
   });
   c.querySelectorAll('.att-remarks-input').forEach(function(inp) {
@@ -5443,9 +5502,18 @@ async function addAttWeek() {
 }
 async function deleteAttWeek(idx) {
   var weeks = await attGetConfig(ATT_WEEKS_KEY) || [];
-  if (!weeks[idx] || !confirm('Remove "'+weeks[idx].label+'"?')) return;
-  weeks.splice(idx,1);
+  if (!weeks[idx]) return;
+  var label = weeks[idx].label;
+  if (!confirm('Remove "' + label + '"?\n\nAttendance data for this week will be deleted from the portal (sheets are unaffected).')) return;
+  // Remove from weeks list
+  weeks.splice(idx, 1);
   await attSaveConfig(ATT_WEEKS_KEY, weeks);
+  // Remove attendance records for this week
+  var allData = await attGetConfig(ATT_DATA_KEY) || {};
+  if (allData[label]) { delete allData[label]; await attSaveConfig(ATT_DATA_KEY, allData); }
+  // Remove parade config for this week
+  var pCfg = await attGetConfig(ATT_PARADE_KEY) || {};
+  if (pCfg[label]) { delete pCfg[label]; await attSaveConfig(ATT_PARADE_KEY, pCfg); }
   renderAttWeeksAdmin();
 }
 
